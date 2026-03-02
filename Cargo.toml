@@ -1,0 +1,17 @@
+[package]
+name = "dithr"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "GPL-3.0-only"
+description = "Buffer-first dithering and halftoning algorithms."
+
+[features]
+default = ["std"]
+std = []
+serde = ["dep:serde"]
+rayon = ["dep:rayon"]
+
+[dependencies]
+rayon = { version = "1.11.0", optional = true }
+serde = { version = "1.0.219", features = ["derive"], optional = true }

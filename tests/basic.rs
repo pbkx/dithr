@@ -1,4 +1,4 @@
-use dithr::{Buffer, BufferError, PixelFormat};
+use dithr::{Buffer, BufferError, IndexedImage, Palette, PaletteError, PixelFormat};
 
 #[test]
 fn buffer_validate_gray_ok() {
@@ -110,4 +110,58 @@ fn buffer_row_returns_correct_slice() {
     };
 
     assert_eq!(buffer.row(1), &[4, 5, 6, 7]);
+}
+
+#[test]
+fn palette_accepts_single_color() {
+    let palette = Palette::new(vec![[10, 20, 30]]).expect("single color palette should be valid");
+
+    assert_eq!(palette.len(), 1);
+    assert!(!palette.is_empty());
+    assert_eq!(palette.as_slice(), &[[10, 20, 30]]);
+    assert_eq!(palette.get(0), Some([10, 20, 30]));
+}
+
+#[test]
+fn palette_accepts_256_colors() {
+    let colors: Vec<[u8; 3]> = (0..256).map(|value| [value as u8, 0, 0]).collect();
+    let palette = Palette::new(colors).expect("256 color palette should be valid");
+
+    assert_eq!(palette.len(), 256);
+}
+
+#[test]
+fn palette_rejects_empty() {
+    assert_eq!(Palette::new(vec![]), Err(PaletteError::Empty));
+}
+
+#[test]
+fn palette_rejects_257_colors() {
+    let colors = vec![[0, 0, 0]; 257];
+
+    assert_eq!(Palette::new(colors), Err(PaletteError::TooLarge));
+}
+
+#[test]
+fn palette_nearest_rgb_returns_exact_index_for_member() {
+    let palette = Palette::new(vec![[0, 0, 0], [10, 20, 30], [255, 255, 255]])
+        .expect("palette should be valid");
+
+    assert_eq!(palette.nearest_rgb([10, 20, 30]), 1);
+}
+
+#[test]
+fn indexed_image_stores_dimensions_and_palette() {
+    let palette = Palette::new(vec![[0, 0, 0], [255, 255, 255]]).expect("palette should be valid");
+    let image = IndexedImage {
+        indices: vec![0, 1, 1, 0],
+        width: 2,
+        height: 2,
+        palette: palette.clone(),
+    };
+
+    assert_eq!(image.indices, vec![0, 1, 1, 0]);
+    assert_eq!(image.width, 2);
+    assert_eq!(image.height, 2);
+    assert_eq!(image.palette, palette);
 }

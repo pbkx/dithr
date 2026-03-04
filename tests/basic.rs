@@ -1,4 +1,7 @@
-use dithr::{Buffer, BufferError, IndexedImage, Palette, PaletteError, PixelFormat};
+use dithr::{
+    quantize_error, quantize_gray_u8, quantize_pixel, quantize_rgb_u8, Buffer, BufferError,
+    IndexedImage, Palette, PaletteError, PixelFormat, QuantizeMode,
+};
 
 #[test]
 fn buffer_validate_gray_ok() {
@@ -164,4 +167,75 @@ fn indexed_image_stores_dimensions_and_palette() {
     assert_eq!(image.width, 2);
     assert_eq!(image.height, 2);
     assert_eq!(image.palette, palette);
+}
+
+#[test]
+fn quantize_gray_1bit_binary_only() {
+    for value in 0_u16..=255 {
+        let quantized = quantize_gray_u8(value as u8, 1);
+        assert!(quantized == 0 || quantized == 255);
+    }
+
+    assert_eq!(quantize_gray_u8(127, 1), 0);
+    assert_eq!(quantize_gray_u8(128, 1), 255);
+}
+
+#[test]
+fn quantize_gray_8bit_identity() {
+    for value in 0_u16..=255 {
+        let input = value as u8;
+        assert_eq!(quantize_gray_u8(input, 8), input);
+    }
+}
+
+#[test]
+fn quantize_rgb_1bit_channels_binary_only() {
+    let quantized = quantize_rgb_u8([1, 127, 128], 1);
+
+    assert_eq!(quantized, [0, 0, 255]);
+    for channel in quantized {
+        assert!(channel == 0 || channel == 255);
+    }
+}
+
+#[test]
+fn quantize_palette_output_is_palette_member() {
+    let palette =
+        Palette::new(vec![[0, 0, 0], [120, 120, 120], [255, 255, 255]]).expect("valid palette");
+    let quantized = quantize_pixel(
+        PixelFormat::Rgb8,
+        &[100, 110, 120],
+        QuantizeMode::Palette(&palette),
+    );
+    let rgb = [quantized[0], quantized[1], quantized[2]];
+
+    assert!(palette.as_slice().contains(&rgb));
+}
+
+#[test]
+fn quantize_single_color_uses_fg_or_black_only() {
+    let fg = [12, 180, 90];
+    let mode = QuantizeMode::SingleColor { fg, bits: 3 };
+
+    for value in 0_u16..=255 {
+        let quantized = quantize_pixel(PixelFormat::Gray8, &[value as u8], mode);
+        let rgb = [quantized[0], quantized[1], quantized[2]];
+        assert!(rgb == [0, 0, 0] || rgb == fg);
+    }
+
+    assert_eq!(
+        quantize_pixel(PixelFormat::Gray8, &[0], mode),
+        [0, 0, 0, 255]
+    );
+    assert_eq!(
+        quantize_pixel(PixelFormat::Gray8, &[255], mode),
+        [fg[0], fg[1], fg[2], 255]
+    );
+}
+
+#[test]
+fn quantize_error_sign_and_magnitude_correct() {
+    let error = quantize_error(&[10, 200, 50, 255], &[20, 180, 60, 200]);
+
+    assert_eq!(error, [-10, 20, -10, 55]);
 }

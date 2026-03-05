@@ -1,3 +1,5 @@
+use crate::math::color::rgb_distance_sq;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Palette {
     colors: Vec<[u8; 3]>,
@@ -68,13 +70,4 @@ impl Palette {
 
         best_idx
     }
-}
-
-#[must_use]
-fn rgb_distance_sq(a: [u8; 3], b: [u8; 3]) -> u32 {
-    let dr = i32::from(a[0]) - i32::from(b[0]);
-    let dg = i32::from(a[1]) - i32::from(b[1]);
-    let db = i32::from(a[2]) - i32::from(b[2]);
-
-    (dr * dr + dg * dg + db * db) as u32
 }

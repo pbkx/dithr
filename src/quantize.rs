@@ -1,4 +1,4 @@
-use crate::{Palette, PixelFormat};
+use crate::{math::color::luma_u8, Palette, PixelFormat};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QuantizeMode<'a> {
@@ -90,10 +90,4 @@ fn pixel_rgb_alpha(format: PixelFormat, pixel: &[u8]) -> ([u8; 3], u8) {
             ([pixel[0], pixel[1], pixel[2]], pixel[3])
         }
     }
-}
-
-#[must_use]
-fn luma_u8(rgb: [u8; 3]) -> u8 {
-    ((77_u32 * u32::from(rgb[0]) + 150_u32 * u32::from(rgb[1]) + 29_u32 * u32::from(rgb[2]) + 128)
-        >> 8) as u8
 }

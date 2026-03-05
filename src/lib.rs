@@ -1,4 +1,5 @@
 pub mod buffer;
+pub mod math;
 pub mod palette;
 pub mod quantize;
 

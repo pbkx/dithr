@@ -1,7 +1,7 @@
 use dithr::{
     cga_palette, grayscale_16, grayscale_2, grayscale_4, quantize_error, quantize_gray_u8,
-    quantize_pixel, quantize_rgb_u8, Buffer, BufferError, IndexedImage, Palette, PaletteError,
-    PixelFormat, QuantizeMode,
+    quantize_pixel, quantize_rgb_u8, threshold_in_place, Buffer, BufferError, IndexedImage,
+    Palette, PaletteError, PixelFormat, QuantizeMode,
 };
 
 #[test]
@@ -268,4 +268,36 @@ fn built_in_palettes_construct_valid_palette() {
             Ok(palette.clone())
         );
     }
+}
+
+#[test]
+fn threshold_gray_threshold_127_splits_expected() {
+    let mut data = vec![0_u8, 64, 127, 128, 200, 255];
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 6,
+        height: 1,
+        stride: 6,
+        format: PixelFormat::Gray8,
+    };
+
+    threshold_in_place(&mut buffer, QuantizeMode::GrayBits(1), 127);
+
+    assert_eq!(data, vec![0, 0, 0, 255, 255, 255]);
+}
+
+#[test]
+fn threshold_rgb_uses_luma() {
+    let mut data = vec![255_u8, 0, 0, 0, 255, 0, 0, 0, 255];
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 3,
+        height: 1,
+        stride: 9,
+        format: PixelFormat::Rgb8,
+    };
+
+    threshold_in_place(&mut buffer, QuantizeMode::RgbBits(1), 127);
+
+    assert_eq!(data, vec![0, 0, 0, 255, 255, 255, 0, 0, 0]);
 }

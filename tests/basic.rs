@@ -1,6 +1,7 @@
 use dithr::{
-    quantize_error, quantize_gray_u8, quantize_pixel, quantize_rgb_u8, Buffer, BufferError,
-    IndexedImage, Palette, PaletteError, PixelFormat, QuantizeMode,
+    cga_palette, grayscale_16, grayscale_2, grayscale_4, quantize_error, quantize_gray_u8,
+    quantize_pixel, quantize_rgb_u8, Buffer, BufferError, IndexedImage, Palette, PaletteError,
+    PixelFormat, QuantizeMode,
 };
 
 #[test]
@@ -238,4 +239,33 @@ fn quantize_error_sign_and_magnitude_correct() {
     let error = quantize_error(&[10, 200, 50, 255], &[20, 180, 60, 200]);
 
     assert_eq!(error, [-10, 20, -10, 55]);
+}
+
+#[test]
+fn grayscale_2_has_len_2() {
+    assert_eq!(grayscale_2().len(), 2);
+}
+
+#[test]
+fn grayscale_4_has_len_4() {
+    assert_eq!(grayscale_4().len(), 4);
+}
+
+#[test]
+fn cga_palette_has_len_16() {
+    assert_eq!(cga_palette().len(), 16);
+}
+
+#[test]
+fn built_in_palettes_construct_valid_palette() {
+    let palettes = [grayscale_2(), grayscale_4(), grayscale_16(), cga_palette()];
+
+    for palette in palettes {
+        assert!(!palette.is_empty());
+        assert!(palette.len() <= 256);
+        assert_eq!(
+            Palette::new(palette.as_slice().to_vec()),
+            Ok(palette.clone())
+        );
+    }
 }

@@ -1,7 +1,7 @@
 use dithr::{
     cga_palette, grayscale_16, grayscale_2, grayscale_4, quantize_error, quantize_gray_u8,
-    quantize_pixel, quantize_rgb_u8, threshold_in_place, Buffer, BufferError, IndexedImage,
-    Palette, PaletteError, PixelFormat, QuantizeMode,
+    quantize_pixel, quantize_rgb_u8, random_in_place, threshold_in_place, Buffer, BufferError,
+    IndexedImage, Palette, PaletteError, PixelFormat, QuantizeMode,
 };
 
 #[test]
@@ -300,4 +300,57 @@ fn threshold_rgb_uses_luma() {
     threshold_in_place(&mut buffer, QuantizeMode::RgbBits(1), 127);
 
     assert_eq!(data, vec![0, 0, 0, 255, 255, 255, 0, 0, 0]);
+}
+
+#[test]
+fn random_same_seed_same_output() {
+    let source: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
+    let mut data_a = source.clone();
+    let mut data_b = source;
+
+    let mut buffer_a = Buffer {
+        data: &mut data_a,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::Gray8,
+    };
+    let mut buffer_b = Buffer {
+        data: &mut data_b,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::Gray8,
+    };
+
+    random_in_place(&mut buffer_a, QuantizeMode::GrayBits(1), 42, 64);
+    random_in_place(&mut buffer_b, QuantizeMode::GrayBits(1), 42, 64);
+
+    assert_eq!(data_a, data_b);
+}
+
+#[test]
+fn random_different_seed_different_output() {
+    let mut data_a = vec![127_u8; 64];
+    let mut data_b = vec![127_u8; 64];
+
+    let mut buffer_a = Buffer {
+        data: &mut data_a,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::Gray8,
+    };
+    let mut buffer_b = Buffer {
+        data: &mut data_b,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::Gray8,
+    };
+
+    random_in_place(&mut buffer_a, QuantizeMode::GrayBits(1), 1, 127);
+    random_in_place(&mut buffer_b, QuantizeMode::GrayBits(1), 2, 127);
+
+    assert_ne!(data_a, data_b);
 }

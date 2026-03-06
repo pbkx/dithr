@@ -1,4 +1,4 @@
-use dithr::{threshold_in_place, Buffer, PixelFormat, QuantizeMode};
+use dithr::{random_in_place, threshold_in_place, Buffer, PixelFormat, QuantizeMode};
 
 #[test]
 fn golden_threshold_gray_ramp_8x8() {
@@ -14,6 +14,22 @@ fn golden_threshold_gray_ramp_8x8() {
     threshold_in_place(&mut buffer, QuantizeMode::GrayBits(1), 127);
 
     assert_eq!(fnv1a64(&data), 4_864_876_028_568_798_213_u64);
+}
+
+#[test]
+fn golden_random_seed_1_gray_ramp_8x8() {
+    let mut data = gray_ramp_8x8();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::Gray8,
+    };
+
+    random_in_place(&mut buffer, QuantizeMode::GrayBits(1), 1, 64);
+
+    assert_eq!(fnv1a64(&data), 4_707_737_849_936_150_024_u64);
 }
 
 fn gray_ramp_8x8() -> Vec<u8> {

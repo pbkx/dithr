@@ -1,6 +1,11 @@
 use dithr::data::{
     generate_bayer_16x16, BAYER_2X2, BAYER_4X4, BAYER_8X8, CLUSTER_DOT_4X4, CLUSTER_DOT_8X8,
 };
+use dithr::ordered::{ordered_dither_in_place, ordered_threshold_for_xy};
+use dithr::{Buffer, Palette, PixelFormat, QuantizeMode};
+
+const BAYER_2X2_FLAT: [u8; 4] = [0, 2, 3, 1];
+const BAYER_4X4_FLAT: [u8; 16] = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 
 #[test]
 fn bayer_2x2_contains_unique_values() {
@@ -45,6 +50,145 @@ fn cluster_maps_have_expected_dimensions() {
     for row in CLUSTER_DOT_8X8 {
         assert_eq!(row.len(), 8);
     }
+}
+
+#[test]
+fn ordered_engine_gray_uses_only_quantized_values() {
+    let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::Gray8,
+    };
+
+    ordered_dither_in_place(
+        &mut buffer,
+        QuantizeMode::GrayBits(1),
+        &BAYER_2X2_FLAT,
+        2,
+        2,
+        64,
+    );
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn ordered_engine_rgb_palette_output_is_palette_member() {
+    let mut data = vec![
+        16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 24, 40, 56, 72, 88, 104, 120, 136,
+        152, 168, 184, 200, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 40, 56, 72, 88,
+        104, 120, 136, 152, 168, 184, 200, 216,
+    ];
+    let palette = Palette::new(vec![
+        [0, 0, 0],
+        [255, 255, 255],
+        [255, 0, 0],
+        [0, 255, 0],
+        [0, 0, 255],
+    ])
+    .expect("palette should be valid");
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 4,
+        height: 4,
+        stride: 12,
+        format: PixelFormat::Rgb8,
+    };
+
+    ordered_dither_in_place(
+        &mut buffer,
+        QuantizeMode::Palette(&palette),
+        &BAYER_4X4_FLAT,
+        4,
+        4,
+        64,
+    );
+
+    for chunk in data.chunks_exact(3) {
+        let rgb = [chunk[0], chunk[1], chunk[2]];
+        assert!(palette.as_slice().contains(&rgb));
+    }
+}
+
+#[test]
+fn ordered_engine_is_deterministic() {
+    let seed_data: Vec<u8> = (0_u16..120)
+        .map(|value| ((value * 13 + 7) % 256) as u8)
+        .collect();
+    let mut a = seed_data.clone();
+    let mut b = seed_data;
+
+    let mut buffer_a = Buffer {
+        data: &mut a,
+        width: 8,
+        height: 5,
+        stride: 24,
+        format: PixelFormat::Rgb8,
+    };
+    let mut buffer_b = Buffer {
+        data: &mut b,
+        width: 8,
+        height: 5,
+        stride: 24,
+        format: PixelFormat::Rgb8,
+    };
+
+    ordered_dither_in_place(
+        &mut buffer_a,
+        QuantizeMode::RgbBits(3),
+        &BAYER_4X4_FLAT,
+        4,
+        4,
+        40,
+    );
+    ordered_dither_in_place(
+        &mut buffer_b,
+        QuantizeMode::RgbBits(3),
+        &BAYER_4X4_FLAT,
+        4,
+        4,
+        40,
+    );
+
+    assert_eq!(a, b);
+}
+
+#[test]
+fn ordered_engine_preserves_alpha_channel() {
+    let mut data: Vec<u8> = (0_u16..80)
+        .map(|value| ((value * 19 + 11) % 256) as u8)
+        .collect();
+    let before_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 4,
+        height: 5,
+        stride: 16,
+        format: PixelFormat::Rgba8,
+    };
+
+    ordered_dither_in_place(
+        &mut buffer,
+        QuantizeMode::RgbBits(2),
+        &BAYER_2X2_FLAT,
+        2,
+        2,
+        48,
+    );
+
+    let after_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_alpha, after_alpha);
+}
+
+#[test]
+fn ordered_threshold_lookup_tiles_correctly() {
+    assert_eq!(ordered_threshold_for_xy(0, 0, &BAYER_2X2_FLAT, 2, 2), 0);
+    assert_eq!(ordered_threshold_for_xy(1, 0, &BAYER_2X2_FLAT, 2, 2), 2);
+    assert_eq!(ordered_threshold_for_xy(2, 0, &BAYER_2X2_FLAT, 2, 2), 0);
+    assert_eq!(ordered_threshold_for_xy(3, 3, &BAYER_2X2_FLAT, 2, 2), 1);
 }
 
 fn assert_unique_square_coverage_2(map: [[u8; 2]; 2]) {

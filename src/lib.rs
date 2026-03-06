@@ -1,6 +1,7 @@
 pub mod buffer;
 pub mod data;
 pub mod math;
+pub mod ordered;
 pub mod palette;
 pub mod quantize;
 

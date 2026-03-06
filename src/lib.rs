@@ -1,5 +1,6 @@
 pub mod buffer;
 pub mod data;
+pub mod diffusion;
 pub mod math;
 pub mod ordered;
 pub mod palette;

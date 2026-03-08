@@ -1,7 +1,7 @@
 pub(crate) mod core;
 
 use crate::{
-    data::{BAYER_2X2, BAYER_4X4},
+    data::{BAYER_2X2, BAYER_4X4, BAYER_8X8},
     Buffer, QuantizeMode,
 };
 
@@ -29,6 +29,72 @@ const BAYER_4X4_FLAT: [u8; 16] = [
     BAYER_4X4[3][2],
     BAYER_4X4[3][3],
 ];
+const BAYER_8X8_FLAT: [u8; 64] = [
+    BAYER_8X8[0][0],
+    BAYER_8X8[0][1],
+    BAYER_8X8[0][2],
+    BAYER_8X8[0][3],
+    BAYER_8X8[0][4],
+    BAYER_8X8[0][5],
+    BAYER_8X8[0][6],
+    BAYER_8X8[0][7],
+    BAYER_8X8[1][0],
+    BAYER_8X8[1][1],
+    BAYER_8X8[1][2],
+    BAYER_8X8[1][3],
+    BAYER_8X8[1][4],
+    BAYER_8X8[1][5],
+    BAYER_8X8[1][6],
+    BAYER_8X8[1][7],
+    BAYER_8X8[2][0],
+    BAYER_8X8[2][1],
+    BAYER_8X8[2][2],
+    BAYER_8X8[2][3],
+    BAYER_8X8[2][4],
+    BAYER_8X8[2][5],
+    BAYER_8X8[2][6],
+    BAYER_8X8[2][7],
+    BAYER_8X8[3][0],
+    BAYER_8X8[3][1],
+    BAYER_8X8[3][2],
+    BAYER_8X8[3][3],
+    BAYER_8X8[3][4],
+    BAYER_8X8[3][5],
+    BAYER_8X8[3][6],
+    BAYER_8X8[3][7],
+    BAYER_8X8[4][0],
+    BAYER_8X8[4][1],
+    BAYER_8X8[4][2],
+    BAYER_8X8[4][3],
+    BAYER_8X8[4][4],
+    BAYER_8X8[4][5],
+    BAYER_8X8[4][6],
+    BAYER_8X8[4][7],
+    BAYER_8X8[5][0],
+    BAYER_8X8[5][1],
+    BAYER_8X8[5][2],
+    BAYER_8X8[5][3],
+    BAYER_8X8[5][4],
+    BAYER_8X8[5][5],
+    BAYER_8X8[5][6],
+    BAYER_8X8[5][7],
+    BAYER_8X8[6][0],
+    BAYER_8X8[6][1],
+    BAYER_8X8[6][2],
+    BAYER_8X8[6][3],
+    BAYER_8X8[6][4],
+    BAYER_8X8[6][5],
+    BAYER_8X8[6][6],
+    BAYER_8X8[6][7],
+    BAYER_8X8[7][0],
+    BAYER_8X8[7][1],
+    BAYER_8X8[7][2],
+    BAYER_8X8[7][3],
+    BAYER_8X8[7][4],
+    BAYER_8X8[7][5],
+    BAYER_8X8[7][6],
+    BAYER_8X8[7][7],
+];
 const DEFAULT_STRENGTH: i16 = 64;
 
 #[doc(hidden)]
@@ -55,4 +121,8 @@ pub fn bayer_2x2_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
 
 pub fn bayer_4x4_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
     ordered_dither_in_place(buffer, mode, &BAYER_4X4_FLAT, 4, 4, DEFAULT_STRENGTH);
+}
+
+pub fn bayer_8x8_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
+    ordered_dither_in_place(buffer, mode, &BAYER_8X8_FLAT, 8, 8, DEFAULT_STRENGTH);
 }

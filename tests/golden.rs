@@ -1,6 +1,6 @@
 use dithr::{
-    bayer_2x2_in_place, bayer_4x4_in_place, random_in_place, threshold_in_place, Buffer,
-    PixelFormat, QuantizeMode,
+    bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place, random_in_place,
+    threshold_in_place, Buffer, PixelFormat, QuantizeMode,
 };
 
 #[test]
@@ -67,8 +67,28 @@ fn golden_bayer_4x4_gray_ramp_8x8() {
     assert_eq!(fnv1a64(&data), 5_176_068_339_558_256_461_u64);
 }
 
+#[test]
+fn golden_bayer_8x8_gray_ramp_16x16() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+
+    bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+
+    assert_eq!(fnv1a64(&data), 1_956_760_498_679_199_251_u64);
+}
+
 fn gray_ramp_8x8() -> Vec<u8> {
     (0_u16..64).map(|value| (value * 4) as u8).collect()
+}
+
+fn gray_ramp_16x16() -> Vec<u8> {
+    (0_u16..256).map(|value| value as u8).collect()
 }
 
 fn fnv1a64(bytes: &[u8]) -> u64 {

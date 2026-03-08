@@ -2,7 +2,7 @@ use dithr::data::{
     generate_bayer_16x16, BAYER_2X2, BAYER_4X4, BAYER_8X8, CLUSTER_DOT_4X4, CLUSTER_DOT_8X8,
 };
 use dithr::ordered::{ordered_dither_in_place, ordered_threshold_for_xy};
-use dithr::{bayer_2x2_in_place, Buffer, Palette, PixelFormat, QuantizeMode};
+use dithr::{bayer_2x2_in_place, bayer_4x4_in_place, Buffer, Palette, PixelFormat, QuantizeMode};
 
 const BAYER_2X2_FLAT: [u8; 4] = [0, 2, 3, 1];
 const BAYER_4X4_FLAT: [u8; 16] = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
@@ -66,6 +66,32 @@ fn bayer_2x2_quantizes_only_to_allowed_values() {
     bayer_2x2_in_place(&mut buffer, QuantizeMode::GrayBits(1));
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn bayer_4x4_periodicity_matches_4() {
+    let mut data = vec![127_u8; 64];
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::Gray8,
+    };
+
+    bayer_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+
+    for y in 0..8 {
+        for x in 0..4 {
+            assert_eq!(data[y * 8 + x], data[y * 8 + x + 4]);
+        }
+    }
+
+    for y in 0..4 {
+        for x in 0..8 {
+            assert_eq!(data[y * 8 + x], data[(y + 4) * 8 + x]);
+        }
+    }
 }
 
 #[test]

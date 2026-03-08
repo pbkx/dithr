@@ -3,8 +3,8 @@ use dithr::data::{
 };
 use dithr::ordered::{ordered_dither_in_place, ordered_threshold_for_xy};
 use dithr::{
-    bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place, Buffer, Palette, PixelFormat,
-    QuantizeMode,
+    bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place, Buffer,
+    Palette, PixelFormat, QuantizeMode,
 };
 
 const BAYER_2X2_FLAT: [u8; 4] = [0, 2, 3, 1];
@@ -121,6 +121,23 @@ fn bayer_8x8_periodicity_matches_8() {
             assert_eq!(data[y * 16 + x], data[(y + 8) * 16 + x]);
         }
     }
+}
+
+#[test]
+fn bayer_16x16_runs_on_16x16_without_panic() {
+    let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+
+    bayer_16x16_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+
+    assert_eq!(data.len(), 256);
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
 
 #[test]

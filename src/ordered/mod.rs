@@ -1,7 +1,7 @@
 pub(crate) mod core;
 
 use crate::{
-    data::{generate_bayer_16x16, BAYER_2X2, BAYER_4X4, BAYER_8X8},
+    data::{generate_bayer_16x16, BAYER_2X2, BAYER_4X4, BAYER_8X8, CLUSTER_DOT_4X4},
     Buffer, QuantizeMode,
 };
 use std::sync::OnceLock;
@@ -96,6 +96,24 @@ const BAYER_8X8_FLAT: [u8; 64] = [
     BAYER_8X8[7][6],
     BAYER_8X8[7][7],
 ];
+const CLUSTER_DOT_4X4_FLAT: [u8; 16] = [
+    CLUSTER_DOT_4X4[0][0],
+    CLUSTER_DOT_4X4[0][1],
+    CLUSTER_DOT_4X4[0][2],
+    CLUSTER_DOT_4X4[0][3],
+    CLUSTER_DOT_4X4[1][0],
+    CLUSTER_DOT_4X4[1][1],
+    CLUSTER_DOT_4X4[1][2],
+    CLUSTER_DOT_4X4[1][3],
+    CLUSTER_DOT_4X4[2][0],
+    CLUSTER_DOT_4X4[2][1],
+    CLUSTER_DOT_4X4[2][2],
+    CLUSTER_DOT_4X4[2][3],
+    CLUSTER_DOT_4X4[3][0],
+    CLUSTER_DOT_4X4[3][1],
+    CLUSTER_DOT_4X4[3][2],
+    CLUSTER_DOT_4X4[3][3],
+];
 static BAYER_16X16_FLAT: OnceLock<[u8; 256]> = OnceLock::new();
 const DEFAULT_STRENGTH: i16 = 64;
 
@@ -131,6 +149,10 @@ pub fn bayer_8x8_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
 
 pub fn bayer_16x16_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
     ordered_dither_in_place(buffer, mode, bayer_16x16_flat(), 16, 16, DEFAULT_STRENGTH);
+}
+
+pub fn cluster_dot_4x4_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
+    ordered_dither_in_place(buffer, mode, &CLUSTER_DOT_4X4_FLAT, 4, 4, DEFAULT_STRENGTH);
 }
 
 fn bayer_16x16_flat() -> &'static [u8; 256] {

@@ -4,7 +4,8 @@ use dithr::data::{
 use dithr::ordered::{ordered_dither_in_place, ordered_threshold_for_xy};
 use dithr::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
-    cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
+    cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place, Buffer,
+    OrderedError, Palette, PixelFormat, QuantizeMode,
 };
 
 const BAYER_2X2_FLAT: [u8; 4] = [0, 2, 3, 1];
@@ -170,6 +171,73 @@ fn cluster_dot_8x8_runs_and_quantizes() {
     cluster_dot_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1));
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn custom_ordered_rejects_empty_map() {
+    let mut data = vec![0_u8; 4];
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 2,
+        height: 2,
+        stride: 2,
+        format: PixelFormat::Gray8,
+    };
+
+    let result = custom_ordered_in_place(&mut buffer, QuantizeMode::GrayBits(1), &[], 0, 0, 64);
+
+    assert_eq!(result, Err(OrderedError::EmptyMap));
+}
+
+#[test]
+fn custom_ordered_rejects_bad_dimensions() {
+    let mut data = vec![0_u8; 4];
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 2,
+        height: 2,
+        stride: 2,
+        format: PixelFormat::Gray8,
+    };
+
+    let map = [0_u8, 1, 2];
+    let result = custom_ordered_in_place(&mut buffer, QuantizeMode::GrayBits(1), &map, 2, 2, 64);
+
+    assert_eq!(result, Err(OrderedError::InvalidDimensions));
+}
+
+#[test]
+fn custom_ordered_2x2_matches_manual_small_case() {
+    let mut data_a: Vec<u8> = (0_u8..16).map(|value| value.saturating_mul(16)).collect();
+    let mut data_b = data_a.clone();
+
+    let mut buffer_a = Buffer {
+        data: &mut data_a,
+        width: 4,
+        height: 4,
+        stride: 4,
+        format: PixelFormat::Gray8,
+    };
+    let mut buffer_b = Buffer {
+        data: &mut data_b,
+        width: 4,
+        height: 4,
+        stride: 4,
+        format: PixelFormat::Gray8,
+    };
+
+    custom_ordered_in_place(
+        &mut buffer_a,
+        QuantizeMode::GrayBits(1),
+        &BAYER_2X2_FLAT,
+        2,
+        2,
+        64,
+    )
+    .expect("custom ordered dither should succeed");
+    bayer_2x2_in_place(&mut buffer_b, QuantizeMode::GrayBits(1));
+
+    assert_eq!(data_a, data_b);
 }
 
 #[test]

@@ -185,6 +185,13 @@ const CLUSTER_DOT_8X8_FLAT: [u8; 64] = [
 static BAYER_16X16_FLAT: OnceLock<[u8; 256]> = OnceLock::new();
 const DEFAULT_STRENGTH: i16 = 64;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OrderedError {
+    EmptyMap,
+    InvalidDimensions,
+    ValueOutOfRange,
+}
+
 #[doc(hidden)]
 pub fn ordered_dither_in_place(
     buffer: &mut Buffer<'_>,
@@ -225,6 +232,33 @@ pub fn cluster_dot_4x4_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>)
 
 pub fn cluster_dot_8x8_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
     ordered_dither_in_place(buffer, mode, &CLUSTER_DOT_8X8_FLAT, 8, 8, DEFAULT_STRENGTH);
+}
+
+pub fn custom_ordered_in_place(
+    buffer: &mut Buffer<'_>,
+    mode: QuantizeMode<'_>,
+    map: &[u8],
+    map_w: usize,
+    map_h: usize,
+    strength: i16,
+) -> Result<(), OrderedError> {
+    if map.is_empty() {
+        return Err(OrderedError::EmptyMap);
+    }
+
+    let expected_len = map_w
+        .checked_mul(map_h)
+        .ok_or(OrderedError::InvalidDimensions)?;
+    if expected_len == 0 || expected_len != map.len() {
+        return Err(OrderedError::InvalidDimensions);
+    }
+
+    if map.iter().any(|&value| usize::from(value) >= map.len()) {
+        return Err(OrderedError::ValueOutOfRange);
+    }
+
+    ordered_dither_in_place(buffer, mode, map, map_w, map_h, strength);
+    Ok(())
 }
 
 fn bayer_16x16_flat() -> &'static [u8; 256] {

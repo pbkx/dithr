@@ -1,7 +1,7 @@
 use dithr::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
-    cluster_dot_4x4_in_place, random_in_place, threshold_in_place, Buffer, PixelFormat,
-    QuantizeMode,
+    cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, random_in_place, threshold_in_place,
+    Buffer, PixelFormat, QuantizeMode,
 };
 
 #[test]
@@ -114,6 +114,22 @@ fn golden_cluster_dot_4x4_gray_ramp_8x8() {
     cluster_dot_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1));
 
     assert_eq!(fnv1a64(&data), 9_783_687_876_575_450_447_u64);
+}
+
+#[test]
+fn golden_cluster_dot_8x8_gray_ramp_16x16() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+
+    cluster_dot_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+
+    assert_eq!(fnv1a64(&data), 15_436_130_700_200_729_221_u64);
 }
 
 fn gray_ramp_8x8() -> Vec<u8> {

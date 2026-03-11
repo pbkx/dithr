@@ -4,7 +4,7 @@ use dithr::data::{
 use dithr::ordered::{ordered_dither_in_place, ordered_threshold_for_xy};
 use dithr::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
-    cluster_dot_4x4_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
+    cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
 };
 
 const BAYER_2X2_FLAT: [u8; 4] = [0, 2, 3, 1];
@@ -152,6 +152,22 @@ fn cluster_dot_4x4_runs_and_quantizes() {
     };
 
     cluster_dot_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn cluster_dot_8x8_runs_and_quantizes() {
+    let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+
+    cluster_dot_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1));
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }

@@ -1,7 +1,9 @@
 pub(crate) mod core;
 
 use crate::{
-    data::{generate_bayer_16x16, BAYER_2X2, BAYER_4X4, BAYER_8X8, CLUSTER_DOT_4X4},
+    data::{
+        generate_bayer_16x16, BAYER_2X2, BAYER_4X4, BAYER_8X8, CLUSTER_DOT_4X4, CLUSTER_DOT_8X8,
+    },
     Buffer, QuantizeMode,
 };
 use std::sync::OnceLock;
@@ -114,6 +116,72 @@ const CLUSTER_DOT_4X4_FLAT: [u8; 16] = [
     CLUSTER_DOT_4X4[3][2],
     CLUSTER_DOT_4X4[3][3],
 ];
+const CLUSTER_DOT_8X8_FLAT: [u8; 64] = [
+    CLUSTER_DOT_8X8[0][0],
+    CLUSTER_DOT_8X8[0][1],
+    CLUSTER_DOT_8X8[0][2],
+    CLUSTER_DOT_8X8[0][3],
+    CLUSTER_DOT_8X8[0][4],
+    CLUSTER_DOT_8X8[0][5],
+    CLUSTER_DOT_8X8[0][6],
+    CLUSTER_DOT_8X8[0][7],
+    CLUSTER_DOT_8X8[1][0],
+    CLUSTER_DOT_8X8[1][1],
+    CLUSTER_DOT_8X8[1][2],
+    CLUSTER_DOT_8X8[1][3],
+    CLUSTER_DOT_8X8[1][4],
+    CLUSTER_DOT_8X8[1][5],
+    CLUSTER_DOT_8X8[1][6],
+    CLUSTER_DOT_8X8[1][7],
+    CLUSTER_DOT_8X8[2][0],
+    CLUSTER_DOT_8X8[2][1],
+    CLUSTER_DOT_8X8[2][2],
+    CLUSTER_DOT_8X8[2][3],
+    CLUSTER_DOT_8X8[2][4],
+    CLUSTER_DOT_8X8[2][5],
+    CLUSTER_DOT_8X8[2][6],
+    CLUSTER_DOT_8X8[2][7],
+    CLUSTER_DOT_8X8[3][0],
+    CLUSTER_DOT_8X8[3][1],
+    CLUSTER_DOT_8X8[3][2],
+    CLUSTER_DOT_8X8[3][3],
+    CLUSTER_DOT_8X8[3][4],
+    CLUSTER_DOT_8X8[3][5],
+    CLUSTER_DOT_8X8[3][6],
+    CLUSTER_DOT_8X8[3][7],
+    CLUSTER_DOT_8X8[4][0],
+    CLUSTER_DOT_8X8[4][1],
+    CLUSTER_DOT_8X8[4][2],
+    CLUSTER_DOT_8X8[4][3],
+    CLUSTER_DOT_8X8[4][4],
+    CLUSTER_DOT_8X8[4][5],
+    CLUSTER_DOT_8X8[4][6],
+    CLUSTER_DOT_8X8[4][7],
+    CLUSTER_DOT_8X8[5][0],
+    CLUSTER_DOT_8X8[5][1],
+    CLUSTER_DOT_8X8[5][2],
+    CLUSTER_DOT_8X8[5][3],
+    CLUSTER_DOT_8X8[5][4],
+    CLUSTER_DOT_8X8[5][5],
+    CLUSTER_DOT_8X8[5][6],
+    CLUSTER_DOT_8X8[5][7],
+    CLUSTER_DOT_8X8[6][0],
+    CLUSTER_DOT_8X8[6][1],
+    CLUSTER_DOT_8X8[6][2],
+    CLUSTER_DOT_8X8[6][3],
+    CLUSTER_DOT_8X8[6][4],
+    CLUSTER_DOT_8X8[6][5],
+    CLUSTER_DOT_8X8[6][6],
+    CLUSTER_DOT_8X8[6][7],
+    CLUSTER_DOT_8X8[7][0],
+    CLUSTER_DOT_8X8[7][1],
+    CLUSTER_DOT_8X8[7][2],
+    CLUSTER_DOT_8X8[7][3],
+    CLUSTER_DOT_8X8[7][4],
+    CLUSTER_DOT_8X8[7][5],
+    CLUSTER_DOT_8X8[7][6],
+    CLUSTER_DOT_8X8[7][7],
+];
 static BAYER_16X16_FLAT: OnceLock<[u8; 256]> = OnceLock::new();
 const DEFAULT_STRENGTH: i16 = 64;
 
@@ -153,6 +221,10 @@ pub fn bayer_16x16_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
 
 pub fn cluster_dot_4x4_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
     ordered_dither_in_place(buffer, mode, &CLUSTER_DOT_4X4_FLAT, 4, 4, DEFAULT_STRENGTH);
+}
+
+pub fn cluster_dot_8x8_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
+    ordered_dither_in_place(buffer, mode, &CLUSTER_DOT_8X8_FLAT, 8, 8, DEFAULT_STRENGTH);
 }
 
 fn bayer_16x16_flat() -> &'static [u8; 256] {

@@ -78,6 +78,76 @@ pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
     }
 }
 
+pub(crate) fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
+    buffer
+        .validate()
+        .expect("buffer must be valid for yliluoma algorithm 2");
+
+    let colors = palette.as_slice();
+    assert!(!colors.is_empty(), "palette must not be empty");
+
+    let width = buffer.width;
+    let height = buffer.height;
+    let format = buffer.format;
+    let bpp = format.bytes_per_pixel();
+    let mut cache = HashMap::<u32, Vec<usize>>::new();
+    let palette_luma: Vec<u32> = colors
+        .iter()
+        .map(|color| {
+            u32::from(color[0]) * 299 + u32::from(color[1]) * 587 + u32::from(color[2]) * 114
+        })
+        .collect();
+
+    for y in 0..height {
+        let row = buffer.row_mut(y);
+
+        for x in 0..width {
+            let offset = x.checked_mul(bpp).expect("pixel offset overflow in row");
+            let source_rgb = match format {
+                PixelFormat::Gray8 => {
+                    let g = row[offset];
+                    [g, g, g]
+                }
+                PixelFormat::Rgb8 | PixelFormat::Rgba8 => {
+                    [row[offset], row[offset + 1], row[offset + 2]]
+                }
+            };
+            let key = pack_rgb(source_rgb);
+            let selected = {
+                let plan = cache
+                    .entry(key)
+                    .or_insert_with(|| devise_color_sequence(source_rgb, colors, &palette_luma));
+                let map_value = usize::from(BAYER_8X8[y % 8][x % 8]);
+                let plan_index = map_value
+                    .checked_mul(plan.len())
+                    .expect("plan index multiplication overflow")
+                    / usize::from(DITHER_LEVELS);
+
+                plan[plan_index]
+            };
+            let chosen = colors[selected];
+
+            match format {
+                PixelFormat::Gray8 => {
+                    row[offset] = luma_u8(chosen);
+                }
+                PixelFormat::Rgb8 => {
+                    row[offset] = chosen[0];
+                    row[offset + 1] = chosen[1];
+                    row[offset + 2] = chosen[2];
+                }
+                PixelFormat::Rgba8 => {
+                    let alpha = row[offset + 3];
+                    row[offset] = chosen[0];
+                    row[offset + 1] = chosen[1];
+                    row[offset + 2] = chosen[2];
+                    row[offset + 3] = alpha;
+                }
+            }
+        }
+    }
+}
+
 fn devise_best_mixing_plan(target: [u8; 3], palette: &[[u8; 3]]) -> MixingPlan {
     let mut best_plan = MixingPlan {
         first_index: 0,
@@ -104,6 +174,97 @@ fn devise_best_mixing_plan(target: [u8; 3], palette: &[[u8; 3]]) -> MixingPlan {
     }
 
     best_plan
+}
+
+fn devise_color_sequence(target: [u8; 3], palette: &[[u8; 3]], palette_luma: &[u32]) -> Vec<usize> {
+    let sequence_len = palette.len();
+    let mut result = Vec::with_capacity(sequence_len);
+    let mut proportion_total = 0_usize;
+    let mut so_far = [0_u32; 3];
+
+    while proportion_total < sequence_len {
+        let mut chosen_amount = 1_usize;
+        let mut chosen_index = 0_usize;
+        let max_test_count = proportion_total.max(1);
+        let mut least_penalty = f64::INFINITY;
+
+        for (index, &color) in palette.iter().enumerate() {
+            let mut sum = so_far;
+            let mut add = [
+                u32::from(color[0]),
+                u32::from(color[1]),
+                u32::from(color[2]),
+            ];
+            let mut amount = 1_usize;
+
+            while amount <= max_test_count {
+                for channel in 0..3 {
+                    sum[channel] = sum[channel]
+                        .checked_add(add[channel])
+                        .expect("sum channel overflow");
+                    add[channel] = add[channel]
+                        .checked_add(add[channel])
+                        .expect("add channel overflow");
+                }
+
+                let total = proportion_total
+                    .checked_add(amount)
+                    .expect("proportion total overflow");
+                let tested = [
+                    (sum[0] / u32::try_from(total).expect("total too large")) as u8,
+                    (sum[1] / u32::try_from(total).expect("total too large")) as u8,
+                    (sum[2] / u32::try_from(total).expect("total too large")) as u8,
+                ];
+                let penalty = color_compare_rgb_luma(target, tested);
+
+                if penalty < least_penalty {
+                    least_penalty = penalty;
+                    chosen_index = index;
+                    chosen_amount = amount;
+                }
+
+                amount = amount.checked_mul(2).expect("test amount overflow");
+            }
+        }
+
+        for _ in 0..chosen_amount {
+            if proportion_total >= sequence_len {
+                break;
+            }
+
+            result.push(chosen_index);
+            proportion_total += 1;
+        }
+
+        let chosen = palette[chosen_index];
+        let chosen_amount_u32 = u32::try_from(chosen_amount).expect("chosen amount too large");
+        so_far[0] = so_far[0]
+            .checked_add(u32::from(chosen[0]) * chosen_amount_u32)
+            .expect("so_far red overflow");
+        so_far[1] = so_far[1]
+            .checked_add(u32::from(chosen[1]) * chosen_amount_u32)
+            .expect("so_far green overflow");
+        so_far[2] = so_far[2]
+            .checked_add(u32::from(chosen[2]) * chosen_amount_u32)
+            .expect("so_far blue overflow");
+    }
+
+    result.sort_by_key(|&index| palette_luma[index]);
+    result
+}
+
+fn color_compare_rgb_luma(a: [u8; 3], b: [u8; 3]) -> f64 {
+    let luma_a = (f64::from(a[0]) * 299.0 + f64::from(a[1]) * 587.0 + f64::from(a[2]) * 114.0)
+        / (255.0 * 1000.0);
+    let luma_b = (f64::from(b[0]) * 299.0 + f64::from(b[1]) * 587.0 + f64::from(b[2]) * 114.0)
+        / (255.0 * 1000.0);
+    let luma_diff = luma_a - luma_b;
+    let diff_r = (f64::from(a[0]) - f64::from(b[0])) / 255.0;
+    let diff_g = (f64::from(a[1]) - f64::from(b[1])) / 255.0;
+    let diff_b = (f64::from(a[2]) - f64::from(b[2])) / 255.0;
+
+    (diff_r * diff_r * 0.299 + diff_g * diff_g * 0.587 + diff_b * diff_b * 0.114) * 0.75
+        + luma_diff * luma_diff
 }
 
 fn interpolate_rgb(a: [u8; 3], b: [u8; 3], ratio: u8, levels: u8) -> [u8; 3] {

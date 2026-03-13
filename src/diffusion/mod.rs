@@ -1,6 +1,9 @@
+pub mod classic;
 pub(crate) mod core;
 
 use crate::{data::ErrorKernel, Buffer, QuantizeMode};
+
+pub use classic::floyd_steinberg_in_place;
 
 #[doc(hidden)]
 pub fn error_diffuse_in_place(

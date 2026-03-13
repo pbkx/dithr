@@ -1,8 +1,8 @@
 use dithr::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
-    cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place, random_in_place,
-    threshold_in_place, yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place, Buffer,
-    Palette, PixelFormat, QuantizeMode,
+    cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
+    floyd_steinberg_in_place, random_in_place, threshold_in_place, yliluoma_1_in_place,
+    yliluoma_2_in_place, yliluoma_3_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
 };
 
 #[test]
@@ -230,6 +230,22 @@ fn golden_yliluoma_3_rgb_gradient_8x8() {
     yliluoma_3_in_place(&mut buffer, &palette);
 
     assert_eq!(fnv1a64(&data), 9_812_579_000_523_236_581_u64);
+}
+
+#[test]
+fn golden_floyd_steinberg_gray_ramp_16x16() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+
+    floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+
+    assert_eq!(fnv1a64(&data), 15_370_527_749_909_082_316_u64);
 }
 
 fn gray_ramp_8x8() -> Vec<u8> {

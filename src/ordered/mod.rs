@@ -1,10 +1,11 @@
 pub(crate) mod core;
+mod yliluoma;
 
 use crate::{
     data::{
         generate_bayer_16x16, BAYER_2X2, BAYER_4X4, BAYER_8X8, CLUSTER_DOT_4X4, CLUSTER_DOT_8X8,
     },
-    Buffer, QuantizeMode,
+    Buffer, Palette, QuantizeMode,
 };
 use std::sync::OnceLock;
 
@@ -259,6 +260,10 @@ pub fn custom_ordered_in_place(
 
     ordered_dither_in_place(buffer, mode, map, map_w, map_h, strength);
     Ok(())
+}
+
+pub fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
+    yliluoma::yliluoma_1_in_place(buffer, palette);
 }
 
 fn bayer_16x16_flat() -> &'static [u8; 256] {

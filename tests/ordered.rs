@@ -4,8 +4,8 @@ use dithr::data::{
 use dithr::ordered::{ordered_dither_in_place, ordered_threshold_for_xy};
 use dithr::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
-    cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place, Buffer,
-    OrderedError, Palette, PixelFormat, QuantizeMode,
+    cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
+    yliluoma_1_in_place, Buffer, OrderedError, Palette, PixelFormat, QuantizeMode,
 };
 
 const BAYER_2X2_FLAT: [u8; 4] = [0, 2, 3, 1];
@@ -241,6 +241,72 @@ fn custom_ordered_2x2_matches_manual_small_case() {
 }
 
 #[test]
+fn yliluoma_1_output_is_always_palette_member() {
+    let mut data = rgb_gradient_8x8_fixture();
+    let palette = Palette::new(vec![
+        [0, 0, 0],
+        [255, 255, 255],
+        [255, 0, 0],
+        [0, 255, 0],
+        [0, 0, 255],
+        [255, 255, 0],
+        [0, 255, 255],
+        [255, 0, 255],
+    ])
+    .expect("palette should be valid");
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 24,
+        format: PixelFormat::Rgb8,
+    };
+
+    yliluoma_1_in_place(&mut buffer, &palette);
+
+    for chunk in data.chunks_exact(3) {
+        let rgb = [chunk[0], chunk[1], chunk[2]];
+        assert!(palette.as_slice().contains(&rgb));
+    }
+}
+
+#[test]
+fn yliluoma_1_deterministic_rgb_fixture() {
+    let mut data_a = rgb_gradient_8x8_fixture();
+    let mut data_b = rgb_gradient_8x8_fixture();
+    let palette = Palette::new(vec![
+        [0, 0, 0],
+        [255, 255, 255],
+        [255, 0, 0],
+        [0, 255, 0],
+        [0, 0, 255],
+        [255, 255, 0],
+        [0, 255, 255],
+        [255, 0, 255],
+    ])
+    .expect("palette should be valid");
+    let mut buffer_a = Buffer {
+        data: &mut data_a,
+        width: 8,
+        height: 8,
+        stride: 24,
+        format: PixelFormat::Rgb8,
+    };
+    let mut buffer_b = Buffer {
+        data: &mut data_b,
+        width: 8,
+        height: 8,
+        stride: 24,
+        format: PixelFormat::Rgb8,
+    };
+
+    yliluoma_1_in_place(&mut buffer_a, &palette);
+    yliluoma_1_in_place(&mut buffer_b, &palette);
+
+    assert_eq!(data_a, data_b);
+}
+
+#[test]
 fn ordered_engine_gray_uses_only_quantized_values() {
     let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
     let mut buffer = Buffer {
@@ -377,6 +443,20 @@ fn ordered_threshold_lookup_tiles_correctly() {
     assert_eq!(ordered_threshold_for_xy(1, 0, &BAYER_2X2_FLAT, 2, 2), 2);
     assert_eq!(ordered_threshold_for_xy(2, 0, &BAYER_2X2_FLAT, 2, 2), 0);
     assert_eq!(ordered_threshold_for_xy(3, 3, &BAYER_2X2_FLAT, 2, 2), 1);
+}
+
+fn rgb_gradient_8x8_fixture() -> Vec<u8> {
+    let mut out = Vec::with_capacity(8 * 8 * 3);
+
+    for y in 0..8_u8 {
+        for x in 0..8_u8 {
+            out.push(x.saturating_mul(32));
+            out.push(y.saturating_mul(32));
+            out.push((x ^ y).saturating_mul(32));
+        }
+    }
+
+    out
 }
 
 fn assert_unique_square_coverage_2(map: [[u8; 2]; 2]) {

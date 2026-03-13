@@ -1,7 +1,7 @@
 use dithr::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
     cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place, random_in_place,
-    threshold_in_place, Buffer, PixelFormat, QuantizeMode,
+    threshold_in_place, yliluoma_1_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
 };
 
 #[test]
@@ -150,12 +150,53 @@ fn golden_custom_ordered_2x2_gray_ramp_8x8() {
     assert_eq!(fnv1a64(&data), 5_176_068_339_558_256_461_u64);
 }
 
+#[test]
+fn golden_yliluoma_1_rgb_gradient_8x8() {
+    let mut data = rgb_gradient_8x8();
+    let palette = Palette::new(vec![
+        [0, 0, 0],
+        [255, 255, 255],
+        [255, 0, 0],
+        [0, 255, 0],
+        [0, 0, 255],
+        [255, 255, 0],
+        [0, 255, 255],
+        [255, 0, 255],
+    ])
+    .expect("palette should be valid");
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 24,
+        format: PixelFormat::Rgb8,
+    };
+
+    yliluoma_1_in_place(&mut buffer, &palette);
+
+    assert_eq!(fnv1a64(&data), 15_541_327_241_764_811_552_u64);
+}
+
 fn gray_ramp_8x8() -> Vec<u8> {
     (0_u16..64).map(|value| (value * 4) as u8).collect()
 }
 
 fn gray_ramp_16x16() -> Vec<u8> {
     (0_u16..256).map(|value| value as u8).collect()
+}
+
+fn rgb_gradient_8x8() -> Vec<u8> {
+    let mut out = Vec::with_capacity(8 * 8 * 3);
+
+    for y in 0..8_u8 {
+        for x in 0..8_u8 {
+            out.push(x.saturating_mul(32));
+            out.push(y.saturating_mul(32));
+            out.push((x ^ y).saturating_mul(32));
+        }
+    }
+
+    out
 }
 
 fn fnv1a64(bytes: &[u8]) -> u64 {

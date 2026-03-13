@@ -6,6 +6,8 @@ use crate::{
 use std::collections::HashMap;
 
 const DITHER_LEVELS: u8 = 64;
+const GAMMA: f64 = 2.2;
+const INV_GAMMA: f64 = 1.0 / GAMMA;
 
 #[derive(Clone, Copy)]
 struct MixingPlan {
@@ -117,6 +119,91 @@ pub(crate) fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
                 let plan = cache
                     .entry(key)
                     .or_insert_with(|| devise_color_sequence(source_rgb, colors, &palette_luma));
+                let map_value = usize::from(BAYER_8X8[y % 8][x % 8]);
+                let plan_index = map_value
+                    .checked_mul(plan.len())
+                    .expect("plan index multiplication overflow")
+                    / usize::from(DITHER_LEVELS);
+
+                plan[plan_index]
+            };
+            let chosen = colors[selected];
+
+            match format {
+                PixelFormat::Gray8 => {
+                    row[offset] = luma_u8(chosen);
+                }
+                PixelFormat::Rgb8 => {
+                    row[offset] = chosen[0];
+                    row[offset + 1] = chosen[1];
+                    row[offset + 2] = chosen[2];
+                }
+                PixelFormat::Rgba8 => {
+                    let alpha = row[offset + 3];
+                    row[offset] = chosen[0];
+                    row[offset + 1] = chosen[1];
+                    row[offset + 2] = chosen[2];
+                    row[offset + 3] = alpha;
+                }
+            }
+        }
+    }
+}
+
+pub(crate) fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
+    buffer
+        .validate()
+        .expect("buffer must be valid for yliluoma algorithm 3");
+
+    let colors = palette.as_slice();
+    assert!(!colors.is_empty(), "palette must not be empty");
+
+    let width = buffer.width;
+    let height = buffer.height;
+    let format = buffer.format;
+    let bpp = format.bytes_per_pixel();
+    let mut cache = HashMap::<u32, Vec<usize>>::new();
+    let palette_luma: Vec<u32> = colors
+        .iter()
+        .map(|color| {
+            u32::from(color[0]) * 299 + u32::from(color[1]) * 587 + u32::from(color[2]) * 114
+        })
+        .collect();
+    let palette_gamma: Vec<[f64; 3]> = colors
+        .iter()
+        .map(|color| {
+            [
+                gamma_correct_channel(color[0]),
+                gamma_correct_channel(color[1]),
+                gamma_correct_channel(color[2]),
+            ]
+        })
+        .collect();
+
+    for y in 0..height {
+        let row = buffer.row_mut(y);
+
+        for x in 0..width {
+            let offset = x.checked_mul(bpp).expect("pixel offset overflow in row");
+            let source_rgb = match format {
+                PixelFormat::Gray8 => {
+                    let g = row[offset];
+                    [g, g, g]
+                }
+                PixelFormat::Rgb8 | PixelFormat::Rgba8 => {
+                    [row[offset], row[offset + 1], row[offset + 2]]
+                }
+            };
+            let key = pack_rgb(source_rgb);
+            let selected = {
+                let plan = cache.entry(key).or_insert_with(|| {
+                    devise_color_sequence_algorithm3(
+                        source_rgb,
+                        colors,
+                        &palette_luma,
+                        &palette_gamma,
+                    )
+                });
                 let map_value = usize::from(BAYER_8X8[y % 8][x % 8]);
                 let plan_index = map_value
                     .checked_mul(plan.len())
@@ -265,6 +352,157 @@ fn color_compare_rgb_luma(a: [u8; 3], b: [u8; 3]) -> f64 {
 
     (diff_r * diff_r * 0.299 + diff_g * diff_g * 0.587 + diff_b * diff_b * 0.114) * 0.75
         + luma_diff * luma_diff
+}
+
+fn devise_color_sequence_algorithm3(
+    target: [u8; 3],
+    palette: &[[u8; 3]],
+    palette_luma: &[u32],
+    palette_gamma: &[[f64; 3]],
+) -> Vec<usize> {
+    let palette_len = palette.len();
+    let mut counts = vec![0_usize; palette_len];
+    let initial = nearest_palette_index(target, palette);
+    counts[initial] = usize::from(DITHER_LEVELS);
+    let mut current_penalty = evaluate_penalty_with_counts(target, &counts, palette_gamma);
+
+    loop {
+        let mut best_penalty = current_penalty;
+        let mut best_split: Option<(usize, usize, usize, usize, usize)> = None;
+
+        for split_from in 0..palette_len {
+            let split_count = counts[split_from];
+            if split_count == 0 {
+                continue;
+            }
+
+            let portion1 = split_count / 2;
+            let portion2 = split_count - portion1;
+            let mut base = [0.0_f64; 3];
+
+            for (index, &count) in counts.iter().enumerate() {
+                if index == split_from || count == 0 {
+                    continue;
+                }
+
+                let weight = count as f64 / f64::from(DITHER_LEVELS);
+                base[0] += palette_gamma[index][0] * weight;
+                base[1] += palette_gamma[index][1] * weight;
+                base[2] += palette_gamma[index][2] * weight;
+            }
+
+            let weight1 = portion1 as f64 / f64::from(DITHER_LEVELS);
+            let weight2 = portion2 as f64 / f64::from(DITHER_LEVELS);
+
+            for c1 in 0..palette_len {
+                let c2_start = if portion1 == portion2 { c1 + 1 } else { 0 };
+                for c2 in c2_start..palette_len {
+                    if c1 == c2 {
+                        continue;
+                    }
+
+                    let mixed_gamma = [
+                        base[0] + palette_gamma[c1][0] * weight1 + palette_gamma[c2][0] * weight2,
+                        base[1] + palette_gamma[c1][1] * weight1 + palette_gamma[c2][1] * weight2,
+                        base[2] + palette_gamma[c1][2] * weight1 + palette_gamma[c2][2] * weight2,
+                    ];
+                    let tested = [
+                        gamma_uncorrect_channel(mixed_gamma[0]),
+                        gamma_uncorrect_channel(mixed_gamma[1]),
+                        gamma_uncorrect_channel(mixed_gamma[2]),
+                    ];
+                    let penalty = color_compare_rgb_luma(target, tested);
+
+                    if penalty < best_penalty {
+                        best_penalty = penalty;
+                        best_split = Some((split_from, split_count, c1, c2, portion1));
+                    }
+                }
+            }
+        }
+
+        let Some((split_from, split_count, c1, c2, portion1)) = best_split else {
+            break;
+        };
+
+        if best_penalty >= current_penalty {
+            break;
+        }
+
+        let portion2 = split_count - portion1;
+        counts[split_from] = 0;
+        counts[c1] = counts[c1]
+            .checked_add(portion1)
+            .expect("color count overflow");
+        counts[c2] = counts[c2]
+            .checked_add(portion2)
+            .expect("color count overflow");
+        current_penalty = best_penalty;
+    }
+
+    let mut result = Vec::with_capacity(usize::from(DITHER_LEVELS));
+    for (index, &count) in counts.iter().enumerate() {
+        for _ in 0..count {
+            result.push(index);
+        }
+    }
+
+    if result.is_empty() {
+        result.push(initial);
+    }
+
+    result.sort_by_key(|&index| (palette_luma[index], index));
+    result
+}
+
+fn evaluate_penalty_with_counts(
+    target: [u8; 3],
+    counts: &[usize],
+    palette_gamma: &[[f64; 3]],
+) -> f64 {
+    let mut mixed_gamma = [0.0_f64; 3];
+
+    for (index, &count) in counts.iter().enumerate() {
+        if count == 0 {
+            continue;
+        }
+
+        let weight = count as f64 / f64::from(DITHER_LEVELS);
+        mixed_gamma[0] += palette_gamma[index][0] * weight;
+        mixed_gamma[1] += palette_gamma[index][1] * weight;
+        mixed_gamma[2] += palette_gamma[index][2] * weight;
+    }
+
+    let mixed = [
+        gamma_uncorrect_channel(mixed_gamma[0]),
+        gamma_uncorrect_channel(mixed_gamma[1]),
+        gamma_uncorrect_channel(mixed_gamma[2]),
+    ];
+
+    color_compare_rgb_luma(target, mixed)
+}
+
+fn nearest_palette_index(target: [u8; 3], palette: &[[u8; 3]]) -> usize {
+    let mut best_index = 0_usize;
+    let mut best_error = rgb_distance_sq(target, palette[0]);
+
+    for (index, &color) in palette.iter().enumerate().skip(1) {
+        let error = rgb_distance_sq(target, color);
+        if error < best_error {
+            best_error = error;
+            best_index = index;
+        }
+    }
+
+    best_index
+}
+
+fn gamma_correct_channel(value: u8) -> f64 {
+    (f64::from(value) / 255.0).powf(GAMMA)
+}
+
+fn gamma_uncorrect_channel(value: f64) -> u8 {
+    (value.clamp(0.0, 1.0).powf(INV_GAMMA) * 255.0).round() as u8
 }
 
 fn interpolate_rgb(a: [u8; 3], b: [u8; 3], ratio: u8, levels: u8) -> [u8; 3] {

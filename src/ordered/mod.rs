@@ -270,6 +270,10 @@ pub fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
     yliluoma::yliluoma_2_in_place(buffer, palette);
 }
 
+pub fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
+    yliluoma::yliluoma_3_in_place(buffer, palette);
+}
+
 fn bayer_16x16_flat() -> &'static [u8; 256] {
     BAYER_16X16_FLAT.get_or_init(|| {
         let map = generate_bayer_16x16();

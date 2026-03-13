@@ -5,8 +5,8 @@ use dithr::ordered::{ordered_dither_in_place, ordered_threshold_for_xy};
 use dithr::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
     cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
-    yliluoma_1_in_place, yliluoma_2_in_place, Buffer, OrderedError, Palette, PixelFormat,
-    QuantizeMode,
+    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place, Buffer, OrderedError, Palette,
+    PixelFormat, QuantizeMode,
 };
 
 const BAYER_2X2_FLAT: [u8; 4] = [0, 2, 3, 1];
@@ -330,6 +330,36 @@ fn yliluoma_2_output_is_always_palette_member() {
     };
 
     yliluoma_2_in_place(&mut buffer, &palette);
+
+    for chunk in data.chunks_exact(3) {
+        let rgb = [chunk[0], chunk[1], chunk[2]];
+        assert!(palette.as_slice().contains(&rgb));
+    }
+}
+
+#[test]
+fn yliluoma_3_output_is_always_palette_member() {
+    let mut data = rgb_gradient_8x8_fixture();
+    let palette = Palette::new(vec![
+        [0, 0, 0],
+        [255, 255, 255],
+        [255, 0, 0],
+        [0, 255, 0],
+        [0, 0, 255],
+        [255, 255, 0],
+        [0, 255, 255],
+        [255, 0, 255],
+    ])
+    .expect("palette should be valid");
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 24,
+        format: PixelFormat::Rgb8,
+    };
+
+    yliluoma_3_in_place(&mut buffer, &palette);
 
     for chunk in data.chunks_exact(3) {
         let rgb = [chunk[0], chunk[1], chunk[2]];

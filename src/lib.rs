@@ -9,7 +9,9 @@ pub mod stochastic;
 
 pub use buffer::{Buffer, BufferError, PixelFormat};
 pub use data::{cga_palette, grayscale_16, grayscale_2, grayscale_4};
-pub use diffusion::{false_floyd_steinberg_in_place, floyd_steinberg_in_place};
+pub use diffusion::{
+    false_floyd_steinberg_in_place, floyd_steinberg_in_place, jarvis_judice_ninke_in_place,
+};
 pub use ordered::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
     cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,

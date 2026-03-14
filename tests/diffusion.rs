@@ -1,6 +1,9 @@
 use dithr::data::FLOYD_STEINBERG;
 use dithr::diffusion::error_diffuse_in_place;
-use dithr::{floyd_steinberg_in_place, Buffer, Palette, PixelFormat, QuantizeMode};
+use dithr::{
+    false_floyd_steinberg_in_place, floyd_steinberg_in_place, Buffer, Palette, PixelFormat,
+    QuantizeMode,
+};
 
 #[test]
 fn diffusion_engine_gray_binary_output_for_graybits1() {
@@ -30,6 +33,22 @@ fn floyd_steinberg_gray_bits1_binary_only() {
     };
 
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn false_floyd_steinberg_runs() {
+    let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+
+    false_floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1));
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }

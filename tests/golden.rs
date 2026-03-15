@@ -1,8 +1,8 @@
 use dithr::{
     atkinson_in_place, bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place,
     bayer_8x8_in_place, burkes_in_place, cluster_dot_4x4_in_place, cluster_dot_8x8_in_place,
-    custom_ordered_in_place, false_floyd_steinberg_in_place, fan_in_place,
-    floyd_steinberg_in_place, gradient_based_error_diffusion_in_place,
+    custom_ordered_in_place, direct_binary_search_in_place, false_floyd_steinberg_in_place,
+    fan_in_place, floyd_steinberg_in_place, gradient_based_error_diffusion_in_place,
     jarvis_judice_ninke_in_place, knuth_dot_diffusion_in_place, ostromoukhov_in_place,
     random_in_place, riemersma_in_place, shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place,
     sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place, threshold_in_place,
@@ -523,6 +523,22 @@ fn golden_knuth_dot_diffusion_gray_ramp_16x16() {
     knuth_dot_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1));
 
     assert_eq!(fnv1a64(&data), 5_433_988_350_430_228_710_u64);
+}
+
+#[test]
+fn golden_dbs_gray_ramp_8x8() {
+    let mut data = gray_ramp_8x8();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::Gray8,
+    };
+
+    direct_binary_search_in_place(&mut buffer, 4);
+
+    assert_eq!(fnv1a64(&data), 1_738_359_872_340_429_752_u64);
 }
 
 fn gray_ramp_8x8() -> Vec<u8> {

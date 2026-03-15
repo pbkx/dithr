@@ -1,6 +1,25 @@
-use crate::{Buffer, PixelFormat};
+use crate::{math::fixed::mul_div_i32, Buffer, PixelFormat};
 
 const DBS_KERNEL: [[u32; 3]; 3] = [[1, 2, 1], [2, 4, 2], [1, 2, 1]];
+const LBM_SCALE: i32 = 16_384;
+const LBM_HALF_SCALE: i32 = LBM_SCALE / 2;
+const LBM_WEIGHTS: [i32; 9] = [7_284, 1_820, 1_820, 1_820, 1_820, 455, 455, 455, 455];
+const LBM_DIRECTIONS: [(isize, isize); 9] = [
+    (0, 0),
+    (1, 0),
+    (0, 1),
+    (-1, 0),
+    (0, -1),
+    (1, 1),
+    (-1, 1),
+    (-1, -1),
+    (1, -1),
+];
+const LBM_OPPOSITE: [usize; 9] = [0, 3, 4, 1, 2, 7, 8, 5, 6];
+const LBM_OMEGA_NUM: i32 = 6;
+const LBM_OMEGA_DEN: i32 = 5;
+const LBM_FORCING_NUM: i32 = 1;
+const LBM_FORCING_DEN: i32 = 4;
 
 pub fn direct_binary_search_in_place(buffer: &mut Buffer<'_>, max_iters: usize) {
     buffer
@@ -102,6 +121,95 @@ pub fn direct_binary_search_in_place(buffer: &mut Buffer<'_>, max_iters: usize) 
         let end = start.checked_add(width).expect("binary row end overflow");
         let row = buffer.row_mut(y);
         row[..width].copy_from_slice(&binary[start..end]);
+    }
+}
+
+pub fn lattice_boltzmann_in_place(buffer: &mut Buffer<'_>, max_steps: usize) {
+    buffer
+        .validate()
+        .expect("buffer must be valid for lattice-boltzmann dithering");
+    assert_eq!(
+        buffer.format,
+        PixelFormat::Gray8,
+        "lattice-boltzmann v1 supports Gray8 only"
+    );
+
+    let width = buffer.width;
+    let height = buffer.height;
+    let pixel_count = width.checked_mul(height).expect("image size overflow");
+    let mut target = Vec::with_capacity(pixel_count);
+
+    for y in 0..height {
+        let row = buffer.row(y);
+        for &value in row.iter().take(width) {
+            target.push(mul_div_i32(i32::from(value), LBM_SCALE, 255));
+        }
+    }
+
+    let mut distributions = vec![[0_i32; 9]; pixel_count];
+    let mut post_collision = vec![[0_i32; 9]; pixel_count];
+    let mut streamed = vec![[0_i32; 9]; pixel_count];
+
+    for i in 0..pixel_count {
+        for d in 0..9 {
+            distributions[i][d] = mul_div_i32(target[i], LBM_WEIGHTS[d], LBM_SCALE);
+        }
+    }
+
+    for _ in 0..max_steps {
+        for idx in 0..pixel_count {
+            let rho = distributions[idx].iter().sum::<i32>();
+            let rho_for_eq = rho + mul_div_i32(target[idx] - rho, LBM_FORCING_NUM, LBM_FORCING_DEN);
+
+            for d in 0..9 {
+                let feq = mul_div_i32(rho_for_eq, LBM_WEIGHTS[d], LBM_SCALE);
+                let delta = feq - distributions[idx][d];
+                post_collision[idx][d] =
+                    distributions[idx][d] + mul_div_i32(delta, LBM_OMEGA_NUM, LBM_OMEGA_DEN);
+            }
+        }
+
+        streamed.fill([0_i32; 9]);
+
+        for y in 0..height {
+            for x in 0..width {
+                let idx = y
+                    .checked_mul(width)
+                    .and_then(|base| base.checked_add(x))
+                    .expect("stream index overflow");
+
+                for d in 0..9 {
+                    let (dx, dy) = LBM_DIRECTIONS[d];
+                    let nx = x as isize + dx;
+                    let ny = y as isize + dy;
+
+                    if nx >= 0 && ny >= 0 && (nx as usize) < width && (ny as usize) < height {
+                        let nidx = (ny as usize)
+                            .checked_mul(width)
+                            .and_then(|base| base.checked_add(nx as usize))
+                            .expect("stream target overflow");
+                        streamed[nidx][d] += post_collision[idx][d];
+                    } else {
+                        let opp = LBM_OPPOSITE[d];
+                        streamed[idx][opp] += post_collision[idx][d];
+                    }
+                }
+            }
+        }
+
+        std::mem::swap(&mut distributions, &mut streamed);
+    }
+
+    for y in 0..height {
+        let row = buffer.row_mut(y);
+        for (x, value) in row.iter_mut().take(width).enumerate() {
+            let idx = y
+                .checked_mul(width)
+                .and_then(|base| base.checked_add(x))
+                .expect("output index overflow");
+            let rho = distributions[idx].iter().sum::<i32>();
+            *value = if rho >= LBM_HALF_SCALE { 255 } else { 0 };
+        }
     }
 }
 

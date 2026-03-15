@@ -1,6 +1,6 @@
 use dithr::{
-    direct_binary_search_in_place, knuth_dot_diffusion_in_place, riemersma_in_place, Buffer,
-    PixelFormat, QuantizeMode,
+    direct_binary_search_in_place, knuth_dot_diffusion_in_place, lattice_boltzmann_in_place,
+    riemersma_in_place, Buffer, PixelFormat, QuantizeMode,
 };
 
 #[test]
@@ -96,6 +96,38 @@ fn dbs_objective_nonincreasing_over_iterations() {
 
     assert!(objective_1 <= objective_0);
     assert!(objective_2 <= objective_1);
+}
+
+#[test]
+fn lattice_boltzmann_runs_small_fixture() {
+    let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::Gray8,
+    };
+
+    lattice_boltzmann_in_place(&mut buffer, 6);
+
+    assert_eq!(data.len(), 64);
+}
+
+#[test]
+fn lattice_boltzmann_binary_only_output() {
+    let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::Gray8,
+    };
+
+    lattice_boltzmann_in_place(&mut buffer, 8);
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
 
 #[test]

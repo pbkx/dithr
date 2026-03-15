@@ -2,8 +2,8 @@ use dithr::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
     burkes_in_place, cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
     false_floyd_steinberg_in_place, floyd_steinberg_in_place, jarvis_judice_ninke_in_place,
-    random_in_place, stucki_in_place, threshold_in_place, yliluoma_1_in_place, yliluoma_2_in_place,
-    yliluoma_3_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
+    random_in_place, sierra_in_place, stucki_in_place, threshold_in_place, yliluoma_1_in_place,
+    yliluoma_2_in_place, yliluoma_3_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
 };
 
 #[test]
@@ -311,6 +311,22 @@ fn golden_burkes_gray_ramp_16x16() {
     burkes_in_place(&mut buffer, QuantizeMode::GrayBits(1));
 
     assert_eq!(fnv1a64(&data), 11_923_719_224_799_449_376_u64);
+}
+
+#[test]
+fn golden_sierra_gray_ramp_16x16() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+
+    sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+
+    assert_eq!(fnv1a64(&data), 407_481_245_873_367_030_u64);
 }
 
 fn gray_ramp_8x8() -> Vec<u8> {

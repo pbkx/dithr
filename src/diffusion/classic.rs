@@ -1,6 +1,6 @@
 use super::error_diffuse_in_place;
 use crate::{
-    data::{BURKES, FALSE_FLOYD_STEINBERG, FLOYD_STEINBERG, JARVIS_JUDICE_NINKE, STUCKI},
+    data::{BURKES, FALSE_FLOYD_STEINBERG, FLOYD_STEINBERG, JARVIS_JUDICE_NINKE, SIERRA, STUCKI},
     Buffer, QuantizeMode,
 };
 
@@ -22,4 +22,8 @@ pub fn stucki_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
 
 pub fn burkes_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
     error_diffuse_in_place(buffer, mode, &BURKES);
+}
+
+pub fn sierra_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
+    error_diffuse_in_place(buffer, mode, &SIERRA);
 }

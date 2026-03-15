@@ -2,8 +2,8 @@ use dithr::data::FLOYD_STEINBERG;
 use dithr::diffusion::error_diffuse_in_place;
 use dithr::{
     burkes_in_place, false_floyd_steinberg_in_place, floyd_steinberg_in_place,
-    jarvis_judice_ninke_in_place, sierra_in_place, sierra_lite_in_place, stucki_in_place,
-    two_row_sierra_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
+    jarvis_judice_ninke_in_place, sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place,
+    stucki_in_place, two_row_sierra_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
 };
 
 #[test]
@@ -146,6 +146,22 @@ fn sierra_lite_runs() {
     };
 
     sierra_lite_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn stevenson_arce_runs() {
+    let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+
+    stevenson_arce_in_place(&mut buffer, QuantizeMode::GrayBits(1));
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }

@@ -4,7 +4,7 @@ pub(crate) mod core;
 use crate::{data::ErrorKernel, Buffer, QuantizeMode};
 
 pub use classic::{
-    burkes_in_place, false_floyd_steinberg_in_place, floyd_steinberg_in_place,
+    atkinson_in_place, burkes_in_place, false_floyd_steinberg_in_place, floyd_steinberg_in_place,
     jarvis_judice_ninke_in_place, sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place,
     stucki_in_place, two_row_sierra_in_place,
 };

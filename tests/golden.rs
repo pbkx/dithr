@@ -3,11 +3,11 @@ use dithr::{
     bayer_8x8_in_place, burkes_in_place, cluster_dot_4x4_in_place, cluster_dot_8x8_in_place,
     custom_ordered_in_place, false_floyd_steinberg_in_place, fan_in_place,
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place,
-    jarvis_judice_ninke_in_place, ostromoukhov_in_place, random_in_place, shiau_fan_2_in_place,
-    shiau_fan_in_place, sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place,
-    stucki_in_place, threshold_in_place, two_row_sierra_in_place, yliluoma_1_in_place,
-    yliluoma_2_in_place, yliluoma_3_in_place, zhou_fang_in_place, Buffer, Palette, PixelFormat,
-    QuantizeMode,
+    jarvis_judice_ninke_in_place, ostromoukhov_in_place, random_in_place, riemersma_in_place,
+    shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place, sierra_lite_in_place,
+    stevenson_arce_in_place, stucki_in_place, threshold_in_place, two_row_sierra_in_place,
+    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place, zhou_fang_in_place, Buffer,
+    Palette, PixelFormat, QuantizeMode,
 };
 
 #[test]
@@ -491,6 +491,22 @@ fn golden_gradient_based_error_diffusion_gray_ramp_16x16() {
     gradient_based_error_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1));
 
     assert_eq!(fnv1a64(&data), 13_379_963_253_640_205_838_u64);
+}
+
+#[test]
+fn golden_riemersma_gray_ramp_16x16() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+
+    riemersma_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+
+    assert_eq!(fnv1a64(&data), 4_759_045_697_198_729_208_u64);
 }
 
 fn gray_ramp_8x8() -> Vec<u8> {

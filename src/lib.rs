@@ -5,6 +5,7 @@ pub mod math;
 pub mod ordered;
 pub mod palette;
 pub mod quantize;
+pub mod riemersma;
 pub mod stochastic;
 
 pub use buffer::{Buffer, BufferError, PixelFormat};
@@ -25,4 +26,5 @@ pub use palette::{IndexedImage, Palette, PaletteError};
 pub use quantize::{
     quantize_error, quantize_gray_u8, quantize_pixel, quantize_rgb_u8, QuantizeMode,
 };
+pub use riemersma::riemersma_in_place;
 pub use stochastic::{random_in_place, threshold_in_place};

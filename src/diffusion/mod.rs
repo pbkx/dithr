@@ -11,7 +11,9 @@ pub use classic::{
     stucki_in_place, two_row_sierra_in_place,
 };
 pub use extended::{fan_in_place, shiau_fan_2_in_place, shiau_fan_in_place};
-pub use variable::{ostromoukhov_in_place, zhou_fang_in_place};
+pub use variable::{
+    gradient_based_error_diffusion_in_place, ostromoukhov_in_place, zhou_fang_in_place,
+};
 
 #[doc(hidden)]
 pub fn error_diffuse_in_place(

@@ -2,10 +2,10 @@ use dithr::data::FLOYD_STEINBERG;
 use dithr::diffusion::error_diffuse_in_place;
 use dithr::{
     atkinson_in_place, burkes_in_place, false_floyd_steinberg_in_place, fan_in_place,
-    floyd_steinberg_in_place, jarvis_judice_ninke_in_place, ostromoukhov_in_place,
-    shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place, sierra_lite_in_place,
-    stevenson_arce_in_place, stucki_in_place, two_row_sierra_in_place, zhou_fang_in_place, Buffer,
-    Palette, PixelFormat, QuantizeMode,
+    floyd_steinberg_in_place, gradient_based_error_diffusion_in_place,
+    jarvis_judice_ninke_in_place, ostromoukhov_in_place, shiau_fan_2_in_place, shiau_fan_in_place,
+    sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place,
+    two_row_sierra_in_place, zhou_fang_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
 };
 
 #[test]
@@ -294,6 +294,22 @@ fn zhou_fang_modulation_in_range() {
     zhou_fang_in_place(&mut buffer, QuantizeMode::GrayBits(1));
 
     assert_eq!(data.len(), 256);
+}
+
+#[test]
+fn gradient_based_error_diffusion_runs() {
+    let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+
+    gradient_based_error_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
 
 #[test]

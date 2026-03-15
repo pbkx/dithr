@@ -1,6 +1,7 @@
 pub mod classic;
 pub(crate) mod core;
 pub mod extended;
+pub mod variable;
 
 use crate::{data::ErrorKernel, Buffer, QuantizeMode};
 
@@ -10,6 +11,7 @@ pub use classic::{
     stucki_in_place, two_row_sierra_in_place,
 };
 pub use extended::{fan_in_place, shiau_fan_2_in_place, shiau_fan_in_place};
+pub use variable::ostromoukhov_in_place;
 
 #[doc(hidden)]
 pub fn error_diffuse_in_place(

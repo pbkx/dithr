@@ -11,7 +11,8 @@ pub use buffer::{Buffer, BufferError, PixelFormat};
 pub use data::{cga_palette, grayscale_16, grayscale_2, grayscale_4};
 pub use diffusion::{
     burkes_in_place, false_floyd_steinberg_in_place, floyd_steinberg_in_place,
-    jarvis_judice_ninke_in_place, sierra_in_place, stucki_in_place, two_row_sierra_in_place,
+    jarvis_judice_ninke_in_place, sierra_in_place, sierra_lite_in_place, stucki_in_place,
+    two_row_sierra_in_place,
 };
 pub use ordered::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,

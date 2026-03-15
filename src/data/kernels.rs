@@ -349,27 +349,6 @@ pub const SIERRA_LITE: ErrorKernel = ErrorKernel {
     weight_den: 4,
 };
 
-pub const SIERRA_2_4A: ErrorKernel = ErrorKernel {
-    taps: &[
-        KernelTap {
-            dx: 1,
-            dy: 0,
-            weight_num: 2,
-        },
-        KernelTap {
-            dx: -1,
-            dy: 1,
-            weight_num: 1,
-        },
-        KernelTap {
-            dx: 0,
-            dy: 1,
-            weight_num: 1,
-        },
-    ],
-    weight_den: 4,
-};
-
 pub const STEVENSON_ARCE: ErrorKernel = ErrorKernel {
     taps: &[
         KernelTap {
@@ -559,8 +538,8 @@ pub const SHIAU_FAN_2: ErrorKernel = ErrorKernel {
 mod tests {
     use super::{
         ErrorKernel, ATKINSON, BURKES, FALSE_FLOYD_STEINBERG, FAN, FLOYD_STEINBERG,
-        JARVIS_JUDICE_NINKE, SHIAU_FAN, SHIAU_FAN_2, SIERRA, SIERRA_2_4A, SIERRA_LITE,
-        STEVENSON_ARCE, STUCKI, TWO_ROW_SIERRA,
+        JARVIS_JUDICE_NINKE, SHIAU_FAN, SHIAU_FAN_2, SIERRA, SIERRA_LITE, STEVENSON_ARCE, STUCKI,
+        TWO_ROW_SIERRA,
     };
 
     #[test]
@@ -588,7 +567,7 @@ mod tests {
         }
     }
 
-    fn all_kernels() -> [&'static ErrorKernel; 14] {
+    fn all_kernels() -> [&'static ErrorKernel; 13] {
         [
             &FLOYD_STEINBERG,
             &FALSE_FLOYD_STEINBERG,
@@ -598,7 +577,6 @@ mod tests {
             &SIERRA,
             &TWO_ROW_SIERRA,
             &SIERRA_LITE,
-            &SIERRA_2_4A,
             &STEVENSON_ARCE,
             &ATKINSON,
             &FAN,

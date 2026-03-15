@@ -28,6 +28,8 @@ const OSTROMOUKHOV_COEFFS: [(i16, i16, i16, i16); 16] = [
     (6, 4, 5, 15),
 ];
 
+const ZHOU_FANG_MODULATION: [i16; 16] = [-8, -7, -6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7, 8];
+
 pub fn ostromoukhov_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
     buffer
         .validate()
@@ -38,6 +40,27 @@ pub fn ostromoukhov_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
         return;
     }
 
+    diffuse_variable_gray(buffer, mode, None);
+}
+
+pub fn zhou_fang_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
+    buffer
+        .validate()
+        .expect("buffer must be valid for zhou-fang diffusion");
+
+    if buffer.format != PixelFormat::Gray8 {
+        error_diffuse_in_place(buffer, mode, &FLOYD_STEINBERG);
+        return;
+    }
+
+    diffuse_variable_gray(buffer, mode, Some(&ZHOU_FANG_MODULATION));
+}
+
+fn diffuse_variable_gray(
+    buffer: &mut Buffer<'_>,
+    mode: QuantizeMode<'_>,
+    modulation: Option<&[i16; 16]>,
+) {
     let width = buffer.width;
     let height = buffer.height;
     let mut errors = vec![0_i32; width.checked_mul(height).expect("image size overflow")];
@@ -52,7 +75,12 @@ pub fn ostromoukhov_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
                 .expect("pixel index overflow");
             let original = *value;
             let adjusted = clamp_u8(i32::from(original) + errors[idx]);
-            let quantized = quantize_pixel(PixelFormat::Gray8, &[adjusted], mode);
+            let thresholded = if let Some(table) = modulation {
+                clamp_u8(i32::from(adjusted) + i32::from(modulation_for_luma(adjusted, table)))
+            } else {
+                adjusted
+            };
+            let quantized = quantize_pixel(PixelFormat::Gray8, &[thresholded], mode);
             let quantized_gray = luma_u8([quantized[0], quantized[1], quantized[2]]);
             *value = quantized_gray;
 
@@ -98,4 +126,9 @@ pub fn ostromoukhov_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
 fn coefficient_for_luma(luma: u8) -> (i16, i16, i16, i16) {
     let idx = (usize::from(luma) * OSTROMOUKHOV_COEFFS.len()) / 256;
     OSTROMOUKHOV_COEFFS[idx]
+}
+
+fn modulation_for_luma(luma: u8, table: &[i16; 16]) -> i16 {
+    let idx = (usize::from(luma) * table.len()) / 256;
+    table[idx]
 }

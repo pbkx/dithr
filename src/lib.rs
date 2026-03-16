@@ -12,7 +12,9 @@ pub mod stochastic;
 
 pub use buffer::{Buffer, BufferError, PixelFormat};
 pub use data::{cga_palette, grayscale_16, grayscale_2, grayscale_4};
-pub use dbs::{direct_binary_search_in_place, lattice_boltzmann_in_place};
+pub use dbs::{
+    direct_binary_search_in_place, electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
+};
 pub use diffusion::{
     atkinson_in_place, burkes_in_place, false_floyd_steinberg_in_place, fan_in_place,
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place,

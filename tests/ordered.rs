@@ -571,6 +571,97 @@ fn fixture_builders_are_deterministic() {
     assert_eq!(fnv1a64(&cube), fnv1a64(&rgb_cube_strip()));
 }
 
+#[cfg(feature = "rayon")]
+#[test]
+fn bayer_8x8_parallel_matches_sequential() {
+    use dithr::bayer_8x8_in_place_par;
+
+    let mut seq = gray_ramp_16x16();
+    let mut par = seq.clone();
+    let mut seq_buffer = Buffer {
+        data: &mut seq,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+    let mut par_buffer = Buffer {
+        data: &mut par,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+
+    bayer_8x8_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1))
+        .expect("sequential should succeed");
+    bayer_8x8_in_place_par(&mut par_buffer, QuantizeMode::GrayBits(1))
+        .expect("parallel should succeed");
+
+    assert_eq!(seq, par);
+}
+
+#[cfg(feature = "rayon")]
+#[test]
+fn cluster_dot_8x8_parallel_matches_sequential() {
+    use dithr::cluster_dot_8x8_in_place_par;
+
+    let mut seq = gray_ramp_16x16();
+    let mut par = seq.clone();
+    let mut seq_buffer = Buffer {
+        data: &mut seq,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+    let mut par_buffer = Buffer {
+        data: &mut par,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+
+    cluster_dot_8x8_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1))
+        .expect("sequential should succeed");
+    cluster_dot_8x8_in_place_par(&mut par_buffer, QuantizeMode::GrayBits(1))
+        .expect("parallel should succeed");
+
+    assert_eq!(seq, par);
+}
+
+#[cfg(feature = "rayon")]
+#[test]
+fn custom_ordered_parallel_matches_sequential() {
+    use dithr::custom_ordered_in_place_par;
+
+    let map = [0_u8, 2, 3, 1];
+    let mut seq = gray_ramp_16x16();
+    let mut par = seq.clone();
+    let mut seq_buffer = Buffer {
+        data: &mut seq,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+    let mut par_buffer = Buffer {
+        data: &mut par,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+
+    custom_ordered_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1), &map, 2, 2, 64)
+        .expect("sequential should succeed");
+    custom_ordered_in_place_par(&mut par_buffer, QuantizeMode::GrayBits(1), &map, 2, 2, 64)
+        .expect("parallel should succeed");
+
+    assert_eq!(seq, par);
+}
+
 fn assert_unique_square_coverage_2(map: [[u8; 2]; 2]) {
     let mut seen = [false; 4];
 

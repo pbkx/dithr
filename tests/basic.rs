@@ -451,6 +451,66 @@ fn random_binary_different_seed_different_output() {
     assert_ne!(data_a, data_b);
 }
 
+#[cfg(feature = "rayon")]
+#[test]
+fn threshold_binary_parallel_matches_sequential() {
+    use dithr::threshold_binary_in_place_par;
+
+    let mut seq = gray_ramp_16x16();
+    let mut par = seq.clone();
+    let mut seq_buffer = Buffer {
+        data: &mut seq,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+    let mut par_buffer = Buffer {
+        data: &mut par,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+
+    threshold_binary_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1), 127)
+        .expect("sequential threshold should succeed");
+    threshold_binary_in_place_par(&mut par_buffer, QuantizeMode::GrayBits(1), 127)
+        .expect("parallel threshold should succeed");
+
+    assert_eq!(seq, par);
+}
+
+#[cfg(feature = "rayon")]
+#[test]
+fn random_binary_parallel_matches_sequential_fixed_seed() {
+    use dithr::random_binary_in_place_par;
+
+    let mut seq = gray_ramp_16x16();
+    let mut par = seq.clone();
+    let mut seq_buffer = Buffer {
+        data: &mut seq,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+    let mut par_buffer = Buffer {
+        data: &mut par,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::Gray8,
+    };
+
+    random_binary_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1), 42, 64)
+        .expect("sequential random should succeed");
+    random_binary_in_place_par(&mut par_buffer, QuantizeMode::GrayBits(1), 42, 64)
+        .expect("parallel random should succeed");
+
+    assert_eq!(seq, par);
+}
+
 #[test]
 fn fixture_builders_are_deterministic() {
     let gray8 = gray_ramp_8x8();

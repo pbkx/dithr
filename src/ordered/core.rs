@@ -5,6 +5,8 @@ use crate::{
     },
     quantize_pixel, Buffer, BufferError, DithrError, DithrResult, PixelFormat, QuantizeMode,
 };
+#[cfg(feature = "rayon")]
+use rayon::prelude::*;
 
 pub(crate) fn ordered_dither_in_place(
     buffer: &mut Buffer<'_>,
@@ -65,6 +67,74 @@ pub(crate) fn ordered_dither_in_place(
             }
         }
     }
+
+    Ok(())
+}
+
+#[cfg(feature = "rayon")]
+pub(crate) fn ordered_dither_in_place_par(
+    buffer: &mut Buffer<'_>,
+    mode: QuantizeMode<'_>,
+    map: &[u8],
+    map_w: usize,
+    map_h: usize,
+    strength: i16,
+) -> DithrResult<()> {
+    buffer.validate()?;
+    validate_map(map, map_w, map_h)?;
+
+    let map_max = map.iter().copied().max().unwrap_or_default();
+    let width = buffer.width;
+    let height = buffer.height;
+    let format = buffer.format;
+    let bpp = buffer.format.bytes_per_pixel();
+    let stride = buffer.stride;
+
+    buffer
+        .data
+        .par_chunks_mut(stride)
+        .take(height)
+        .enumerate()
+        .for_each(|(y, row)| {
+            for x in 0..width {
+                let threshold = ordered_threshold_for_xy(x, y, map, map_w, map_h);
+                let bias = threshold_bias(threshold, map_max, strength);
+                let offset = x * bpp;
+
+                match format {
+                    PixelFormat::Gray8 => {
+                        let value = apply_bias(row[offset], bias);
+                        let quantized = quantize_pixel(PixelFormat::Gray8, &[value], mode);
+                        row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
+                    }
+                    PixelFormat::Rgb8 => {
+                        let adjusted = [
+                            apply_bias(row[offset], bias),
+                            apply_bias(row[offset + 1], bias),
+                            apply_bias(row[offset + 2], bias),
+                        ];
+                        let quantized = quantize_pixel(PixelFormat::Rgb8, &adjusted, mode);
+                        row[offset] = quantized[0];
+                        row[offset + 1] = quantized[1];
+                        row[offset + 2] = quantized[2];
+                    }
+                    PixelFormat::Rgba8 => {
+                        let alpha = row[offset + 3];
+                        let adjusted = [
+                            apply_bias(row[offset], bias),
+                            apply_bias(row[offset + 1], bias),
+                            apply_bias(row[offset + 2], bias),
+                            alpha,
+                        ];
+                        let quantized = quantize_pixel(PixelFormat::Rgba8, &adjusted, mode);
+                        row[offset] = quantized[0];
+                        row[offset + 1] = quantized[1];
+                        row[offset + 2] = quantized[2];
+                        row[offset + 3] = alpha;
+                    }
+                }
+            }
+        });
 
     Ok(())
 }

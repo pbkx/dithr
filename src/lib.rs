@@ -30,6 +30,12 @@ pub use ordered::{
     cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
     yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place, OrderedError,
 };
+#[cfg(feature = "rayon")]
+pub use ordered::{
+    bayer_16x16_in_place_par, bayer_2x2_in_place_par, bayer_4x4_in_place_par,
+    bayer_8x8_in_place_par, cluster_dot_4x4_in_place_par, cluster_dot_8x8_in_place_par,
+    custom_ordered_in_place_par,
+};
 pub use palette::{IndexedImage, Palette, PaletteError};
 pub use quantize::{
     quantize_error, quantize_gray_u8, quantize_pixel, quantize_rgb_u8, QuantizeMode,
@@ -38,3 +44,5 @@ pub use riemersma::riemersma_in_place;
 pub use stochastic::{
     random_binary_in_place, random_in_place, threshold_binary_in_place, threshold_in_place,
 };
+#[cfg(feature = "rayon")]
+pub use stochastic::{random_binary_in_place_par, threshold_binary_in_place_par};

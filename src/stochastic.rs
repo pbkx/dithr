@@ -2,6 +2,8 @@ use crate::{
     math::{color::luma_u8, utils::clamp_u8},
     quantize_pixel, Buffer, BufferError, DithrResult, PixelFormat, QuantizeMode,
 };
+#[cfg(feature = "rayon")]
+use rayon::prelude::*;
 
 pub fn threshold_binary_in_place(
     buffer: &mut Buffer<'_>,
@@ -122,6 +124,144 @@ pub fn random_binary_in_place(
             }
         }
     }
+
+    Ok(())
+}
+
+#[cfg(feature = "rayon")]
+pub fn threshold_binary_in_place_par(
+    buffer: &mut Buffer<'_>,
+    mode: QuantizeMode<'_>,
+    threshold: u8,
+) -> DithrResult<()> {
+    buffer.validate()?;
+
+    let width = buffer.width;
+    let height = buffer.height;
+    let format = buffer.format;
+    let bpp = format.bytes_per_pixel();
+    let stride = buffer.stride;
+
+    buffer
+        .data
+        .par_chunks_mut(stride)
+        .take(height)
+        .for_each(|row| {
+            for x in 0..width {
+                let offset = x * bpp;
+                match format {
+                    PixelFormat::Gray8 => {
+                        let light = row[offset] > threshold;
+                        let sample = if light { [255_u8] } else { [0_u8] };
+                        let quantized = quantize_pixel(PixelFormat::Gray8, &sample, mode);
+                        row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
+                    }
+                    PixelFormat::Rgb8 => {
+                        let source = [row[offset], row[offset + 1], row[offset + 2]];
+                        let light = luma_u8(source) > threshold;
+                        let sample = if light {
+                            [255_u8, 255_u8, 255_u8]
+                        } else {
+                            [0_u8, 0_u8, 0_u8]
+                        };
+                        let quantized = quantize_pixel(PixelFormat::Rgb8, &sample, mode);
+                        row[offset] = quantized[0];
+                        row[offset + 1] = quantized[1];
+                        row[offset + 2] = quantized[2];
+                    }
+                    PixelFormat::Rgba8 => {
+                        let alpha = row[offset + 3];
+                        let source = [row[offset], row[offset + 1], row[offset + 2]];
+                        let light = luma_u8(source) > threshold;
+                        let sample = if light {
+                            [255_u8, 255_u8, 255_u8, alpha]
+                        } else {
+                            [0_u8, 0_u8, 0_u8, alpha]
+                        };
+                        let quantized = quantize_pixel(PixelFormat::Rgba8, &sample, mode);
+                        row[offset] = quantized[0];
+                        row[offset + 1] = quantized[1];
+                        row[offset + 2] = quantized[2];
+                        row[offset + 3] = alpha;
+                    }
+                }
+            }
+        });
+
+    Ok(())
+}
+
+#[cfg(feature = "rayon")]
+pub fn random_binary_in_place_par(
+    buffer: &mut Buffer<'_>,
+    mode: QuantizeMode<'_>,
+    seed: u64,
+    strength: u8,
+) -> DithrResult<()> {
+    buffer.validate()?;
+
+    let width = buffer.width;
+    let height = buffer.height;
+    let format = buffer.format;
+    let bpp = format.bytes_per_pixel();
+    let stride = buffer.stride;
+    let threshold_len = width.checked_mul(height).ok_or(BufferError::OutOfBounds)?;
+    let mut thresholds = vec![0_u8; threshold_len];
+    let mut prng = XorShift64::new(seed);
+    for y in 0..height {
+        for x in 0..width {
+            thresholds[y * width + x] = perturbed_threshold(&mut prng, seed, x, y, strength);
+        }
+    }
+
+    buffer
+        .data
+        .par_chunks_mut(stride)
+        .take(height)
+        .enumerate()
+        .for_each(|(y, row)| {
+            for x in 0..width {
+                let threshold = thresholds[y * width + x];
+                let offset = x * bpp;
+
+                match format {
+                    PixelFormat::Gray8 => {
+                        let light = row[offset] > threshold;
+                        let sample = if light { [255_u8] } else { [0_u8] };
+                        let quantized = quantize_pixel(PixelFormat::Gray8, &sample, mode);
+                        row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
+                    }
+                    PixelFormat::Rgb8 => {
+                        let source = [row[offset], row[offset + 1], row[offset + 2]];
+                        let light = luma_u8(source) > threshold;
+                        let sample = if light {
+                            [255_u8, 255_u8, 255_u8]
+                        } else {
+                            [0_u8, 0_u8, 0_u8]
+                        };
+                        let quantized = quantize_pixel(PixelFormat::Rgb8, &sample, mode);
+                        row[offset] = quantized[0];
+                        row[offset + 1] = quantized[1];
+                        row[offset + 2] = quantized[2];
+                    }
+                    PixelFormat::Rgba8 => {
+                        let alpha = row[offset + 3];
+                        let source = [row[offset], row[offset + 1], row[offset + 2]];
+                        let light = luma_u8(source) > threshold;
+                        let sample = if light {
+                            [255_u8, 255_u8, 255_u8, alpha]
+                        } else {
+                            [0_u8, 0_u8, 0_u8, alpha]
+                        };
+                        let quantized = quantize_pixel(PixelFormat::Rgba8, &sample, mode);
+                        row[offset] = quantized[0];
+                        row[offset + 1] = quantized[1];
+                        row[offset + 2] = quantized[2];
+                        row[offset + 3] = alpha;
+                    }
+                }
+            }
+        });
 
     Ok(())
 }

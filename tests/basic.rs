@@ -122,6 +122,66 @@ fn buffer_row_returns_correct_slice() {
 }
 
 #[test]
+fn buffer_new_validates_ok() {
+    let mut data = vec![0_u8; 32];
+    let buffer =
+        Buffer::new(&mut data, 8, 4, 8, PixelFormat::Gray8).expect("valid buffer should construct");
+
+    assert_eq!(buffer.validate(), Ok(()));
+}
+
+#[test]
+fn buffer_required_len_matches_stride_times_height() {
+    let mut data = vec![0_u8; 40];
+    let buffer =
+        Buffer::new(&mut data, 3, 4, 10, PixelFormat::Rgb8).expect("valid buffer should construct");
+
+    assert_eq!(buffer.required_len(), Ok(40));
+}
+
+#[test]
+fn buffer_try_row_rejects_y_out_of_bounds() {
+    let mut data = vec![0_u8; 12];
+    let buffer =
+        Buffer::new(&mut data, 4, 3, 4, PixelFormat::Gray8).expect("valid buffer should construct");
+
+    assert_eq!(buffer.try_row(3), Err(BufferError::RowOutOfBounds));
+}
+
+#[test]
+fn buffer_try_row_mut_rejects_y_out_of_bounds() {
+    let mut data = vec![0_u8; 12];
+    let mut buffer =
+        Buffer::new(&mut data, 4, 3, 4, PixelFormat::Gray8).expect("valid buffer should construct");
+
+    assert_eq!(buffer.try_row_mut(3), Err(BufferError::RowOutOfBounds));
+}
+
+#[test]
+fn buffer_try_pixel_offset_rejects_x_out_of_bounds() {
+    let mut data = vec![0_u8; 36];
+    let buffer = Buffer::new(&mut data, 3, 3, 12, PixelFormat::Rgba8)
+        .expect("valid buffer should construct");
+
+    assert_eq!(
+        buffer.try_pixel_offset(3, 1),
+        Err(BufferError::PixelOutOfBounds)
+    );
+}
+
+#[test]
+fn buffer_try_pixel_offset_rejects_y_out_of_bounds() {
+    let mut data = vec![0_u8; 36];
+    let buffer = Buffer::new(&mut data, 3, 3, 12, PixelFormat::Rgba8)
+        .expect("valid buffer should construct");
+
+    assert_eq!(
+        buffer.try_pixel_offset(1, 3),
+        Err(BufferError::PixelOutOfBounds)
+    );
+}
+
+#[test]
 fn palette_accepts_single_color() {
     let palette = Palette::new(vec![[10, 20, 30]]).expect("single color palette should be valid");
 

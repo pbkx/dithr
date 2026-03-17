@@ -21,6 +21,8 @@ pub enum BufferError {
     StrideTooSmall,
     DataTooShort,
     ZeroDimensions,
+    RowOutOfBounds,
+    PixelOutOfBounds,
     OutOfBounds,
 }
 
@@ -33,31 +35,54 @@ pub struct Buffer<'a> {
 }
 
 impl<'a> Buffer<'a> {
-    #[must_use]
-    pub fn width_bytes(&self) -> usize {
-        self.width
-            .checked_mul(self.format.bytes_per_pixel())
-            .expect("width in bytes overflow")
+    pub fn new(
+        data: &'a mut [u8],
+        width: usize,
+        height: usize,
+        stride: usize,
+        format: PixelFormat,
+    ) -> Result<Self, BufferError> {
+        let buffer = Self {
+            data,
+            width,
+            height,
+            stride,
+            format,
+        };
+        buffer.validate()?;
+        Ok(buffer)
     }
 
-    pub fn validate(&self) -> Result<(), BufferError> {
+    #[must_use]
+    pub fn width_bytes(&self) -> usize {
+        self.try_width_bytes()
+            .expect("width in bytes computation failed")
+    }
+
+    pub fn try_width_bytes(&self) -> Result<usize, BufferError> {
+        self.width
+            .checked_mul(self.format.bytes_per_pixel())
+            .ok_or(BufferError::OutOfBounds)
+    }
+
+    pub fn required_len(&self) -> Result<usize, BufferError> {
         if self.width == 0 || self.height == 0 {
             return Err(BufferError::ZeroDimensions);
         }
 
-        let width_bytes = self
-            .width
-            .checked_mul(self.format.bytes_per_pixel())
-            .ok_or(BufferError::OutOfBounds)?;
+        let width_bytes = self.try_width_bytes()?;
 
         if self.stride < width_bytes {
             return Err(BufferError::StrideTooSmall);
         }
 
-        let required_len = self
-            .stride
+        self.stride
             .checked_mul(self.height)
-            .ok_or(BufferError::OutOfBounds)?;
+            .ok_or(BufferError::OutOfBounds)
+    }
+
+    pub fn validate(&self) -> Result<(), BufferError> {
+        let required_len = self.required_len()?;
 
         if self.data.len() < required_len {
             return Err(BufferError::DataTooShort);
@@ -68,35 +93,71 @@ impl<'a> Buffer<'a> {
 
     #[must_use]
     pub fn row(&self, y: usize) -> &[u8] {
-        assert!(y < self.height, "row index out of bounds");
+        self.try_row(y).expect("row access failed")
+    }
 
-        let start = y.checked_mul(self.stride).expect("row start overflow");
-        let end = start.checked_add(self.stride).expect("row end overflow");
+    pub fn try_row(&self, y: usize) -> Result<&[u8], BufferError> {
+        self.validate()?;
+        if y >= self.height {
+            return Err(BufferError::RowOutOfBounds);
+        }
 
-        &self.data[start..end]
+        let start = y.checked_mul(self.stride).ok_or(BufferError::OutOfBounds)?;
+        let end = start
+            .checked_add(self.stride)
+            .ok_or(BufferError::OutOfBounds)?;
+        if end > self.data.len() {
+            return Err(BufferError::DataTooShort);
+        }
+
+        Ok(&self.data[start..end])
     }
 
     #[must_use]
     pub fn row_mut(&mut self, y: usize) -> &mut [u8] {
-        assert!(y < self.height, "row index out of bounds");
+        self.try_row_mut(y).expect("row mut access failed")
+    }
 
-        let start = y.checked_mul(self.stride).expect("row start overflow");
-        let end = start.checked_add(self.stride).expect("row end overflow");
+    pub fn try_row_mut(&mut self, y: usize) -> Result<&mut [u8], BufferError> {
+        self.validate()?;
+        if y >= self.height {
+            return Err(BufferError::RowOutOfBounds);
+        }
 
-        &mut self.data[start..end]
+        let start = y.checked_mul(self.stride).ok_or(BufferError::OutOfBounds)?;
+        let end = start
+            .checked_add(self.stride)
+            .ok_or(BufferError::OutOfBounds)?;
+        if end > self.data.len() {
+            return Err(BufferError::DataTooShort);
+        }
+
+        Ok(&mut self.data[start..end])
     }
 
     #[must_use]
     pub fn pixel_offset(&self, x: usize, y: usize) -> usize {
-        assert!(x < self.width, "x index out of bounds");
-        assert!(y < self.height, "y index out of bounds");
+        self.try_pixel_offset(x, y)
+            .expect("pixel offset computation failed")
+    }
+
+    pub fn try_pixel_offset(&self, x: usize, y: usize) -> Result<usize, BufferError> {
+        self.validate()?;
+        if x >= self.width || y >= self.height {
+            return Err(BufferError::PixelOutOfBounds);
+        }
 
         let bpp = self.format.bytes_per_pixel();
-        let row_start = y.checked_mul(self.stride).expect("row start overflow");
-        let in_row = x.checked_mul(bpp).expect("pixel-in-row overflow");
+        let row_start = y.checked_mul(self.stride).ok_or(BufferError::OutOfBounds)?;
+        let in_row = x.checked_mul(bpp).ok_or(BufferError::OutOfBounds)?;
 
-        row_start
+        let offset = row_start
             .checked_add(in_row)
-            .expect("pixel offset overflow")
+            .ok_or(BufferError::OutOfBounds)?;
+        if offset >= self.data.len() {
+            return Err(BufferError::DataTooShort);
+        }
+
+        Ok(offset)
     }
 }

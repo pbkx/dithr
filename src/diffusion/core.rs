@@ -5,18 +5,20 @@ use crate::{
         fixed::mul_div_i32,
         utils::{clamp_i16, clamp_u8},
     },
-    quantize_pixel, Buffer, PixelFormat, QuantizeMode,
+    quantize_pixel, Buffer, DithrError, DithrResult, PixelFormat, QuantizeMode,
 };
 
 pub(crate) fn error_diffuse_in_place(
     buffer: &mut Buffer<'_>,
     mode: QuantizeMode<'_>,
     kernel: &ErrorKernel,
-) {
-    buffer
-        .validate()
-        .expect("buffer must be valid for error diffusion");
-    assert!(kernel.weight_den > 0, "kernel denominator must be positive");
+) -> DithrResult<()> {
+    buffer.validate()?;
+    if kernel.weight_den <= 0 {
+        return Err(DithrError::InvalidArgument(
+            "kernel denominator must be positive",
+        ));
+    }
 
     match buffer.format {
         PixelFormat::Gray8 => diffuse_gray_row_major(buffer, mode, kernel),
@@ -43,23 +45,11 @@ pub(crate) fn add_error_to_pixel(
         return;
     }
 
-    let pixel_index = match y.checked_mul(width).and_then(|base| base.checked_add(x)) {
-        Some(value) => value,
-        None => return,
-    };
-    let base = match pixel_index.checked_mul(channels) {
-        Some(value) => value,
-        None => return,
-    };
+    let pixel_index = y * width + x;
+    let base = pixel_index * channels;
 
     if channels == 1 {
-        if let Some(value) = errors.get_mut(base) {
-            *value += delta[0];
-        }
-        return;
-    }
-
-    if base + 2 >= errors.len() {
+        errors[base] += delta[0];
         return;
     }
 
@@ -72,20 +62,21 @@ pub(crate) fn diffuse_gray_row_major(
     buffer: &mut Buffer<'_>,
     mode: QuantizeMode<'_>,
     kernel: &ErrorKernel,
-) {
+) -> DithrResult<()> {
     let width = buffer.width;
     let height = buffer.height;
-    let den = i32::from(kernel.weight_den);
-    let mut errors = vec![0_i32; width.checked_mul(height).expect("image size overflow")];
+    let denominator = i32::from(kernel.weight_den);
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
+    let mut errors = vec![0_i32; pixel_count];
 
     for y in 0..height {
-        let row = buffer.row_mut(y);
+        let row = buffer.try_row_mut(y)?;
+        let row_base = y * width;
 
-        for (x, value) in row.iter_mut().take(width).enumerate() {
-            let idx = y
-                .checked_mul(width)
-                .and_then(|base| base.checked_add(x))
-                .expect("pixel index overflow");
+        for (x, value) in row.iter_mut().enumerate().take(width) {
+            let idx = row_base + x;
             let original = *value;
             let adjusted = clamp_u8(i32::from(original) + errors[idx]);
             let quantized = quantize_pixel(PixelFormat::Gray8, &[adjusted], mode);
@@ -97,7 +88,7 @@ pub(crate) fn diffuse_gray_row_major(
             for tap in kernel.taps {
                 let nx = x as isize + isize::from(tap.dx);
                 let ny = y as isize + isize::from(tap.dy);
-                let distributed = mul_div_i32(err, i32::from(tap.weight_num), den);
+                let distributed = mul_div_i32(err, i32::from(tap.weight_num), denominator);
                 add_error_to_pixel(
                     &mut errors,
                     width,
@@ -110,48 +101,44 @@ pub(crate) fn diffuse_gray_row_major(
             }
         }
     }
+
+    Ok(())
 }
 
 pub(crate) fn diffuse_rgb_row_major(
     buffer: &mut Buffer<'_>,
     mode: QuantizeMode<'_>,
     kernel: &ErrorKernel,
-) {
+) -> DithrResult<()> {
     let width = buffer.width;
     let height = buffer.height;
     let format = buffer.format;
-    let den = i32::from(kernel.weight_den);
-    let bpp = format.bytes_per_pixel();
+    let denominator = i32::from(kernel.weight_den);
+    let bytes_per_pixel = format.bytes_per_pixel();
     let channels = 3_usize;
-    let pixel_count = width.checked_mul(height).expect("image size overflow");
-    let mut errors = vec![
-        0_i32;
-        pixel_count
-            .checked_mul(channels)
-            .expect("error buffer size overflow")
-    ];
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
+    let error_len = pixel_count
+        .checked_mul(channels)
+        .ok_or(DithrError::InvalidArgument("error buffer size overflow"))?;
+    let mut errors = vec![0_i32; error_len];
+    let is_rgba = format == PixelFormat::Rgba8;
 
     for y in 0..height {
-        let row = buffer.row_mut(y);
+        let row = buffer.try_row_mut(y)?;
+        let row_error_base = y * width * channels;
 
         for x in 0..width {
-            let offset = x.checked_mul(bpp).expect("row offset overflow");
-            let base = y
-                .checked_mul(width)
-                .and_then(|v| v.checked_add(x))
-                .and_then(|v| v.checked_mul(channels))
-                .expect("rgb error index overflow");
+            let offset = x * bytes_per_pixel;
+            let error_base = row_error_base + x * channels;
             let adjusted = [
-                clamp_u8(i32::from(row[offset]) + errors[base]),
-                clamp_u8(i32::from(row[offset + 1]) + errors[base + 1]),
-                clamp_u8(i32::from(row[offset + 2]) + errors[base + 2]),
+                clamp_u8(i32::from(row[offset]) + errors[error_base]),
+                clamp_u8(i32::from(row[offset + 1]) + errors[error_base + 1]),
+                clamp_u8(i32::from(row[offset + 2]) + errors[error_base + 2]),
             ];
-            let alpha = if format == PixelFormat::Rgba8 {
-                row[offset + 3]
-            } else {
-                255
-            };
-            let pixel = if format == PixelFormat::Rgba8 {
+            let alpha = if is_rgba { row[offset + 3] } else { 255 };
+            let pixel = if is_rgba {
                 [adjusted[0], adjusted[1], adjusted[2], alpha]
             } else {
                 [adjusted[0], adjusted[1], adjusted[2], 255]
@@ -161,7 +148,7 @@ pub(crate) fn diffuse_rgb_row_major(
             row[offset] = quantized[0];
             row[offset + 1] = quantized[1];
             row[offset + 2] = quantized[2];
-            if format == PixelFormat::Rgba8 {
+            if is_rgba {
                 row[offset + 3] = alpha;
             }
 
@@ -175,9 +162,9 @@ pub(crate) fn diffuse_rgb_row_major(
                 let nx = x as isize + isize::from(tap.dx);
                 let ny = y as isize + isize::from(tap.dy);
                 let distributed = [
-                    mul_div_i32(err[0], i32::from(tap.weight_num), den),
-                    mul_div_i32(err[1], i32::from(tap.weight_num), den),
-                    mul_div_i32(err[2], i32::from(tap.weight_num), den),
+                    mul_div_i32(err[0], i32::from(tap.weight_num), denominator),
+                    mul_div_i32(err[1], i32::from(tap.weight_num), denominator),
+                    mul_div_i32(err[2], i32::from(tap.weight_num), denominator),
                 ];
                 add_error_to_pixel(
                     &mut errors,
@@ -195,4 +182,6 @@ pub(crate) fn diffuse_rgb_row_major(
             }
         }
     }
+
+    Ok(())
 }

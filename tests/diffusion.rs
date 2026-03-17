@@ -22,7 +22,8 @@ fn diffusion_engine_gray_binary_output_for_graybits1() {
         format: PixelFormat::Gray8,
     };
 
-    floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("floyd-steinberg should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -38,7 +39,8 @@ fn floyd_steinberg_gray_bits1_binary_only() {
         format: PixelFormat::Gray8,
     };
 
-    floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("floyd-steinberg should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -54,7 +56,8 @@ fn false_floyd_steinberg_runs() {
         format: PixelFormat::Gray8,
     };
 
-    false_floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    false_floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("false floyd-steinberg should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -70,7 +73,8 @@ fn jarvis_judice_ninke_runs() {
         format: PixelFormat::Gray8,
     };
 
-    jarvis_judice_ninke_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    jarvis_judice_ninke_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("jarvis-judice-ninke should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -86,7 +90,7 @@ fn stucki_runs() {
         format: PixelFormat::Gray8,
     };
 
-    stucki_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    stucki_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("stucki should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -102,7 +106,7 @@ fn burkes_runs() {
         format: PixelFormat::Gray8,
     };
 
-    burkes_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    burkes_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("burkes should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -118,7 +122,7 @@ fn sierra_runs() {
         format: PixelFormat::Gray8,
     };
 
-    sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("sierra should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -134,7 +138,8 @@ fn two_row_sierra_runs() {
         format: PixelFormat::Gray8,
     };
 
-    two_row_sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    two_row_sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("two-row sierra should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -150,7 +155,8 @@ fn sierra_lite_runs() {
         format: PixelFormat::Gray8,
     };
 
-    sierra_lite_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    sierra_lite_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("sierra lite should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -166,7 +172,8 @@ fn stevenson_arce_runs() {
         format: PixelFormat::Gray8,
     };
 
-    stevenson_arce_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    stevenson_arce_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("stevenson-arce should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -182,7 +189,7 @@ fn atkinson_runs() {
         format: PixelFormat::Gray8,
     };
 
-    atkinson_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    atkinson_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("atkinson should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -338,7 +345,8 @@ fn diffusion_engine_rgb_palette_output_is_palette_member() {
         format: PixelFormat::Rgb8,
     };
 
-    floyd_steinberg_in_place(&mut buffer, QuantizeMode::Palette(&palette));
+    floyd_steinberg_in_place(&mut buffer, QuantizeMode::Palette(&palette))
+        .expect("floyd-steinberg should succeed");
 
     for chunk in data.chunks_exact(3) {
         let rgb = [chunk[0], chunk[1], chunk[2]];
@@ -360,7 +368,8 @@ fn diffusion_engine_preserves_alpha() {
         format: PixelFormat::Rgba8,
     };
 
-    floyd_steinberg_in_place(&mut buffer, QuantizeMode::RgbBits(2));
+    floyd_steinberg_in_place(&mut buffer, QuantizeMode::RgbBits(2))
+        .expect("floyd-steinberg should succeed");
 
     let after_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
     assert_eq!(before_alpha, after_alpha);
@@ -377,7 +386,8 @@ fn diffusion_engine_does_not_panic_on_1x1() {
         format: PixelFormat::Gray8,
     };
 
-    floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("floyd-steinberg should succeed");
 
     assert_eq!(data.len(), 1);
 }
@@ -405,8 +415,10 @@ fn diffusion_engine_is_deterministic() {
         format: PixelFormat::Rgb8,
     };
 
-    floyd_steinberg_in_place(&mut buffer_a, QuantizeMode::RgbBits(3));
-    floyd_steinberg_in_place(&mut buffer_b, QuantizeMode::RgbBits(3));
+    floyd_steinberg_in_place(&mut buffer_a, QuantizeMode::RgbBits(3))
+        .expect("floyd-steinberg should succeed");
+    floyd_steinberg_in_place(&mut buffer_b, QuantizeMode::RgbBits(3))
+        .expect("floyd-steinberg should succeed");
 
     assert_eq!(a, b);
 }

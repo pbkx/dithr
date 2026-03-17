@@ -268,7 +268,8 @@ fn golden_floyd_steinberg_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("floyd-steinberg should succeed");
 
     assert_eq!(fnv1a64(&data), 15_370_527_749_909_082_316_u64);
 }
@@ -284,7 +285,8 @@ fn golden_false_floyd_steinberg_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    false_floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    false_floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("false floyd-steinberg should succeed");
 
     assert_eq!(fnv1a64(&data), 2_599_382_831_596_154_378_u64);
 }
@@ -300,7 +302,8 @@ fn golden_jarvis_judice_ninke_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    jarvis_judice_ninke_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    jarvis_judice_ninke_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("jarvis-judice-ninke should succeed");
 
     assert_eq!(fnv1a64(&data), 709_575_439_284_171_922_u64);
 }
@@ -316,7 +319,7 @@ fn golden_stucki_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    stucki_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    stucki_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("stucki should succeed");
 
     assert_eq!(fnv1a64(&data), 10_872_794_653_581_678_681_u64);
 }
@@ -332,7 +335,7 @@ fn golden_burkes_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    burkes_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    burkes_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("burkes should succeed");
 
     assert_eq!(fnv1a64(&data), 11_923_719_224_799_449_376_u64);
 }
@@ -348,7 +351,7 @@ fn golden_sierra_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("sierra should succeed");
 
     assert_eq!(fnv1a64(&data), 407_481_245_873_367_030_u64);
 }
@@ -364,7 +367,8 @@ fn golden_two_row_sierra_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    two_row_sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    two_row_sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("two-row sierra should succeed");
 
     assert_eq!(fnv1a64(&data), 15_373_028_790_230_598_230_u64);
 }
@@ -380,7 +384,8 @@ fn golden_sierra_lite_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    sierra_lite_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    sierra_lite_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("sierra lite should succeed");
 
     assert_eq!(fnv1a64(&data), 7_763_576_900_855_120_566_u64);
 }
@@ -396,7 +401,8 @@ fn golden_stevenson_arce_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    stevenson_arce_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    stevenson_arce_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("stevenson-arce should succeed");
 
     assert_eq!(fnv1a64(&data), 2_020_166_953_124_605_799_u64);
 }
@@ -412,7 +418,7 @@ fn golden_atkinson_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    atkinson_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    atkinson_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("atkinson should succeed");
 
     assert_eq!(fnv1a64(&data), 2_916_696_500_870_610_775_u64);
 }

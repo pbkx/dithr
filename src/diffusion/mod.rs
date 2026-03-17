@@ -21,5 +21,6 @@ pub(crate) fn error_diffuse_in_place(
     mode: QuantizeMode<'_>,
     kernel: &ErrorKernel,
 ) {
-    core::error_diffuse_in_place(buffer, mode, kernel);
+    core::error_diffuse_in_place(buffer, mode, kernel)
+        .expect("buffer and kernel must be valid for error diffusion");
 }

@@ -6,7 +6,6 @@ use common::{
 use dithr::data::{
     generate_bayer_16x16, BAYER_2X2, BAYER_4X4, BAYER_8X8, CLUSTER_DOT_4X4, CLUSTER_DOT_8X8,
 };
-use dithr::ordered::{ordered_dither_in_place, ordered_threshold_for_xy};
 use dithr::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
     cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
@@ -383,14 +382,15 @@ fn ordered_engine_gray_uses_only_quantized_values() {
         format: PixelFormat::Gray8,
     };
 
-    ordered_dither_in_place(
+    custom_ordered_in_place(
         &mut buffer,
         QuantizeMode::GrayBits(1),
         &BAYER_2X2_FLAT,
         2,
         2,
         64,
-    );
+    )
+    .expect("custom ordered dither should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -418,14 +418,15 @@ fn ordered_engine_rgb_palette_output_is_palette_member() {
         format: PixelFormat::Rgb8,
     };
 
-    ordered_dither_in_place(
+    custom_ordered_in_place(
         &mut buffer,
         QuantizeMode::Palette(&palette),
         &BAYER_4X4_FLAT,
         4,
         4,
         64,
-    );
+    )
+    .expect("custom ordered dither should succeed");
 
     for chunk in data.chunks_exact(3) {
         let rgb = [chunk[0], chunk[1], chunk[2]];
@@ -456,22 +457,24 @@ fn ordered_engine_is_deterministic() {
         format: PixelFormat::Rgb8,
     };
 
-    ordered_dither_in_place(
+    custom_ordered_in_place(
         &mut buffer_a,
         QuantizeMode::RgbBits(3),
         &BAYER_4X4_FLAT,
         4,
         4,
         40,
-    );
-    ordered_dither_in_place(
+    )
+    .expect("custom ordered dither should succeed");
+    custom_ordered_in_place(
         &mut buffer_b,
         QuantizeMode::RgbBits(3),
         &BAYER_4X4_FLAT,
         4,
         4,
         40,
-    );
+    )
+    .expect("custom ordered dither should succeed");
 
     assert_eq!(a, b);
 }
@@ -490,25 +493,52 @@ fn ordered_engine_preserves_alpha_channel() {
         format: PixelFormat::Rgba8,
     };
 
-    ordered_dither_in_place(
+    custom_ordered_in_place(
         &mut buffer,
         QuantizeMode::RgbBits(2),
         &BAYER_2X2_FLAT,
         2,
         2,
         48,
-    );
+    )
+    .expect("custom ordered dither should succeed");
 
     let after_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
     assert_eq!(before_alpha, after_alpha);
 }
 
 #[test]
-fn ordered_threshold_lookup_tiles_correctly() {
-    assert_eq!(ordered_threshold_for_xy(0, 0, &BAYER_2X2_FLAT, 2, 2), 0);
-    assert_eq!(ordered_threshold_for_xy(1, 0, &BAYER_2X2_FLAT, 2, 2), 2);
-    assert_eq!(ordered_threshold_for_xy(2, 0, &BAYER_2X2_FLAT, 2, 2), 0);
-    assert_eq!(ordered_threshold_for_xy(3, 3, &BAYER_2X2_FLAT, 2, 2), 1);
+fn custom_ordered_map_tiling_is_consistent() {
+    let mut data = vec![127_u8; 64];
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::Gray8,
+    };
+
+    custom_ordered_in_place(
+        &mut buffer,
+        QuantizeMode::GrayBits(1),
+        &BAYER_2X2_FLAT,
+        2,
+        2,
+        64,
+    )
+    .expect("custom ordered dither should succeed");
+
+    for y in 0..8 {
+        for x in 0..6 {
+            assert_eq!(data[y * 8 + x], data[y * 8 + x + 2]);
+        }
+    }
+
+    for y in 0..6 {
+        for x in 0..8 {
+            assert_eq!(data[y * 8 + x], data[(y + 2) * 8 + x]);
+        }
+    }
 }
 
 #[test]

@@ -3,8 +3,6 @@ mod common;
 use common::{
     checker_8x8, fnv1a64, gray_ramp_16x16, gray_ramp_8x8, rgb_cube_strip, rgb_gradient_8x8,
 };
-use dithr::data::FLOYD_STEINBERG;
-use dithr::diffusion::error_diffuse_in_place;
 use dithr::{
     atkinson_in_place, burkes_in_place, false_floyd_steinberg_in_place, fan_in_place,
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place,
@@ -24,7 +22,7 @@ fn diffusion_engine_gray_binary_output_for_graybits1() {
         format: PixelFormat::Gray8,
     };
 
-    error_diffuse_in_place(&mut buffer, QuantizeMode::GrayBits(1), &FLOYD_STEINBERG);
+    floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1));
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -340,11 +338,7 @@ fn diffusion_engine_rgb_palette_output_is_palette_member() {
         format: PixelFormat::Rgb8,
     };
 
-    error_diffuse_in_place(
-        &mut buffer,
-        QuantizeMode::Palette(&palette),
-        &FLOYD_STEINBERG,
-    );
+    floyd_steinberg_in_place(&mut buffer, QuantizeMode::Palette(&palette));
 
     for chunk in data.chunks_exact(3) {
         let rgb = [chunk[0], chunk[1], chunk[2]];
@@ -366,7 +360,7 @@ fn diffusion_engine_preserves_alpha() {
         format: PixelFormat::Rgba8,
     };
 
-    error_diffuse_in_place(&mut buffer, QuantizeMode::RgbBits(2), &FLOYD_STEINBERG);
+    floyd_steinberg_in_place(&mut buffer, QuantizeMode::RgbBits(2));
 
     let after_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
     assert_eq!(before_alpha, after_alpha);
@@ -383,7 +377,7 @@ fn diffusion_engine_does_not_panic_on_1x1() {
         format: PixelFormat::Gray8,
     };
 
-    error_diffuse_in_place(&mut buffer, QuantizeMode::GrayBits(1), &FLOYD_STEINBERG);
+    floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1));
 
     assert_eq!(data.len(), 1);
 }
@@ -411,8 +405,8 @@ fn diffusion_engine_is_deterministic() {
         format: PixelFormat::Rgb8,
     };
 
-    error_diffuse_in_place(&mut buffer_a, QuantizeMode::RgbBits(3), &FLOYD_STEINBERG);
-    error_diffuse_in_place(&mut buffer_b, QuantizeMode::RgbBits(3), &FLOYD_STEINBERG);
+    floyd_steinberg_in_place(&mut buffer_a, QuantizeMode::RgbBits(3));
+    floyd_steinberg_in_place(&mut buffer_b, QuantizeMode::RgbBits(3));
 
     assert_eq!(a, b);
 }

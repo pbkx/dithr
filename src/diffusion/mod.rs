@@ -16,7 +16,7 @@ pub use variable::{
 };
 
 #[doc(hidden)]
-pub fn error_diffuse_in_place(
+pub(crate) fn error_diffuse_in_place(
     buffer: &mut Buffer<'_>,
     mode: QuantizeMode<'_>,
     kernel: &ErrorKernel,

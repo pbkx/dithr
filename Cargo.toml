@@ -3,6 +3,7 @@ name = "dithr"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
+autobenches = false
 license = "GPL-3.0-only"
 description = "Buffer-first dithering and halftoning algorithms."
 
@@ -13,3 +14,26 @@ rayon = ["dep:rayon"]
 
 [dependencies]
 rayon = { version = "1.11.0", optional = true }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "stochastic"
+harness = false
+
+[[bench]]
+name = "ordered"
+harness = false
+
+[[bench]]
+name = "yliluoma"
+harness = false
+
+[[bench]]
+name = "diffusion"
+harness = false
+
+[[bench]]
+name = "advanced"
+harness = false

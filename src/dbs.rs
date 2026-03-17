@@ -1,4 +1,4 @@
-use crate::{math::fixed::mul_div_i32, Buffer, PixelFormat};
+use crate::{math::fixed::mul_div_i32, Buffer, DithrError, DithrResult, PixelFormat};
 
 const DBS_KERNEL: [[u32; 3]; 3] = [[1, 2, 1], [2, 4, 2], [1, 2, 1]];
 const LBM_SCALE: i32 = 16_384;
@@ -35,48 +35,45 @@ const ELECTRO_NEIGHBORS: [(isize, isize); 9] = [
     (1, 1),
 ];
 
-pub fn direct_binary_search_in_place(buffer: &mut Buffer<'_>, max_iters: usize) {
-    buffer
-        .validate()
-        .expect("buffer must be valid for direct binary search");
-    assert_eq!(
-        buffer.format,
-        PixelFormat::Gray8,
-        "direct binary search v1 supports Gray8 only"
-    );
+pub fn direct_binary_search_in_place(buffer: &mut Buffer<'_>, max_iters: usize) -> DithrResult<()> {
+    buffer.validate()?;
+    if buffer.format != PixelFormat::Gray8 {
+        return Err(DithrError::UnsupportedFormat(
+            "direct binary search supports Gray8 only",
+        ));
+    }
 
     let width = buffer.width;
     let height = buffer.height;
-    let pixel_count = width.checked_mul(height).expect("image size overflow");
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
 
     let mut target = Vec::with_capacity(pixel_count);
     let mut binary = Vec::with_capacity(pixel_count);
 
     for y in 0..height {
-        let row = buffer.row(y);
+        let row = buffer.try_row(y)?;
         for &value in row.iter().take(width) {
             target.push(value);
             binary.push(if value >= 128 { 255 } else { 0 });
         }
     }
 
-    let mut current_objective = dbs_objective(&target, &binary, width, height);
+    let mut current_objective = dbs_objective(&target, &binary, width, height)?;
 
     for _ in 0..max_iters {
         let mut improved = false;
 
         for y in 0..height {
             for x in 0..width {
-                let idx = y
-                    .checked_mul(width)
-                    .and_then(|base| base.checked_add(x))
-                    .expect("pixel index overflow");
+                let idx = y * width + x;
                 let mut best = current_objective;
                 let mut best_move = CandidateMove::None;
 
                 let original = binary[idx];
                 binary[idx] = 255_u8.wrapping_sub(original);
-                let flip_objective = dbs_objective(&target, &binary, width, height);
+                let flip_objective = dbs_objective(&target, &binary, width, height)?;
                 if flip_objective < best {
                     best = flip_objective;
                     best_move = CandidateMove::Flip(idx);
@@ -87,7 +84,7 @@ pub fn direct_binary_search_in_place(buffer: &mut Buffer<'_>, max_iters: usize) 
                     let right = idx + 1;
                     if binary[idx] != binary[right] {
                         binary.swap(idx, right);
-                        let swap_right_objective = dbs_objective(&target, &binary, width, height);
+                        let swap_right_objective = dbs_objective(&target, &binary, width, height)?;
                         if swap_right_objective < best {
                             best = swap_right_objective;
                             best_move = CandidateMove::Swap(idx, right);
@@ -100,7 +97,7 @@ pub fn direct_binary_search_in_place(buffer: &mut Buffer<'_>, max_iters: usize) 
                     let below = idx + width;
                     if binary[idx] != binary[below] {
                         binary.swap(idx, below);
-                        let swap_down_objective = dbs_objective(&target, &binary, width, height);
+                        let swap_down_objective = dbs_objective(&target, &binary, width, height)?;
                         if swap_down_objective < best {
                             best = swap_down_objective;
                             best_move = CandidateMove::Swap(idx, below);
@@ -131,30 +128,32 @@ pub fn direct_binary_search_in_place(buffer: &mut Buffer<'_>, max_iters: usize) 
     }
 
     for y in 0..height {
-        let start = y.checked_mul(width).expect("binary row start overflow");
-        let end = start.checked_add(width).expect("binary row end overflow");
-        let row = buffer.row_mut(y);
+        let start = y * width;
+        let end = start + width;
+        let row = buffer.try_row_mut(y)?;
         row[..width].copy_from_slice(&binary[start..end]);
     }
+
+    Ok(())
 }
 
-pub fn lattice_boltzmann_in_place(buffer: &mut Buffer<'_>, max_steps: usize) {
-    buffer
-        .validate()
-        .expect("buffer must be valid for lattice-boltzmann dithering");
-    assert_eq!(
-        buffer.format,
-        PixelFormat::Gray8,
-        "lattice-boltzmann v1 supports Gray8 only"
-    );
+pub fn lattice_boltzmann_in_place(buffer: &mut Buffer<'_>, max_steps: usize) -> DithrResult<()> {
+    buffer.validate()?;
+    if buffer.format != PixelFormat::Gray8 {
+        return Err(DithrError::UnsupportedFormat(
+            "lattice-boltzmann supports Gray8 only",
+        ));
+    }
 
     let width = buffer.width;
     let height = buffer.height;
-    let pixel_count = width.checked_mul(height).expect("image size overflow");
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
     let mut target = Vec::with_capacity(pixel_count);
 
     for y in 0..height {
-        let row = buffer.row(y);
+        let row = buffer.try_row(y)?;
         for &value in row.iter().take(width) {
             target.push(mul_div_i32(i32::from(value), LBM_SCALE, 255));
         }
@@ -187,10 +186,7 @@ pub fn lattice_boltzmann_in_place(buffer: &mut Buffer<'_>, max_steps: usize) {
 
         for y in 0..height {
             for x in 0..width {
-                let idx = y
-                    .checked_mul(width)
-                    .and_then(|base| base.checked_add(x))
-                    .expect("stream index overflow");
+                let idx = y * width + x;
 
                 for d in 0..9 {
                     let (dx, dy) = LBM_DIRECTIONS[d];
@@ -198,10 +194,7 @@ pub fn lattice_boltzmann_in_place(buffer: &mut Buffer<'_>, max_steps: usize) {
                     let ny = y as isize + dy;
 
                     if nx >= 0 && ny >= 0 && (nx as usize) < width && (ny as usize) < height {
-                        let nidx = (ny as usize)
-                            .checked_mul(width)
-                            .and_then(|base| base.checked_add(nx as usize))
-                            .expect("stream target overflow");
+                        let nidx = ny as usize * width + nx as usize;
                         streamed[nidx][d] += post_collision[idx][d];
                     } else {
                         let opp = LBM_OPPOSITE[d];
@@ -215,35 +208,37 @@ pub fn lattice_boltzmann_in_place(buffer: &mut Buffer<'_>, max_steps: usize) {
     }
 
     for y in 0..height {
-        let row = buffer.row_mut(y);
+        let row = buffer.try_row_mut(y)?;
         for (x, value) in row.iter_mut().take(width).enumerate() {
-            let idx = y
-                .checked_mul(width)
-                .and_then(|base| base.checked_add(x))
-                .expect("output index overflow");
+            let idx = y * width + x;
             let rho = distributions[idx].iter().sum::<i32>();
             *value = if rho >= LBM_HALF_SCALE { 255 } else { 0 };
         }
     }
+
+    Ok(())
 }
 
-pub fn electrostatic_halftoning_in_place(buffer: &mut Buffer<'_>, max_steps: usize) {
-    buffer
-        .validate()
-        .expect("buffer must be valid for electrostatic halftoning");
-    assert_eq!(
-        buffer.format,
-        PixelFormat::Gray8,
-        "electrostatic halftoning v1 supports Gray8 only"
-    );
+pub fn electrostatic_halftoning_in_place(
+    buffer: &mut Buffer<'_>,
+    max_steps: usize,
+) -> DithrResult<()> {
+    buffer.validate()?;
+    if buffer.format != PixelFormat::Gray8 {
+        return Err(DithrError::UnsupportedFormat(
+            "electrostatic halftoning supports Gray8 only",
+        ));
+    }
 
     let width = buffer.width;
     let height = buffer.height;
-    let pixel_count = width.checked_mul(height).expect("image size overflow");
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
     let mut darkness = Vec::with_capacity(pixel_count);
 
     for y in 0..height {
-        let row = buffer.row(y);
+        let row = buffer.try_row(y)?;
         for &value in row.iter().take(width) {
             darkness.push(255_u8.wrapping_sub(value));
         }
@@ -276,10 +271,7 @@ pub fn electrostatic_halftoning_in_place(buffer: &mut Buffer<'_>, max_steps: usi
                     continue;
                 }
 
-                let candidate = (ny as usize)
-                    .checked_mul(width)
-                    .and_then(|base| base.checked_add(nx as usize))
-                    .expect("candidate index overflow");
+                let candidate = ny as usize * width + nx as usize;
                 if candidate != current && occupied[candidate] {
                     continue;
                 }
@@ -306,18 +298,17 @@ pub fn electrostatic_halftoning_in_place(buffer: &mut Buffer<'_>, max_steps: usi
     }
 
     for y in 0..height {
-        let row = buffer.row_mut(y);
+        let row = buffer.try_row_mut(y)?;
         for (x, value) in row.iter_mut().take(width).enumerate() {
-            let idx = y
-                .checked_mul(width)
-                .and_then(|base| base.checked_add(x))
-                .expect("output index overflow");
+            let idx = y * width + x;
             *value = if occupied[idx] { 0 } else { 255 };
         }
     }
+
+    Ok(())
 }
 
-fn dbs_objective(target: &[u8], binary: &[u8], width: usize, height: usize) -> u64 {
+fn dbs_objective(target: &[u8], binary: &[u8], width: usize, height: usize) -> DithrResult<u64> {
     let mut total = 0_u64;
 
     for y in 0..height {
@@ -335,36 +326,24 @@ fn dbs_objective(target: &[u8], binary: &[u8], width: usize, height: usize) -> u
                     let ky = ny + 1 - y;
                     let kx = nx + 1 - x;
                     let weight = DBS_KERNEL[ky][kx];
-                    let idx = ny
-                        .checked_mul(width)
-                        .and_then(|base| base.checked_add(nx))
-                        .expect("neighbor index overflow");
+                    let idx = ny * width + nx;
 
-                    weighted_sum = weighted_sum
-                        .checked_add(
-                            u32::from(binary[idx])
-                                .checked_mul(weight)
-                                .expect("weighted sum overflow"),
-                        )
-                        .expect("weighted accumulation overflow");
-                    weight_total = weight_total
-                        .checked_add(weight)
-                        .expect("weight accumulation overflow");
+                    weighted_sum += u32::from(binary[idx]) * weight;
+                    weight_total += weight;
                 }
             }
 
             let filtered = ((weighted_sum + (weight_total / 2)) / weight_total) as i32;
-            let idx = y
-                .checked_mul(width)
-                .and_then(|base| base.checked_add(x))
-                .expect("target index overflow");
+            let idx = y * width + x;
             let diff = i32::from(target[idx]) - filtered;
-            let sq = i64::from(diff) * i64::from(diff);
-            total = total.checked_add(sq as u64).expect("objective overflow");
+            let sq = (i64::from(diff) * i64::from(diff)) as u64;
+            total = total
+                .checked_add(sq)
+                .ok_or(DithrError::InvalidArgument("objective overflow"))?;
         }
     }
 
-    total
+    Ok(total)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -409,14 +388,11 @@ fn electrostatic_utility(
         let oy = (other / width) as i64;
         let dx = cx - ox;
         let dy = cy - oy;
-        let dist2 = dx
-            .checked_mul(dx)
-            .and_then(|v| v.checked_add(dy * dy))
-            .expect("distance overflow");
+        let dist2 = i128::from(dx) * i128::from(dx) + i128::from(dy) * i128::from(dy);
         if dist2 == 0 {
             continue;
         }
-        repulsion += ELECTRO_REPEL_SCALE / dist2;
+        repulsion += (i128::from(ELECTRO_REPEL_SCALE) / dist2) as i64;
     }
 
     let attraction = i64::from(darkness[candidate]) * ELECTRO_ATTRACT_WEIGHT;

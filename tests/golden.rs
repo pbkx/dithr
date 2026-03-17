@@ -533,7 +533,7 @@ fn golden_riemersma_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    riemersma_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    riemersma_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("riemersma should succeed");
 
     assert_eq!(fnv1a64(&data), 4_759_045_697_198_729_208_u64);
 }
@@ -549,7 +549,8 @@ fn golden_knuth_dot_diffusion_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    knuth_dot_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    knuth_dot_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("knuth dot diffusion should succeed");
 
     assert_eq!(fnv1a64(&data), 5_433_988_350_430_228_710_u64);
 }
@@ -565,7 +566,7 @@ fn golden_dbs_gray_ramp_8x8() {
         format: PixelFormat::Gray8,
     };
 
-    direct_binary_search_in_place(&mut buffer, 4);
+    direct_binary_search_in_place(&mut buffer, 4).expect("direct binary search should succeed");
 
     assert_eq!(fnv1a64(&data), 1_738_359_872_340_429_752_u64);
 }
@@ -581,7 +582,7 @@ fn golden_lattice_boltzmann_gray_ramp_8x8() {
         format: PixelFormat::Gray8,
     };
 
-    lattice_boltzmann_in_place(&mut buffer, 8);
+    lattice_boltzmann_in_place(&mut buffer, 8).expect("lattice-boltzmann should succeed");
 
     assert_eq!(fnv1a64(&data), 4_864_876_028_568_798_213_u64);
 }
@@ -597,7 +598,8 @@ fn golden_electrostatic_halftoning_gray_ramp_8x8() {
         format: PixelFormat::Gray8,
     };
 
-    electrostatic_halftoning_in_place(&mut buffer, 10);
+    electrostatic_halftoning_in_place(&mut buffer, 10)
+        .expect("electrostatic halftoning should succeed");
 
     assert_eq!(fnv1a64(&data), 1_985_050_605_501_357_403_u64);
 }

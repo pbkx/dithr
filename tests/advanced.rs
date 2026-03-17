@@ -41,7 +41,8 @@ fn knuth_dot_diffusion_runs() {
         format: PixelFormat::Gray8,
     };
 
-    knuth_dot_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    knuth_dot_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("knuth dot diffusion should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -57,7 +58,7 @@ fn dbs_runs_small_fixture() {
         format: PixelFormat::Gray8,
     };
 
-    direct_binary_search_in_place(&mut buffer, 4);
+    direct_binary_search_in_place(&mut buffer, 4).expect("direct binary search should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -91,9 +92,9 @@ fn dbs_objective_nonincreasing_over_iterations() {
         format: PixelFormat::Gray8,
     };
 
-    direct_binary_search_in_place(&mut buffer_0, 0);
-    direct_binary_search_in_place(&mut buffer_1, 1);
-    direct_binary_search_in_place(&mut buffer_2, 2);
+    direct_binary_search_in_place(&mut buffer_0, 0).expect("direct binary search should succeed");
+    direct_binary_search_in_place(&mut buffer_1, 1).expect("direct binary search should succeed");
+    direct_binary_search_in_place(&mut buffer_2, 2).expect("direct binary search should succeed");
 
     let objective_0 = dbs_objective_for_test(&target, &data_0, 8, 8);
     let objective_1 = dbs_objective_for_test(&target, &data_1, 8, 8);
@@ -114,7 +115,7 @@ fn lattice_boltzmann_runs_small_fixture() {
         format: PixelFormat::Gray8,
     };
 
-    lattice_boltzmann_in_place(&mut buffer, 6);
+    lattice_boltzmann_in_place(&mut buffer, 6).expect("lattice-boltzmann should succeed");
 
     assert_eq!(data.len(), 64);
 }
@@ -130,7 +131,7 @@ fn lattice_boltzmann_binary_only_output() {
         format: PixelFormat::Gray8,
     };
 
-    lattice_boltzmann_in_place(&mut buffer, 8);
+    lattice_boltzmann_in_place(&mut buffer, 8).expect("lattice-boltzmann should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -146,7 +147,8 @@ fn electrostatic_halftoning_runs_small_fixture() {
         format: PixelFormat::Gray8,
     };
 
-    electrostatic_halftoning_in_place(&mut buffer, 8);
+    electrostatic_halftoning_in_place(&mut buffer, 8)
+        .expect("electrostatic halftoning should succeed");
 
     assert_eq!(data.len(), 64);
 }
@@ -162,7 +164,8 @@ fn electrostatic_halftoning_binary_only_output() {
         format: PixelFormat::Gray8,
     };
 
-    electrostatic_halftoning_in_place(&mut buffer, 10);
+    electrostatic_halftoning_in_place(&mut buffer, 10)
+        .expect("electrostatic halftoning should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -178,7 +181,7 @@ fn riemersma_runs() {
         format: PixelFormat::Gray8,
     };
 
-    riemersma_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    riemersma_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("riemersma should succeed");
 
     assert_eq!(data.len(), 256);
 }
@@ -194,7 +197,7 @@ fn riemersma_binary_only_for_graybits1() {
         format: PixelFormat::Gray8,
     };
 
-    riemersma_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    riemersma_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("riemersma should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }

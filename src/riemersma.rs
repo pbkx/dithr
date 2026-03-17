@@ -3,26 +3,26 @@ use crate::{
         color::luma_u8,
         utils::{clamp_i16, clamp_u8},
     },
-    quantize_pixel, Buffer, PixelFormat, QuantizeMode,
+    quantize_pixel, Buffer, DithrError, DithrResult, PixelFormat, QuantizeMode,
 };
 
 const HISTORY_LEN: usize = 16;
 const HISTORY_WEIGHTS: [i32; HISTORY_LEN] = [1, 1, 2, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 19, 23, 27];
 const HISTORY_WEIGHT_SUM: i32 = 153;
 
-pub fn riemersma_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
-    buffer
-        .validate()
-        .expect("buffer must be valid for riemersma dithering");
+pub fn riemersma_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> DithrResult<()> {
+    buffer.validate()?;
 
     let width = buffer.width;
     let height = buffer.height;
-    let stride = buffer.stride;
     let format = buffer.format;
-    let bpp = format.bytes_per_pixel();
-    let pixel_count = width.checked_mul(height).expect("image size overflow");
-    let side = hilbert_side(width.max(height));
-    let total_steps = side.checked_mul(side).expect("hilbert size overflow");
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
+    let side = hilbert_side(width.max(height))?;
+    let total_steps = side
+        .checked_mul(side)
+        .ok_or(DithrError::InvalidArgument("hilbert size overflow"))?;
 
     let mut history = [[0_i32; 3]; HISTORY_LEN];
     let mut head = 0_usize;
@@ -34,17 +34,12 @@ pub fn riemersma_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
             break;
         }
 
-        let (x, y) = hilbert_d2xy(side, d);
+        let (x, y) = hilbert_d2xy(side, d)?;
         if x >= width || y >= height {
             continue;
         }
 
-        let row_base = y.checked_mul(stride).expect("row offset overflow");
-        let col_base = x.checked_mul(bpp).expect("col offset overflow");
-        let offset = row_base
-            .checked_add(col_base)
-            .expect("pixel offset overflow");
-
+        let offset = buffer.try_pixel_offset(x, y)?;
         let weighted = weighted_error(&history, head, filled);
         let new_error = match format {
             PixelFormat::Gray8 => {
@@ -98,6 +93,8 @@ pub fn riemersma_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
         push_error(&mut history, &mut head, &mut filled, new_error);
         visited += 1;
     }
+
+    Ok(())
 }
 
 fn weighted_error(history: &[[i32; 3]; HISTORY_LEN], head: usize, filled: usize) -> [i32; 3] {
@@ -142,15 +139,17 @@ fn push_error(
     }
 }
 
-fn hilbert_side(max_dimension: usize) -> usize {
+fn hilbert_side(max_dimension: usize) -> DithrResult<usize> {
     let mut side = 1_usize;
     while side < max_dimension {
-        side = side.checked_shl(1).expect("hilbert side overflow");
+        side = side
+            .checked_shl(1)
+            .ok_or(DithrError::InvalidArgument("hilbert side overflow"))?;
     }
-    side
+    Ok(side)
 }
 
-fn hilbert_d2xy(side: usize, distance: usize) -> (usize, usize) {
+fn hilbert_d2xy(side: usize, distance: usize) -> DithrResult<(usize, usize)> {
     let mut d = distance;
     let mut x = 0_usize;
     let mut y = 0_usize;
@@ -163,10 +162,12 @@ fn hilbert_d2xy(side: usize, distance: usize) -> (usize, usize) {
         x = nx + s * rx;
         y = ny + s * ry;
         d /= 4;
-        s = s.checked_shl(1).expect("hilbert step overflow");
+        s = s
+            .checked_shl(1)
+            .ok_or(DithrError::InvalidArgument("hilbert step overflow"))?;
     }
 
-    (x, y)
+    Ok((x, y))
 }
 
 fn hilbert_rotate(side: usize, x: usize, y: usize, rx: usize, ry: usize) -> (usize, usize) {

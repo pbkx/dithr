@@ -3,7 +3,7 @@ use crate::{
         color::luma_u8,
         utils::{clamp_i16, clamp_u8},
     },
-    quantize_pixel, Buffer, PixelFormat, QuantizeMode,
+    quantize_pixel, Buffer, DithrError, DithrResult, PixelFormat, QuantizeMode,
 };
 
 const CLASS_MATRIX_W: usize = 4;
@@ -12,35 +12,35 @@ const CLASS_COUNT: usize = CLASS_MATRIX_W * CLASS_MATRIX_H;
 const CLASS_MATRIX: [[u8; CLASS_MATRIX_W]; CLASS_MATRIX_H] =
     [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 
-pub fn knuth_dot_diffusion_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
-    buffer
-        .validate()
-        .expect("buffer must be valid for dot diffusion");
-
+pub fn knuth_dot_diffusion_in_place(
+    buffer: &mut Buffer<'_>,
+    mode: QuantizeMode<'_>,
+) -> DithrResult<()> {
+    buffer.validate()?;
     match buffer.format {
         PixelFormat::Gray8 => dot_diffuse_gray(buffer, mode),
         PixelFormat::Rgb8 | PixelFormat::Rgba8 => dot_diffuse_rgb(buffer, mode),
     }
 }
 
-fn dot_diffuse_gray(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
+fn dot_diffuse_gray(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> DithrResult<()> {
     let width = buffer.width;
     let height = buffer.height;
-    let mut errors = vec![0_i32; width.checked_mul(height).expect("image size overflow")];
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
+    let mut errors = vec![0_i32; pixel_count];
 
     for class in 0..CLASS_COUNT as u8 {
         for y in 0..height {
-            let row = buffer.row_mut(y);
+            let row = buffer.try_row_mut(y)?;
 
             for (x, value) in row.iter_mut().take(width).enumerate() {
                 if class_at(x, y) != class {
                     continue;
                 }
 
-                let idx = y
-                    .checked_mul(width)
-                    .and_then(|base| base.checked_add(x))
-                    .expect("pixel index overflow");
+                let idx = y * width + x;
 
                 let adjusted = clamp_u8(i32::from(*value) + errors[idx]);
                 let quantized = quantize_pixel(PixelFormat::Gray8, &[adjusted], mode);
@@ -52,37 +52,35 @@ fn dot_diffuse_gray(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
             }
         }
     }
+
+    Ok(())
 }
 
-fn dot_diffuse_rgb(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
+fn dot_diffuse_rgb(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> DithrResult<()> {
     let width = buffer.width;
     let height = buffer.height;
     let format = buffer.format;
     let bpp = format.bytes_per_pixel();
     let channels = 3_usize;
-    let pixel_count = width.checked_mul(height).expect("image size overflow");
-    let mut errors = vec![
-        0_i32;
-        pixel_count
-            .checked_mul(channels)
-            .expect("error buffer size overflow")
-    ];
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
+    let error_len = pixel_count
+        .checked_mul(channels)
+        .ok_or(DithrError::InvalidArgument("error buffer size overflow"))?;
+    let mut errors = vec![0_i32; error_len];
 
     for class in 0..CLASS_COUNT as u8 {
         for y in 0..height {
-            let row = buffer.row_mut(y);
+            let row = buffer.try_row_mut(y)?;
 
             for x in 0..width {
                 if class_at(x, y) != class {
                     continue;
                 }
 
-                let offset = x.checked_mul(bpp).expect("row offset overflow");
-                let base = y
-                    .checked_mul(width)
-                    .and_then(|v| v.checked_add(x))
-                    .and_then(|v| v.checked_mul(channels))
-                    .expect("rgb error index overflow");
+                let offset = x * bpp;
+                let base = (y * width + x) * channels;
 
                 let adjusted = [
                     clamp_u8(i32::from(row[offset]) + errors[base]),
@@ -117,6 +115,8 @@ fn dot_diffuse_rgb(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
             }
         }
     }
+
+    Ok(())
 }
 
 fn diffuse_gray_to_higher_classes(
@@ -135,10 +135,7 @@ fn diffuse_gray_to_higher_classes(
     let share = i32::from(clamp_i16(err / targets.len() as i32));
 
     for (nx, ny) in targets {
-        let idx = ny
-            .checked_mul(width)
-            .and_then(|base| base.checked_add(nx))
-            .expect("neighbor index overflow");
+        let idx = ny * width + nx;
         errors[idx] += share;
     }
 }
@@ -165,11 +162,7 @@ fn diffuse_rgb_to_higher_classes(
     ];
 
     for (nx, ny) in targets {
-        let base = ny
-            .checked_mul(width)
-            .and_then(|v| v.checked_add(nx))
-            .and_then(|v| v.checked_mul(3))
-            .expect("rgb neighbor index overflow");
+        let base = (ny * width + nx) * 3;
         errors[base] += share[0];
         errors[base + 1] += share[1];
         errors[base + 2] += share[2];

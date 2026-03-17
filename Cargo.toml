@@ -11,9 +11,11 @@ description = "Buffer-first dithering and halftoning algorithms."
 default = ["std"]
 std = []
 rayon = ["dep:rayon"]
+image = ["dep:image"]
 
 [dependencies]
 rayon = { version = "1.11.0", optional = true }
+image = { version = "0.24.9", default-features = false, optional = true }
 
 [dev-dependencies]
 criterion = "0.5"

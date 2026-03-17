@@ -1,3 +1,5 @@
+#[cfg(feature = "image")]
+pub mod adapter;
 pub mod buffer;
 pub mod data;
 pub mod dbs;
@@ -11,6 +13,11 @@ pub mod quantize;
 pub mod riemersma;
 pub mod stochastic;
 
+#[cfg(feature = "image")]
+pub use adapter::{
+    dynamic_image_as_buffer, gray_image_as_buffer, rgb_image_as_buffer, rgba_image_as_buffer,
+    DynamicImageBuffer,
+};
 pub use buffer::{Buffer, BufferError, PixelFormat};
 pub use data::{cga_palette, grayscale_16, grayscale_2, grayscale_4};
 pub use dbs::{

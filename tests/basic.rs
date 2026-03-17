@@ -219,14 +219,21 @@ fn quantize_palette_output_is_palette_member() {
 }
 
 #[test]
-fn quantize_single_color_uses_fg_or_black_only() {
+fn quantize_single_color_preserves_intermediate_levels() {
     let fg = [12, 180, 90];
     let mode = QuantizeMode::SingleColor { fg, bits: 3 };
+    let mut saw_mid = false;
 
     for value in 0_u16..=255 {
         let quantized = quantize_pixel(PixelFormat::Gray8, &[value as u8], mode);
         let rgb = [quantized[0], quantized[1], quantized[2]];
-        assert!(rgb == [0, 0, 0] || rgb == fg);
+        assert!(rgb[0] <= fg[0]);
+        assert!(rgb[1] <= fg[1]);
+        assert!(rgb[2] <= fg[2]);
+
+        if rgb != [0, 0, 0] && rgb != fg {
+            saw_mid = true;
+        }
     }
 
     assert_eq!(
@@ -237,6 +244,7 @@ fn quantize_single_color_uses_fg_or_black_only() {
         quantize_pixel(PixelFormat::Gray8, &[255], mode),
         [fg[0], fg[1], fg[2], 255]
     );
+    assert!(saw_mid);
 }
 
 #[test]

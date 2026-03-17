@@ -46,11 +46,12 @@ pub fn quantize_pixel(format: PixelFormat, pixel: &[u8], mode: QuantizeMode<'_>)
         }
         QuantizeMode::SingleColor { fg, bits } => {
             let g = quantize_gray_u8(luma_u8(rgb), bits);
-            if g == 0 {
-                [0, 0, 0, alpha]
-            } else {
-                [fg[0], fg[1], fg[2], alpha]
-            }
+            [
+                scale_channel_by_gray(fg[0], g),
+                scale_channel_by_gray(fg[1], g),
+                scale_channel_by_gray(fg[2], g),
+                alpha,
+            ]
         }
     }
 }
@@ -90,4 +91,14 @@ fn pixel_rgb_alpha(format: PixelFormat, pixel: &[u8]) -> ([u8; 3], u8) {
             ([pixel[0], pixel[1], pixel[2]], pixel[3])
         }
     }
+}
+
+#[must_use]
+fn scale_channel_by_gray(channel: u8, gray: u8) -> u8 {
+    let scaled = u16::from(channel)
+        .checked_mul(u16::from(gray))
+        .expect("scaled channel overflow");
+    let rounded = scaled.checked_add(127).expect("rounded channel overflow");
+
+    (rounded / 255) as u8
 }

@@ -1,3 +1,8 @@
+mod common;
+
+use common::{
+    checker_8x8, fnv1a64, gray_ramp_16x16, gray_ramp_8x8, rgb_cube_strip, rgb_gradient_8x8,
+};
 use dithr::data::{
     generate_bayer_16x16, BAYER_2X2, BAYER_4X4, BAYER_8X8, CLUSTER_DOT_4X4, CLUSTER_DOT_8X8,
 };
@@ -243,7 +248,7 @@ fn custom_ordered_2x2_matches_manual_small_case() {
 
 #[test]
 fn yliluoma_1_output_is_always_palette_member() {
-    let mut data = rgb_gradient_8x8_fixture();
+    let mut data = rgb_gradient_8x8();
     let palette = Palette::new(vec![
         [0, 0, 0],
         [255, 255, 255],
@@ -273,8 +278,8 @@ fn yliluoma_1_output_is_always_palette_member() {
 
 #[test]
 fn yliluoma_1_deterministic_rgb_fixture() {
-    let mut data_a = rgb_gradient_8x8_fixture();
-    let mut data_b = rgb_gradient_8x8_fixture();
+    let mut data_a = rgb_gradient_8x8();
+    let mut data_b = rgb_gradient_8x8();
     let palette = Palette::new(vec![
         [0, 0, 0],
         [255, 255, 255],
@@ -309,7 +314,7 @@ fn yliluoma_1_deterministic_rgb_fixture() {
 
 #[test]
 fn yliluoma_2_output_is_always_palette_member() {
-    let mut data = rgb_gradient_8x8_fixture();
+    let mut data = rgb_gradient_8x8();
     let palette = Palette::new(vec![
         [0, 0, 0],
         [255, 255, 255],
@@ -339,7 +344,7 @@ fn yliluoma_2_output_is_always_palette_member() {
 
 #[test]
 fn yliluoma_3_output_is_always_palette_member() {
-    let mut data = rgb_gradient_8x8_fixture();
+    let mut data = rgb_gradient_8x8();
     let palette = Palette::new(vec![
         [0, 0, 0],
         [255, 255, 255],
@@ -506,18 +511,28 @@ fn ordered_threshold_lookup_tiles_correctly() {
     assert_eq!(ordered_threshold_for_xy(3, 3, &BAYER_2X2_FLAT, 2, 2), 1);
 }
 
-fn rgb_gradient_8x8_fixture() -> Vec<u8> {
-    let mut out = Vec::with_capacity(8 * 8 * 3);
+#[test]
+fn fixture_builders_are_deterministic() {
+    let gray8 = gray_ramp_8x8();
+    let gray16 = gray_ramp_16x16();
+    let checker = checker_8x8();
+    let gradient = rgb_gradient_8x8();
+    let cube = rgb_cube_strip();
 
-    for y in 0..8_u8 {
-        for x in 0..8_u8 {
-            out.push(x.saturating_mul(32));
-            out.push(y.saturating_mul(32));
-            out.push((x ^ y).saturating_mul(32));
-        }
-    }
+    assert_eq!(gray8.len(), 64);
+    assert_eq!(gray16.len(), 256);
+    assert_eq!(checker.len(), 64);
+    assert_eq!(gradient.len(), 8 * 8 * 3);
+    assert_eq!(cube.len(), 27 * 3);
 
-    out
+    assert_eq!(checker.iter().filter(|&&value| value == 0).count(), 32);
+    assert_eq!(checker.iter().filter(|&&value| value == 255).count(), 32);
+
+    assert_eq!(fnv1a64(&gray8), fnv1a64(&gray_ramp_8x8()));
+    assert_eq!(fnv1a64(&gray16), fnv1a64(&gray_ramp_16x16()));
+    assert_eq!(fnv1a64(&checker), fnv1a64(&checker_8x8()));
+    assert_eq!(fnv1a64(&gradient), fnv1a64(&rgb_gradient_8x8()));
+    assert_eq!(fnv1a64(&cube), fnv1a64(&rgb_cube_strip()));
 }
 
 fn assert_unique_square_coverage_2(map: [[u8; 2]; 2]) {

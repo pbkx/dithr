@@ -1,3 +1,8 @@
+mod common;
+
+use common::{
+    checker_8x8, fnv1a64, gray_ramp_16x16, gray_ramp_8x8, rgb_cube_strip, rgb_gradient_8x8,
+};
 use dithr::{
     cga_palette, grayscale_16, grayscale_2, grayscale_4, quantize_error, quantize_gray_u8,
     quantize_pixel, quantize_rgb_u8, random_in_place, threshold_in_place, Buffer, BufferError,
@@ -353,4 +358,28 @@ fn random_different_seed_different_output() {
     random_in_place(&mut buffer_b, QuantizeMode::GrayBits(1), 2, 127);
 
     assert_ne!(data_a, data_b);
+}
+
+#[test]
+fn fixture_builders_are_deterministic() {
+    let gray8 = gray_ramp_8x8();
+    let gray16 = gray_ramp_16x16();
+    let checker = checker_8x8();
+    let gradient = rgb_gradient_8x8();
+    let cube = rgb_cube_strip();
+
+    assert_eq!(gray8.len(), 64);
+    assert_eq!(gray16.len(), 256);
+    assert_eq!(checker.len(), 64);
+    assert_eq!(gradient.len(), 8 * 8 * 3);
+    assert_eq!(cube.len(), 27 * 3);
+
+    assert_eq!(checker.iter().filter(|&&value| value == 0).count(), 32);
+    assert_eq!(checker.iter().filter(|&&value| value == 255).count(), 32);
+
+    assert_eq!(fnv1a64(&gray8), fnv1a64(&gray_ramp_8x8()));
+    assert_eq!(fnv1a64(&gray16), fnv1a64(&gray_ramp_16x16()));
+    assert_eq!(fnv1a64(&checker), fnv1a64(&checker_8x8()));
+    assert_eq!(fnv1a64(&gradient), fnv1a64(&rgb_gradient_8x8()));
+    assert_eq!(fnv1a64(&cube), fnv1a64(&rgb_cube_strip()));
 }

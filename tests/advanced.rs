@@ -1,3 +1,8 @@
+mod common;
+
+use common::{
+    checker_8x8, fnv1a64, gray_ramp_16x16, gray_ramp_8x8, rgb_cube_strip, rgb_gradient_8x8,
+};
 use dithr::{
     direct_binary_search_in_place, electrostatic_halftoning_in_place, knuth_dot_diffusion_in_place,
     lattice_boltzmann_in_place, riemersma_in_place, Buffer, PixelFormat, QuantizeMode,
@@ -241,4 +246,28 @@ fn dbs_objective_for_test(target: &[u8], binary: &[u8], width: usize, height: us
     }
 
     total
+}
+
+#[test]
+fn fixture_builders_are_deterministic() {
+    let gray8 = gray_ramp_8x8();
+    let gray16 = gray_ramp_16x16();
+    let checker = checker_8x8();
+    let gradient = rgb_gradient_8x8();
+    let cube = rgb_cube_strip();
+
+    assert_eq!(gray8.len(), 64);
+    assert_eq!(gray16.len(), 256);
+    assert_eq!(checker.len(), 64);
+    assert_eq!(gradient.len(), 8 * 8 * 3);
+    assert_eq!(cube.len(), 27 * 3);
+
+    assert_eq!(checker.iter().filter(|&&value| value == 0).count(), 32);
+    assert_eq!(checker.iter().filter(|&&value| value == 255).count(), 32);
+
+    assert_eq!(fnv1a64(&gray8), fnv1a64(&gray_ramp_8x8()));
+    assert_eq!(fnv1a64(&gray16), fnv1a64(&gray_ramp_16x16()));
+    assert_eq!(fnv1a64(&checker), fnv1a64(&checker_8x8()));
+    assert_eq!(fnv1a64(&gradient), fnv1a64(&rgb_gradient_8x8()));
+    assert_eq!(fnv1a64(&cube), fnv1a64(&rgb_cube_strip()));
 }

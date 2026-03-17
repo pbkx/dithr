@@ -9,8 +9,8 @@ use dithr::data::{
 use dithr::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
     cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
-    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place, Buffer, OrderedError, Palette,
-    PixelFormat, QuantizeMode,
+    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place, Buffer, DithrError,
+    OrderedError, Palette, PixelFormat, QuantizeMode,
 };
 
 const BAYER_2X2_FLAT: [u8; 4] = [0, 2, 3, 1];
@@ -72,7 +72,7 @@ fn bayer_2x2_quantizes_only_to_allowed_values() {
         format: PixelFormat::Gray8,
     };
 
-    bayer_2x2_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    bayer_2x2_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 2x2 should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -88,7 +88,7 @@ fn bayer_4x4_periodicity_matches_4() {
         format: PixelFormat::Gray8,
     };
 
-    bayer_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    bayer_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 4x4 should succeed");
 
     for y in 0..8 {
         for x in 0..4 {
@@ -114,7 +114,7 @@ fn bayer_8x8_periodicity_matches_8() {
         format: PixelFormat::Gray8,
     };
 
-    bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 8x8 should succeed");
 
     for y in 0..16 {
         for x in 0..8 {
@@ -140,7 +140,8 @@ fn bayer_16x16_runs_on_16x16_without_panic() {
         format: PixelFormat::Gray8,
     };
 
-    bayer_16x16_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    bayer_16x16_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("bayer 16x16 should succeed");
 
     assert_eq!(data.len(), 256);
     assert!(data.iter().all(|&value| value == 0 || value == 255));
@@ -157,7 +158,8 @@ fn cluster_dot_4x4_runs_and_quantizes() {
         format: PixelFormat::Gray8,
     };
 
-    cluster_dot_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    cluster_dot_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("cluster-dot 4x4 should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -173,7 +175,8 @@ fn cluster_dot_8x8_runs_and_quantizes() {
         format: PixelFormat::Gray8,
     };
 
-    cluster_dot_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    cluster_dot_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("cluster-dot 8x8 should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -191,7 +194,7 @@ fn custom_ordered_rejects_empty_map() {
 
     let result = custom_ordered_in_place(&mut buffer, QuantizeMode::GrayBits(1), &[], 0, 0, 64);
 
-    assert_eq!(result, Err(OrderedError::EmptyMap));
+    assert_eq!(result, Err(DithrError::Ordered(OrderedError::EmptyMap)));
 }
 
 #[test]
@@ -208,7 +211,10 @@ fn custom_ordered_rejects_bad_dimensions() {
     let map = [0_u8, 1, 2];
     let result = custom_ordered_in_place(&mut buffer, QuantizeMode::GrayBits(1), &map, 2, 2, 64);
 
-    assert_eq!(result, Err(OrderedError::InvalidDimensions));
+    assert_eq!(
+        result,
+        Err(DithrError::Ordered(OrderedError::InvalidDimensions))
+    );
 }
 
 #[test]
@@ -240,7 +246,7 @@ fn custom_ordered_2x2_matches_manual_small_case() {
         64,
     )
     .expect("custom ordered dither should succeed");
-    bayer_2x2_in_place(&mut buffer_b, QuantizeMode::GrayBits(1));
+    bayer_2x2_in_place(&mut buffer_b, QuantizeMode::GrayBits(1)).expect("bayer 2x2 should succeed");
 
     assert_eq!(data_a, data_b);
 }

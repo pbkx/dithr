@@ -3,7 +3,7 @@ use crate::{
         color::luma_u8,
         utils::{clamp_i16, clamp_u8},
     },
-    quantize_pixel, Buffer, PixelFormat, QuantizeMode,
+    quantize_pixel, Buffer, BufferError, DithrError, DithrResult, PixelFormat, QuantizeMode,
 };
 
 pub(crate) fn ordered_dither_in_place(
@@ -13,22 +13,9 @@ pub(crate) fn ordered_dither_in_place(
     map_w: usize,
     map_h: usize,
     strength: i16,
-) {
-    buffer
-        .validate()
-        .expect("buffer must be valid for ordered dithering");
-
-    assert!(map_w > 0, "map width must be positive");
-    assert!(map_h > 0, "map height must be positive");
-
-    let map_len = map_w
-        .checked_mul(map_h)
-        .expect("map dimensions overflow during multiplication");
-    assert_eq!(
-        map.len(),
-        map_len,
-        "map length must match width*height for ordered dithering",
-    );
+) -> DithrResult<()> {
+    buffer.validate()?;
+    validate_map(map, map_w, map_h)?;
 
     let map_max = map.iter().copied().max().unwrap_or_default();
     let width = buffer.width;
@@ -37,12 +24,12 @@ pub(crate) fn ordered_dither_in_place(
     let bpp = buffer.format.bytes_per_pixel();
 
     for y in 0..height {
-        let row = buffer.row_mut(y);
+        let row = buffer.try_row_mut(y)?;
 
         for x in 0..width {
             let threshold = ordered_threshold_for_xy(x, y, map, map_w, map_h);
             let bias = threshold_bias(threshold, map_max, strength);
-            let offset = x.checked_mul(bpp).expect("pixel offset overflow in row");
+            let offset = x.checked_mul(bpp).ok_or(BufferError::OutOfBounds)?;
 
             match format {
                 PixelFormat::Gray8 => {
@@ -78,6 +65,8 @@ pub(crate) fn ordered_dither_in_place(
             }
         }
     }
+
+    Ok(())
 }
 
 pub(crate) fn ordered_threshold_for_xy(
@@ -87,26 +76,45 @@ pub(crate) fn ordered_threshold_for_xy(
     map_w: usize,
     map_h: usize,
 ) -> u8 {
-    assert!(map_w > 0, "map width must be positive");
-    assert!(map_h > 0, "map height must be positive");
-
-    let map_len = map_w
-        .checked_mul(map_h)
-        .expect("map dimensions overflow during multiplication");
-    assert_eq!(
-        map.len(),
-        map_len,
-        "map length must match width*height for threshold lookup",
-    );
+    if map_w == 0 || map_h == 0 {
+        return 0;
+    }
+    let Some(map_len) = map_w.checked_mul(map_h) else {
+        return 0;
+    };
+    if map.len() != map_len {
+        return 0;
+    }
 
     let map_x = x % map_w;
     let map_y = y % map_h;
-    let index = map_y
+    let Some(index) = map_y
         .checked_mul(map_w)
         .and_then(|row_start| row_start.checked_add(map_x))
-        .expect("threshold index overflow");
+    else {
+        return 0;
+    };
 
-    map[index]
+    map.get(index).copied().unwrap_or_default()
+}
+
+fn validate_map(map: &[u8], map_w: usize, map_h: usize) -> DithrResult<()> {
+    if map_w == 0 || map_h == 0 {
+        return Err(DithrError::InvalidArgument(
+            "ordered map dimensions must be positive",
+        ));
+    }
+
+    let expected_len = map_w.checked_mul(map_h).ok_or(DithrError::InvalidArgument(
+        "ordered map dimensions overflow",
+    ))?;
+    if map.len() != expected_len {
+        return Err(DithrError::InvalidArgument(
+            "ordered map length must match dimensions",
+        ));
+    }
+
+    Ok(())
 }
 
 fn threshold_bias(threshold: u8, map_max: u8, strength: i16) -> i16 {

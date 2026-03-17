@@ -70,7 +70,7 @@ fn golden_bayer_2x2_gray_ramp_8x8() {
         format: PixelFormat::Gray8,
     };
 
-    bayer_2x2_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    bayer_2x2_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 2x2 should succeed");
 
     assert_eq!(fnv1a64(&data), 5_176_068_339_558_256_461_u64);
 }
@@ -86,7 +86,7 @@ fn golden_bayer_4x4_gray_ramp_8x8() {
         format: PixelFormat::Gray8,
     };
 
-    bayer_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    bayer_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 4x4 should succeed");
 
     assert_eq!(fnv1a64(&data), 5_176_068_339_558_256_461_u64);
 }
@@ -102,7 +102,7 @@ fn golden_bayer_8x8_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 8x8 should succeed");
 
     assert_eq!(fnv1a64(&data), 1_956_760_498_679_199_251_u64);
 }
@@ -118,7 +118,8 @@ fn golden_bayer_16x16_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    bayer_16x16_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    bayer_16x16_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("bayer 16x16 should succeed");
 
     assert_eq!(fnv1a64(&data), 13_072_875_211_936_825_827_u64);
 }
@@ -134,7 +135,8 @@ fn golden_cluster_dot_4x4_gray_ramp_8x8() {
         format: PixelFormat::Gray8,
     };
 
-    cluster_dot_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    cluster_dot_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("cluster-dot 4x4 should succeed");
 
     assert_eq!(fnv1a64(&data), 9_783_687_876_575_450_447_u64);
 }
@@ -150,7 +152,8 @@ fn golden_cluster_dot_8x8_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    cluster_dot_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    cluster_dot_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("cluster-dot 8x8 should succeed");
 
     assert_eq!(fnv1a64(&data), 15_436_130_700_200_729_221_u64);
 }

@@ -3,7 +3,7 @@ pub(crate) mod core;
 pub mod extended;
 pub mod variable;
 
-use crate::{data::ErrorKernel, Buffer, QuantizeMode};
+use crate::{data::ErrorKernel, Buffer, DithrResult, QuantizeMode};
 
 pub use classic::{
     atkinson_in_place, burkes_in_place, false_floyd_steinberg_in_place, floyd_steinberg_in_place,
@@ -20,7 +20,6 @@ pub(crate) fn error_diffuse_in_place(
     buffer: &mut Buffer<'_>,
     mode: QuantizeMode<'_>,
     kernel: &ErrorKernel,
-) {
+) -> DithrResult<()> {
     core::error_diffuse_in_place(buffer, mode, kernel)
-        .expect("buffer and kernel must be valid for error diffusion");
 }

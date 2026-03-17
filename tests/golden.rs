@@ -434,7 +434,7 @@ fn golden_fan_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    fan_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    fan_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("fan should succeed");
 
     assert_eq!(fnv1a64(&data), 4_193_123_207_078_656_034_u64);
 }
@@ -450,7 +450,7 @@ fn golden_shiau_fan_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    shiau_fan_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    shiau_fan_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("shiau-fan should succeed");
 
     assert_eq!(fnv1a64(&data), 12_715_220_158_707_814_659_u64);
 }
@@ -466,7 +466,8 @@ fn golden_shiau_fan_2_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    shiau_fan_2_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    shiau_fan_2_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("shiau-fan-2 should succeed");
 
     assert_eq!(fnv1a64(&data), 7_982_209_771_024_887_798_u64);
 }
@@ -482,7 +483,8 @@ fn golden_ostromoukhov_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    ostromoukhov_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    ostromoukhov_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("ostromoukhov should succeed");
 
     assert_eq!(fnv1a64(&data), 1_681_378_057_948_508_056_u64);
 }
@@ -498,7 +500,7 @@ fn golden_zhou_fang_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    zhou_fang_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    zhou_fang_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("zhou-fang should succeed");
 
     assert_eq!(fnv1a64(&data), 1_681_378_057_948_508_056_u64);
 }
@@ -514,7 +516,8 @@ fn golden_gradient_based_error_diffusion_gray_ramp_16x16() {
         format: PixelFormat::Gray8,
     };
 
-    gradient_based_error_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    gradient_based_error_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("gradient-based diffusion should succeed");
 
     assert_eq!(fnv1a64(&data), 13_379_963_253_640_205_838_u64);
 }

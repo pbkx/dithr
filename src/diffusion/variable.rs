@@ -1,85 +1,76 @@
 use super::{core::add_error_to_pixel, error_diffuse_in_place};
 use crate::{
-    data::FLOYD_STEINBERG,
+    data::{FLOYD_STEINBERG, OSTROMOUKHOV_COEFFS, ZHOU_FANG_MODULATION},
     math::{
         color::luma_u8,
         fixed::mul_div_i32,
         utils::{clamp_i16, clamp_u8},
     },
-    quantize_pixel, Buffer, PixelFormat, QuantizeMode,
+    quantize_pixel, Buffer, DithrError, DithrResult, PixelFormat, QuantizeMode,
 };
 
-const OSTROMOUKHOV_COEFFS: [(i16, i16, i16, i16); 16] = [
-    (8, 2, 6, 16),
-    (8, 2, 6, 16),
-    (8, 2, 6, 16),
-    (8, 2, 6, 16),
-    (7, 3, 6, 16),
-    (7, 3, 6, 16),
-    (7, 3, 6, 16),
-    (7, 3, 6, 16),
-    (7, 3, 5, 15),
-    (7, 3, 5, 15),
-    (7, 3, 5, 15),
-    (7, 3, 5, 15),
-    (6, 4, 5, 15),
-    (6, 4, 5, 15),
-    (6, 4, 5, 15),
-    (6, 4, 5, 15),
-];
-
-const ZHOU_FANG_MODULATION: [i16; 16] = [-8, -7, -6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7, 8];
-
-pub fn ostromoukhov_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
-    buffer
-        .validate()
-        .expect("buffer must be valid for ostromoukhov diffusion");
-
-    if buffer.format != PixelFormat::Gray8 {
-        error_diffuse_in_place(buffer, mode, &FLOYD_STEINBERG);
-        return;
-    }
-
-    diffuse_variable_gray(buffer, mode, None);
+#[derive(Clone, Copy)]
+enum GrayOnlyVariableAlgorithm {
+    Ostromoukhov,
+    ZhouFang,
+    GradientBased,
 }
 
-pub fn zhou_fang_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
-    buffer
-        .validate()
-        .expect("buffer must be valid for zhou-fang diffusion");
-
-    if buffer.format != PixelFormat::Gray8 {
-        error_diffuse_in_place(buffer, mode, &FLOYD_STEINBERG);
-        return;
-    }
-
-    diffuse_variable_gray(buffer, mode, Some(&ZHOU_FANG_MODULATION));
+pub fn ostromoukhov_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> DithrResult<()> {
+    diffuse_gray_only_variable_or_floyd_steinberg(
+        buffer,
+        mode,
+        GrayOnlyVariableAlgorithm::Ostromoukhov,
+    )
 }
 
-pub fn gradient_based_error_diffusion_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) {
-    buffer
-        .validate()
-        .expect("buffer must be valid for gradient-based diffusion");
+pub fn zhou_fang_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> DithrResult<()> {
+    diffuse_gray_only_variable_or_floyd_steinberg(buffer, mode, GrayOnlyVariableAlgorithm::ZhouFang)
+}
+
+pub fn gradient_based_error_diffusion_in_place(
+    buffer: &mut Buffer<'_>,
+    mode: QuantizeMode<'_>,
+) -> DithrResult<()> {
+    diffuse_gray_only_variable_or_floyd_steinberg(
+        buffer,
+        mode,
+        GrayOnlyVariableAlgorithm::GradientBased,
+    )
+}
+
+fn diffuse_gray_only_variable_or_floyd_steinberg(
+    buffer: &mut Buffer<'_>,
+    mode: QuantizeMode<'_>,
+    algorithm: GrayOnlyVariableAlgorithm,
+) -> DithrResult<()> {
+    buffer.validate()?;
 
     if buffer.format != PixelFormat::Gray8 {
-        error_diffuse_in_place(buffer, mode, &FLOYD_STEINBERG);
-        return;
+        return error_diffuse_in_place(buffer, mode, &FLOYD_STEINBERG);
     }
 
+    match algorithm {
+        GrayOnlyVariableAlgorithm::Ostromoukhov => diffuse_variable_gray(buffer, mode, None),
+        GrayOnlyVariableAlgorithm::ZhouFang => {
+            diffuse_variable_gray(buffer, mode, Some(&ZHOU_FANG_MODULATION))
+        }
+        GrayOnlyVariableAlgorithm::GradientBased => diffuse_gradient_gray(buffer, mode),
+    }
+}
+
+fn diffuse_gradient_gray(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> DithrResult<()> {
     let width = buffer.width;
     let height = buffer.height;
     let stride = buffer.stride;
     let source = buffer.data.to_vec();
-    let mut errors = vec![0_i32; width.checked_mul(height).expect("image size overflow")];
+    let mut errors = allocate_gray_error_buffer(width, height)?;
 
     for y in 0..height {
-        let row = buffer.row_mut(y);
+        let row = buffer.try_row_mut(y)?;
 
         for (x, value) in row.iter_mut().take(width).enumerate() {
-            let idx = y
-                .checked_mul(width)
-                .and_then(|base| base.checked_add(x))
-                .expect("pixel index overflow");
+            let idx = y * width + x;
             let original = *value;
             let adjusted = clamp_u8(i32::from(original) + errors[idx]);
             let quantized = quantize_pixel(PixelFormat::Gray8, &[adjusted], mode);
@@ -133,25 +124,24 @@ pub fn gradient_based_error_diffusion_in_place(buffer: &mut Buffer<'_>, mode: Qu
             );
         }
     }
+
+    Ok(())
 }
 
 fn diffuse_variable_gray(
     buffer: &mut Buffer<'_>,
     mode: QuantizeMode<'_>,
     modulation: Option<&[i16; 16]>,
-) {
+) -> DithrResult<()> {
     let width = buffer.width;
     let height = buffer.height;
-    let mut errors = vec![0_i32; width.checked_mul(height).expect("image size overflow")];
+    let mut errors = allocate_gray_error_buffer(width, height)?;
 
     for y in 0..height {
-        let row = buffer.row_mut(y);
+        let row = buffer.try_row_mut(y)?;
 
         for (x, value) in row.iter_mut().take(width).enumerate() {
-            let idx = y
-                .checked_mul(width)
-                .and_then(|base| base.checked_add(x))
-                .expect("pixel index overflow");
+            let idx = y * width + x;
             let original = *value;
             let adjusted = clamp_u8(i32::from(original) + errors[idx]);
             let thresholded = if let Some(table) = modulation {
@@ -200,6 +190,15 @@ fn diffuse_variable_gray(
             );
         }
     }
+
+    Ok(())
+}
+
+fn allocate_gray_error_buffer(width: usize, height: usize) -> DithrResult<Vec<i32>> {
+    let len = width
+        .checked_mul(height)
+        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
+    Ok(vec![0_i32; len])
 }
 
 fn coefficient_for_luma(luma: u8) -> (i16, i16, i16, i16) {

@@ -1,6 +1,7 @@
 pub mod kernels;
 pub mod maps;
 pub mod palettes;
+pub mod variable;
 
 pub use kernels::{
     ErrorKernel, KernelTap, ATKINSON, BURKES, FALSE_FLOYD_STEINBERG, FAN, FLOYD_STEINBERG,
@@ -13,3 +14,4 @@ pub use maps::{
     CLUSTER_DOT_8X8, CLUSTER_DOT_8X8_FLAT,
 };
 pub use palettes::{cga_palette, grayscale_16, grayscale_2, grayscale_4};
+pub use variable::{OSTROMOUKHOV_COEFFS, ZHOU_FANG_MODULATION};

@@ -205,7 +205,7 @@ fn fan_runs() {
         format: PixelFormat::Gray8,
     };
 
-    fan_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    fan_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("fan should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -221,7 +221,7 @@ fn shiau_fan_runs() {
         format: PixelFormat::Gray8,
     };
 
-    shiau_fan_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    shiau_fan_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("shiau-fan should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -237,7 +237,8 @@ fn shiau_fan_2_runs() {
         format: PixelFormat::Gray8,
     };
 
-    shiau_fan_2_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    shiau_fan_2_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("shiau-fan-2 should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -253,7 +254,8 @@ fn ostromoukhov_runs_gray() {
         format: PixelFormat::Gray8,
     };
 
-    ostromoukhov_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    ostromoukhov_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("ostromoukhov should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -269,7 +271,8 @@ fn ostromoukhov_coeff_index_in_range() {
         format: PixelFormat::Gray8,
     };
 
-    ostromoukhov_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    ostromoukhov_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("ostromoukhov should succeed");
 
     assert_eq!(data.len(), 256);
 }
@@ -285,7 +288,7 @@ fn zhou_fang_runs_gray() {
         format: PixelFormat::Gray8,
     };
 
-    zhou_fang_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    zhou_fang_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("zhou-fang should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -301,7 +304,7 @@ fn zhou_fang_modulation_in_range() {
         format: PixelFormat::Gray8,
     };
 
-    zhou_fang_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    zhou_fang_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("zhou-fang should succeed");
 
     assert_eq!(data.len(), 256);
 }
@@ -317,7 +320,8 @@ fn gradient_based_error_diffusion_runs() {
         format: PixelFormat::Gray8,
     };
 
-    gradient_based_error_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1));
+    gradient_based_error_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+        .expect("gradient-based diffusion should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }

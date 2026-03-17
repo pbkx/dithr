@@ -3,6 +3,7 @@ pub mod data;
 pub mod dbs;
 pub mod diffusion;
 pub mod dot_diffusion;
+pub mod error;
 pub mod math;
 pub mod ordered;
 pub mod palette;
@@ -23,6 +24,7 @@ pub use diffusion::{
     two_row_sierra_in_place, zhou_fang_in_place,
 };
 pub use dot_diffusion::knuth_dot_diffusion_in_place;
+pub use error::{DithrError, DithrResult};
 pub use ordered::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
     cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,

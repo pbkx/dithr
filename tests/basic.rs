@@ -5,8 +5,8 @@ use common::{
 };
 use dithr::{
     cga_palette, grayscale_16, grayscale_2, grayscale_4, quantize_error, quantize_gray_u8,
-    quantize_pixel, quantize_rgb_u8, random_in_place, threshold_in_place, Buffer, BufferError,
-    IndexedImage, Palette, PaletteError, PixelFormat, QuantizeMode,
+    quantize_pixel, quantize_rgb_u8, random_binary_in_place, threshold_binary_in_place, Buffer,
+    BufferError, IndexedImage, Palette, PaletteError, PixelFormat, QuantizeMode,
 };
 
 #[test]
@@ -361,7 +361,7 @@ fn built_in_palettes_construct_valid_palette() {
 }
 
 #[test]
-fn threshold_gray_threshold_127_splits_expected() {
+fn threshold_binary_gray_threshold_127_splits_expected() {
     let mut data = vec![0_u8, 64, 127, 128, 200, 255];
     let mut buffer = Buffer {
         data: &mut data,
@@ -371,13 +371,14 @@ fn threshold_gray_threshold_127_splits_expected() {
         format: PixelFormat::Gray8,
     };
 
-    threshold_in_place(&mut buffer, QuantizeMode::GrayBits(1), 127);
+    threshold_binary_in_place(&mut buffer, QuantizeMode::GrayBits(1), 127)
+        .expect("threshold binary should succeed");
 
     assert_eq!(data, vec![0, 0, 0, 255, 255, 255]);
 }
 
 #[test]
-fn threshold_rgb_uses_luma() {
+fn threshold_binary_rgb_uses_luma() {
     let mut data = vec![255_u8, 0, 0, 0, 255, 0, 0, 0, 255];
     let mut buffer = Buffer {
         data: &mut data,
@@ -387,13 +388,14 @@ fn threshold_rgb_uses_luma() {
         format: PixelFormat::Rgb8,
     };
 
-    threshold_in_place(&mut buffer, QuantizeMode::RgbBits(1), 127);
+    threshold_binary_in_place(&mut buffer, QuantizeMode::RgbBits(1), 127)
+        .expect("threshold binary should succeed");
 
     assert_eq!(data, vec![0, 0, 0, 255, 255, 255, 0, 0, 0]);
 }
 
 #[test]
-fn random_same_seed_same_output() {
+fn random_binary_same_seed_same_output() {
     let source: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
     let mut data_a = source.clone();
     let mut data_b = source;
@@ -413,14 +415,16 @@ fn random_same_seed_same_output() {
         format: PixelFormat::Gray8,
     };
 
-    random_in_place(&mut buffer_a, QuantizeMode::GrayBits(1), 42, 64);
-    random_in_place(&mut buffer_b, QuantizeMode::GrayBits(1), 42, 64);
+    random_binary_in_place(&mut buffer_a, QuantizeMode::GrayBits(1), 42, 64)
+        .expect("random binary should succeed");
+    random_binary_in_place(&mut buffer_b, QuantizeMode::GrayBits(1), 42, 64)
+        .expect("random binary should succeed");
 
     assert_eq!(data_a, data_b);
 }
 
 #[test]
-fn random_different_seed_different_output() {
+fn random_binary_different_seed_different_output() {
     let mut data_a = vec![127_u8; 64];
     let mut data_b = vec![127_u8; 64];
 
@@ -439,8 +443,10 @@ fn random_different_seed_different_output() {
         format: PixelFormat::Gray8,
     };
 
-    random_in_place(&mut buffer_a, QuantizeMode::GrayBits(1), 1, 127);
-    random_in_place(&mut buffer_b, QuantizeMode::GrayBits(1), 2, 127);
+    random_binary_in_place(&mut buffer_a, QuantizeMode::GrayBits(1), 1, 127)
+        .expect("random binary should succeed");
+    random_binary_in_place(&mut buffer_b, QuantizeMode::GrayBits(1), 2, 127)
+        .expect("random binary should succeed");
 
     assert_ne!(data_a, data_b);
 }

@@ -10,10 +10,10 @@ use dithr::{
     false_floyd_steinberg_in_place, fan_in_place, floyd_steinberg_in_place,
     gradient_based_error_diffusion_in_place, jarvis_judice_ninke_in_place,
     knuth_dot_diffusion_in_place, lattice_boltzmann_in_place, ostromoukhov_in_place,
-    random_in_place, riemersma_in_place, shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place,
-    sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place, threshold_in_place,
-    two_row_sierra_in_place, yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
-    zhou_fang_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
+    random_binary_in_place, riemersma_in_place, shiau_fan_2_in_place, shiau_fan_in_place,
+    sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place,
+    threshold_binary_in_place, two_row_sierra_in_place, yliluoma_1_in_place, yliluoma_2_in_place,
+    yliluoma_3_in_place, zhou_fang_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
 };
 
 #[test]
@@ -36,7 +36,8 @@ fn golden_threshold_gray_ramp_8x8() {
         format: PixelFormat::Gray8,
     };
 
-    threshold_in_place(&mut buffer, QuantizeMode::GrayBits(1), 127);
+    threshold_binary_in_place(&mut buffer, QuantizeMode::GrayBits(1), 127)
+        .expect("threshold binary should succeed");
 
     assert_eq!(fnv1a64(&data), 4_864_876_028_568_798_213_u64);
 }
@@ -52,7 +53,8 @@ fn golden_random_seed_1_gray_ramp_8x8() {
         format: PixelFormat::Gray8,
     };
 
-    random_in_place(&mut buffer, QuantizeMode::GrayBits(1), 1, 64);
+    random_binary_in_place(&mut buffer, QuantizeMode::GrayBits(1), 1, 64)
+        .expect("random binary should succeed");
 
     assert_eq!(fnv1a64(&data), 4_707_737_849_936_150_024_u64);
 }

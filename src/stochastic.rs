@@ -1,12 +1,14 @@
 use crate::{
     math::{color::luma_u8, utils::clamp_u8},
-    quantize_pixel, Buffer, PixelFormat, QuantizeMode,
+    quantize_pixel, Buffer, BufferError, DithrResult, PixelFormat, QuantizeMode,
 };
 
-pub fn threshold_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>, threshold: u8) {
-    buffer
-        .validate()
-        .expect("buffer must be valid for threshold dithering");
+pub fn threshold_binary_in_place(
+    buffer: &mut Buffer<'_>,
+    mode: QuantizeMode<'_>,
+    threshold: u8,
+) -> DithrResult<()> {
+    buffer.validate()?;
 
     let width = buffer.width;
     let height = buffer.height;
@@ -14,10 +16,10 @@ pub fn threshold_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>, thres
     let bpp = format.bytes_per_pixel();
 
     for y in 0..height {
-        let row = buffer.row_mut(y);
+        let row = buffer.try_row_mut(y)?;
 
         for x in 0..width {
-            let offset = x.checked_mul(bpp).expect("pixel offset overflow in row");
+            let offset = x.checked_mul(bpp).ok_or(BufferError::OutOfBounds)?;
 
             match format {
                 PixelFormat::Gray8 => {
@@ -57,12 +59,17 @@ pub fn threshold_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>, thres
             }
         }
     }
+
+    Ok(())
 }
 
-pub fn random_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>, seed: u64, strength: u8) {
-    buffer
-        .validate()
-        .expect("buffer must be valid for random dithering");
+pub fn random_binary_in_place(
+    buffer: &mut Buffer<'_>,
+    mode: QuantizeMode<'_>,
+    seed: u64,
+    strength: u8,
+) -> DithrResult<()> {
+    buffer.validate()?;
 
     let width = buffer.width;
     let height = buffer.height;
@@ -71,11 +78,11 @@ pub fn random_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>, seed: u6
     let mut prng = XorShift64::new(seed);
 
     for y in 0..height {
-        let row = buffer.row_mut(y);
+        let row = buffer.try_row_mut(y)?;
 
         for x in 0..width {
             let threshold = perturbed_threshold(&mut prng, seed, x, y, strength);
-            let offset = x.checked_mul(bpp).expect("pixel offset overflow in row");
+            let offset = x.checked_mul(bpp).ok_or(BufferError::OutOfBounds)?;
 
             match format {
                 PixelFormat::Gray8 => {
@@ -115,6 +122,18 @@ pub fn random_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>, seed: u6
             }
         }
     }
+
+    Ok(())
+}
+
+pub fn threshold_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>, threshold: u8) {
+    threshold_binary_in_place(buffer, mode, threshold)
+        .expect("buffer must be valid for threshold dithering");
+}
+
+pub fn random_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>, seed: u64, strength: u8) {
+    random_binary_in_place(buffer, mode, seed, strength)
+        .expect("buffer must be valid for random dithering");
 }
 
 fn perturbed_threshold(prng: &mut XorShift64, seed: u64, x: usize, y: usize, strength: u8) -> u8 {

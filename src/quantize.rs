@@ -9,6 +9,7 @@ pub enum QuantizeMode<'a> {
 }
 
 #[must_use]
+#[inline]
 pub fn quantize_gray_u8(value: u8, bits: u8) -> u8 {
     let bits = normalize_bits(bits);
     let levels = (1_u16 << bits) - 1;
@@ -18,6 +19,7 @@ pub fn quantize_gray_u8(value: u8, bits: u8) -> u8 {
 }
 
 #[must_use]
+#[inline]
 pub fn quantize_rgb_u8(rgb: [u8; 3], bits: u8) -> [u8; 3] {
     [
         quantize_gray_u8(rgb[0], bits),
@@ -40,7 +42,7 @@ pub fn quantize_pixel(format: PixelFormat, pixel: &[u8], mode: QuantizeMode<'_>)
             [q[0], q[1], q[2], alpha]
         }
         QuantizeMode::Palette(palette) => {
-            let nearest = palette.nearest_rgb(rgb);
+            let nearest = palette.nearest_rgb_index(rgb);
             let q = palette.as_slice()[nearest];
             [q[0], q[1], q[2], alpha]
         }
@@ -57,6 +59,7 @@ pub fn quantize_pixel(format: PixelFormat, pixel: &[u8], mode: QuantizeMode<'_>)
 }
 
 #[must_use]
+#[inline]
 pub fn quantize_error(original: &[u8], quantized: &[u8]) -> [i16; 4] {
     let mut out = [0_i16; 4];
 
@@ -94,6 +97,7 @@ fn pixel_rgb_alpha(format: PixelFormat, pixel: &[u8]) -> ([u8; 3], u8) {
 }
 
 #[must_use]
+#[inline]
 fn scale_channel_by_gray(channel: u8, gray: u8) -> u8 {
     let scaled = u16::from(channel)
         .checked_mul(u16::from(gray))

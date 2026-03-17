@@ -212,11 +212,28 @@ fn palette_rejects_257_colors() {
 }
 
 #[test]
-fn palette_nearest_rgb_returns_exact_index_for_member() {
+fn palette_nearest_rgb_index_returns_exact_index_for_member() {
     let palette = Palette::new(vec![[0, 0, 0], [10, 20, 30], [255, 255, 255]])
         .expect("palette should be valid");
 
-    assert_eq!(palette.nearest_rgb([10, 20, 30]), 1);
+    assert_eq!(palette.nearest_rgb_index([10, 20, 30]), 1);
+}
+
+#[test]
+fn palette_nearest_rgb_color_returns_palette_member() {
+    let palette = Palette::new(vec![[0, 0, 0], [10, 20, 30], [255, 255, 255]])
+        .expect("palette should be valid");
+
+    let nearest = palette.nearest_rgb_color([11, 22, 29]);
+    assert!(palette.contains(nearest));
+}
+
+#[test]
+fn palette_contains_true_for_member() {
+    let palette = Palette::new(vec![[0, 0, 0], [10, 20, 30], [255, 255, 255]])
+        .expect("palette should be valid");
+
+    assert!(palette.contains([10, 20, 30]));
 }
 
 #[test]

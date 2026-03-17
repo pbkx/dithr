@@ -56,7 +56,7 @@ impl Palette {
     }
 
     #[must_use]
-    pub fn nearest_rgb(&self, rgb: [u8; 3]) -> usize {
+    pub fn nearest_rgb_index(&self, rgb: [u8; 3]) -> usize {
         let mut best_idx = 0_usize;
         let mut best_dist = rgb_distance_sq(rgb, self.colors[0]);
 
@@ -69,5 +69,21 @@ impl Palette {
         }
 
         best_idx
+    }
+
+    #[must_use]
+    pub fn nearest_rgb_color(&self, rgb: [u8; 3]) -> [u8; 3] {
+        self.colors[self.nearest_rgb_index(rgb)]
+    }
+
+    #[must_use]
+    pub fn contains(&self, rgb: [u8; 3]) -> bool {
+        self.colors.contains(&rgb)
+    }
+
+    #[deprecated(since = "0.1.0", note = "use nearest_rgb_index instead")]
+    #[must_use]
+    pub fn nearest_rgb(&self, rgb: [u8; 3]) -> usize {
+        self.nearest_rgb_index(rgb)
     }
 }

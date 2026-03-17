@@ -264,7 +264,7 @@ fn devise_best_mixing_plan(target: [u8; 3], palette: &[[u8; 3]]) -> MixingPlan {
 }
 
 fn devise_color_sequence(target: [u8; 3], palette: &[[u8; 3]], palette_luma: &[u32]) -> Vec<usize> {
-    let sequence_len = palette.len();
+    let sequence_len = usize::from(DITHER_LEVELS);
     let mut result = Vec::with_capacity(sequence_len);
     let mut proportion_total = 0_usize;
     let mut so_far = [0_u32; 3];

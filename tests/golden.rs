@@ -222,7 +222,7 @@ fn golden_yliluoma_2_rgb_gradient_8x8() {
 
     yliluoma_2_in_place(&mut buffer, &palette);
 
-    assert_eq!(fnv1a64(&data), 9_822_094_116_201_420_289_u64);
+    assert_eq!(fnv1a64(&data), 6_371_937_729_658_429_102_u64);
 }
 
 #[test]

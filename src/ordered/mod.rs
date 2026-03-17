@@ -88,16 +88,16 @@ pub fn custom_ordered_in_place(
     ordered_dither_in_place(buffer, mode, map, map_w, map_h, strength)
 }
 
-pub fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
-    yliluoma::yliluoma_1_in_place(buffer, palette);
+pub fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> DithrResult<()> {
+    yliluoma::yliluoma_1_in_place(buffer, palette)
 }
 
-pub fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
-    yliluoma::yliluoma_2_in_place(buffer, palette);
+pub fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> DithrResult<()> {
+    yliluoma::yliluoma_2_in_place(buffer, palette)
 }
 
-pub fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
-    yliluoma::yliluoma_3_in_place(buffer, palette);
+pub fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> DithrResult<()> {
+    yliluoma::yliluoma_3_in_place(buffer, palette)
 }
 
 fn bayer_16x16_flat() -> &'static [u8; 256] {

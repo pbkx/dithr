@@ -198,7 +198,7 @@ fn golden_yliluoma_1_rgb_gradient_8x8() {
         format: PixelFormat::Rgb8,
     };
 
-    yliluoma_1_in_place(&mut buffer, &palette);
+    yliluoma_1_in_place(&mut buffer, &palette).expect("yliluoma 1 should succeed");
 
     assert_eq!(fnv1a64(&data), 15_541_327_241_764_811_552_u64);
 }
@@ -225,7 +225,7 @@ fn golden_yliluoma_2_rgb_gradient_8x8() {
         format: PixelFormat::Rgb8,
     };
 
-    yliluoma_2_in_place(&mut buffer, &palette);
+    yliluoma_2_in_place(&mut buffer, &palette).expect("yliluoma 2 should succeed");
 
     assert_eq!(fnv1a64(&data), 6_371_937_729_658_429_102_u64);
 }
@@ -252,7 +252,7 @@ fn golden_yliluoma_3_rgb_gradient_8x8() {
         format: PixelFormat::Rgb8,
     };
 
-    yliluoma_3_in_place(&mut buffer, &palette);
+    yliluoma_3_in_place(&mut buffer, &palette).expect("yliluoma 3 should succeed");
 
     assert_eq!(fnv1a64(&data), 9_812_579_000_523_236_581_u64);
 }

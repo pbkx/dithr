@@ -1,7 +1,7 @@
 use crate::{
     data::BAYER_8X8,
     math::color::{luma_u8, rgb_distance_sq},
-    Buffer, Palette, PixelFormat,
+    Buffer, BufferError, DithrResult, Palette, PixelFormat,
 };
 use std::collections::HashMap;
 
@@ -16,13 +16,51 @@ struct MixingPlan {
     ratio: u8,
 }
 
-pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
-    buffer
-        .validate()
-        .expect("buffer must be valid for yliluoma algorithm 1");
+struct PaletteView<'a> {
+    colors: &'a [[u8; 3]],
+    luma: Vec<u32>,
+    packed: Vec<u32>,
+}
 
-    let colors = palette.as_slice();
-    assert!(!colors.is_empty(), "palette must not be empty");
+impl<'a> PaletteView<'a> {
+    fn new(palette: &'a Palette) -> Self {
+        let colors = palette.as_slice();
+        let mut luma = Vec::with_capacity(colors.len());
+        let mut packed = Vec::with_capacity(colors.len());
+
+        for &color in colors {
+            luma.push(
+                u32::from(color[0]) * 299 + u32::from(color[1]) * 587 + u32::from(color[2]) * 114,
+            );
+            packed.push(pack_rgb(color));
+        }
+
+        Self {
+            colors,
+            luma,
+            packed,
+        }
+    }
+
+    fn gamma_table(&self) -> Vec<[f64; 3]> {
+        self.colors
+            .iter()
+            .map(|color| {
+                [
+                    gamma_correct_channel(color[0]),
+                    gamma_correct_channel(color[1]),
+                    gamma_correct_channel(color[2]),
+                ]
+            })
+            .collect()
+    }
+}
+
+pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> DithrResult<()> {
+    buffer.validate()?;
+
+    let view = PaletteView::new(palette);
+    debug_assert!(!view.colors.is_empty());
 
     let width = buffer.width;
     let height = buffer.height;
@@ -31,10 +69,10 @@ pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
     let mut cache = HashMap::<u32, MixingPlan>::new();
 
     for y in 0..height {
-        let row = buffer.row_mut(y);
+        let row = buffer.try_row_mut(y)?;
 
         for x in 0..width {
-            let offset = x.checked_mul(bpp).expect("pixel offset overflow in row");
+            let offset = x.checked_mul(bpp).ok_or(BufferError::OutOfBounds)?;
             let source_rgb = match format {
                 PixelFormat::Gray8 => {
                     let g = row[offset];
@@ -48,15 +86,15 @@ pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
             let plan = if let Some(&cached) = cache.get(&key) {
                 cached
             } else {
-                let computed = devise_best_mixing_plan(source_rgb, colors);
+                let computed = devise_best_mixing_plan(source_rgb, view.colors);
                 cache.insert(key, computed);
                 computed
             };
             let threshold = BAYER_8X8[y % 8][x % 8];
             let chosen = if threshold < plan.ratio {
-                colors[plan.second_index]
+                view.colors[plan.second_index]
             } else {
-                colors[plan.first_index]
+                view.colors[plan.first_index]
             };
 
             match format {
@@ -78,33 +116,27 @@ pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
             }
         }
     }
+
+    Ok(())
 }
 
-pub(crate) fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
-    buffer
-        .validate()
-        .expect("buffer must be valid for yliluoma algorithm 2");
+pub(crate) fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> DithrResult<()> {
+    buffer.validate()?;
 
-    let colors = palette.as_slice();
-    assert!(!colors.is_empty(), "palette must not be empty");
+    let view = PaletteView::new(palette);
+    debug_assert!(!view.colors.is_empty());
 
     let width = buffer.width;
     let height = buffer.height;
     let format = buffer.format;
     let bpp = format.bytes_per_pixel();
     let mut cache = HashMap::<u32, Vec<usize>>::new();
-    let palette_luma: Vec<u32> = colors
-        .iter()
-        .map(|color| {
-            u32::from(color[0]) * 299 + u32::from(color[1]) * 587 + u32::from(color[2]) * 114
-        })
-        .collect();
 
     for y in 0..height {
-        let row = buffer.row_mut(y);
+        let row = buffer.try_row_mut(y)?;
 
         for x in 0..width {
-            let offset = x.checked_mul(bpp).expect("pixel offset overflow in row");
+            let offset = x.checked_mul(bpp).ok_or(BufferError::OutOfBounds)?;
             let source_rgb = match format {
                 PixelFormat::Gray8 => {
                     let g = row[offset];
@@ -118,16 +150,16 @@ pub(crate) fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
             let selected = {
                 let plan = cache
                     .entry(key)
-                    .or_insert_with(|| devise_color_sequence(source_rgb, colors, &palette_luma));
+                    .or_insert_with(|| devise_color_sequence(source_rgb, view.colors, &view.luma));
                 let map_value = usize::from(BAYER_8X8[y % 8][x % 8]);
                 let plan_index = map_value
                     .checked_mul(plan.len())
-                    .expect("plan index multiplication overflow")
+                    .ok_or(BufferError::OutOfBounds)?
                     / usize::from(DITHER_LEVELS);
 
                 plan[plan_index]
             };
-            let chosen = colors[selected];
+            let chosen = view.colors[selected];
 
             match format {
                 PixelFormat::Gray8 => {
@@ -148,43 +180,28 @@ pub(crate) fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
             }
         }
     }
+
+    Ok(())
 }
 
-pub(crate) fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
-    buffer
-        .validate()
-        .expect("buffer must be valid for yliluoma algorithm 3");
+pub(crate) fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> DithrResult<()> {
+    buffer.validate()?;
 
-    let colors = palette.as_slice();
-    assert!(!colors.is_empty(), "palette must not be empty");
+    let view = PaletteView::new(palette);
+    debug_assert!(!view.colors.is_empty());
 
     let width = buffer.width;
     let height = buffer.height;
     let format = buffer.format;
     let bpp = format.bytes_per_pixel();
     let mut cache = HashMap::<u32, Vec<usize>>::new();
-    let palette_luma: Vec<u32> = colors
-        .iter()
-        .map(|color| {
-            u32::from(color[0]) * 299 + u32::from(color[1]) * 587 + u32::from(color[2]) * 114
-        })
-        .collect();
-    let palette_gamma: Vec<[f64; 3]> = colors
-        .iter()
-        .map(|color| {
-            [
-                gamma_correct_channel(color[0]),
-                gamma_correct_channel(color[1]),
-                gamma_correct_channel(color[2]),
-            ]
-        })
-        .collect();
+    let palette_gamma = view.gamma_table();
 
     for y in 0..height {
-        let row = buffer.row_mut(y);
+        let row = buffer.try_row_mut(y)?;
 
         for x in 0..width {
-            let offset = x.checked_mul(bpp).expect("pixel offset overflow in row");
+            let offset = x.checked_mul(bpp).ok_or(BufferError::OutOfBounds)?;
             let source_rgb = match format {
                 PixelFormat::Gray8 => {
                     let g = row[offset];
@@ -197,22 +214,17 @@ pub(crate) fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
             let key = pack_rgb(source_rgb);
             let selected = {
                 let plan = cache.entry(key).or_insert_with(|| {
-                    devise_color_sequence_algorithm3(
-                        source_rgb,
-                        colors,
-                        &palette_luma,
-                        &palette_gamma,
-                    )
+                    devise_color_sequence_algorithm3(source_rgb, &view, &palette_gamma)
                 });
                 let map_value = usize::from(BAYER_8X8[y % 8][x % 8]);
                 let plan_index = map_value
                     .checked_mul(plan.len())
-                    .expect("plan index multiplication overflow")
+                    .ok_or(BufferError::OutOfBounds)?
                     / usize::from(DITHER_LEVELS);
 
                 plan[plan_index]
             };
-            let chosen = colors[selected];
+            let chosen = view.colors[selected];
 
             match format {
                 PixelFormat::Gray8 => {
@@ -233,6 +245,8 @@ pub(crate) fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) {
             }
         }
     }
+
+    Ok(())
 }
 
 fn devise_best_mixing_plan(target: [u8; 3], palette: &[[u8; 3]]) -> MixingPlan {
@@ -356,13 +370,12 @@ fn color_compare_rgb_luma(a: [u8; 3], b: [u8; 3]) -> f64 {
 
 fn devise_color_sequence_algorithm3(
     target: [u8; 3],
-    palette: &[[u8; 3]],
-    palette_luma: &[u32],
+    view: &PaletteView<'_>,
     palette_gamma: &[[f64; 3]],
 ) -> Vec<usize> {
-    let palette_len = palette.len();
+    let palette_len = view.colors.len();
     let mut counts = vec![0_usize; palette_len];
-    let initial = nearest_palette_index(target, palette);
+    let initial = nearest_palette_index(target, view);
     counts[initial] = usize::from(DITHER_LEVELS);
     let mut current_penalty = evaluate_penalty_with_counts(target, &counts, palette_gamma);
 
@@ -451,7 +464,7 @@ fn devise_color_sequence_algorithm3(
         result.push(initial);
     }
 
-    result.sort_by_key(|&index| (palette_luma[index], index));
+    result.sort_by_key(|&index| (view.luma[index], index));
     result
 }
 
@@ -482,11 +495,16 @@ fn evaluate_penalty_with_counts(
     color_compare_rgb_luma(target, mixed)
 }
 
-fn nearest_palette_index(target: [u8; 3], palette: &[[u8; 3]]) -> usize {
-    let mut best_index = 0_usize;
-    let mut best_error = rgb_distance_sq(target, palette[0]);
+fn nearest_palette_index(target: [u8; 3], view: &PaletteView<'_>) -> usize {
+    let packed = pack_rgb(target);
+    if let Some(index) = view.packed.iter().position(|&entry| entry == packed) {
+        return index;
+    }
 
-    for (index, &color) in palette.iter().enumerate().skip(1) {
+    let mut best_index = 0_usize;
+    let mut best_error = rgb_distance_sq(target, view.colors[0]);
+
+    for (index, &color) in view.colors.iter().enumerate().skip(1) {
         let error = rgb_distance_sq(target, color);
         if error < best_error {
             best_error = error;

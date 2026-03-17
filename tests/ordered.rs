@@ -273,7 +273,7 @@ fn yliluoma_1_output_is_always_palette_member() {
         format: PixelFormat::Rgb8,
     };
 
-    yliluoma_1_in_place(&mut buffer, &palette);
+    yliluoma_1_in_place(&mut buffer, &palette).expect("yliluoma 1 should succeed");
 
     for chunk in data.chunks_exact(3) {
         let rgb = [chunk[0], chunk[1], chunk[2]];
@@ -311,8 +311,8 @@ fn yliluoma_1_deterministic_rgb_fixture() {
         format: PixelFormat::Rgb8,
     };
 
-    yliluoma_1_in_place(&mut buffer_a, &palette);
-    yliluoma_1_in_place(&mut buffer_b, &palette);
+    yliluoma_1_in_place(&mut buffer_a, &palette).expect("yliluoma 1 should succeed");
+    yliluoma_1_in_place(&mut buffer_b, &palette).expect("yliluoma 1 should succeed");
 
     assert_eq!(data_a, data_b);
 }
@@ -339,7 +339,7 @@ fn yliluoma_2_output_is_always_palette_member() {
         format: PixelFormat::Rgb8,
     };
 
-    yliluoma_2_in_place(&mut buffer, &palette);
+    yliluoma_2_in_place(&mut buffer, &palette).expect("yliluoma 2 should succeed");
 
     for chunk in data.chunks_exact(3) {
         let rgb = [chunk[0], chunk[1], chunk[2]];
@@ -369,7 +369,7 @@ fn yliluoma_3_output_is_always_palette_member() {
         format: PixelFormat::Rgb8,
     };
 
-    yliluoma_3_in_place(&mut buffer, &palette);
+    yliluoma_3_in_place(&mut buffer, &palette).expect("yliluoma 3 should succeed");
 
     for chunk in data.chunks_exact(3) {
         let rgb = [chunk[0], chunk[1], chunk[2]];

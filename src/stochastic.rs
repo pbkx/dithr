@@ -1,6 +1,6 @@
 use crate::{
     math::{color::luma_u8, utils::clamp_u8},
-    quantize_pixel, Buffer, BufferError, DithrResult, PixelFormat, QuantizeMode,
+    quantize_pixel, Buffer, BufferError, PixelFormat, QuantizeMode, Result,
 };
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
@@ -9,7 +9,7 @@ pub fn threshold_binary_in_place(
     buffer: &mut Buffer<'_>,
     mode: QuantizeMode<'_>,
     threshold: u8,
-) -> DithrResult<()> {
+) -> Result<()> {
     buffer.validate()?;
 
     let width = buffer.width;
@@ -70,7 +70,7 @@ pub fn random_binary_in_place(
     mode: QuantizeMode<'_>,
     seed: u64,
     strength: u8,
-) -> DithrResult<()> {
+) -> Result<()> {
     buffer.validate()?;
 
     let width = buffer.width;
@@ -133,7 +133,7 @@ pub fn threshold_binary_in_place_par(
     buffer: &mut Buffer<'_>,
     mode: QuantizeMode<'_>,
     threshold: u8,
-) -> DithrResult<()> {
+) -> Result<()> {
     buffer.validate()?;
 
     let width = buffer.width;
@@ -197,7 +197,7 @@ pub fn random_binary_in_place_par(
     mode: QuantizeMode<'_>,
     seed: u64,
     strength: u8,
-) -> DithrResult<()> {
+) -> Result<()> {
     buffer.validate()?;
 
     let width = buffer.width;

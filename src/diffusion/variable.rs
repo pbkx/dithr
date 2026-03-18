@@ -6,7 +6,7 @@ use crate::{
         fixed::mul_div_i32,
         utils::{clamp_i16, clamp_u8},
     },
-    quantize_pixel, Buffer, DithrError, DithrResult, PixelFormat, QuantizeMode,
+    quantize_pixel, Buffer, Error, PixelFormat, QuantizeMode, Result,
 };
 
 #[derive(Clone, Copy)]
@@ -16,7 +16,7 @@ enum GrayOnlyVariableAlgorithm {
     GradientBased,
 }
 
-pub fn ostromoukhov_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> DithrResult<()> {
+pub fn ostromoukhov_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Result<()> {
     diffuse_gray_only_variable_or_floyd_steinberg(
         buffer,
         mode,
@@ -24,14 +24,14 @@ pub fn ostromoukhov_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) ->
     )
 }
 
-pub fn zhou_fang_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> DithrResult<()> {
+pub fn zhou_fang_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Result<()> {
     diffuse_gray_only_variable_or_floyd_steinberg(buffer, mode, GrayOnlyVariableAlgorithm::ZhouFang)
 }
 
 pub fn gradient_based_error_diffusion_in_place(
     buffer: &mut Buffer<'_>,
     mode: QuantizeMode<'_>,
-) -> DithrResult<()> {
+) -> Result<()> {
     diffuse_gray_only_variable_or_floyd_steinberg(
         buffer,
         mode,
@@ -43,7 +43,7 @@ fn diffuse_gray_only_variable_or_floyd_steinberg(
     buffer: &mut Buffer<'_>,
     mode: QuantizeMode<'_>,
     algorithm: GrayOnlyVariableAlgorithm,
-) -> DithrResult<()> {
+) -> Result<()> {
     buffer.validate()?;
 
     if buffer.format != PixelFormat::Gray8 {
@@ -59,7 +59,7 @@ fn diffuse_gray_only_variable_or_floyd_steinberg(
     }
 }
 
-fn diffuse_gradient_gray(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> DithrResult<()> {
+fn diffuse_gradient_gray(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Result<()> {
     let width = buffer.width;
     let height = buffer.height;
     let stride = buffer.stride;
@@ -132,7 +132,7 @@ fn diffuse_variable_gray(
     buffer: &mut Buffer<'_>,
     mode: QuantizeMode<'_>,
     modulation: Option<&[i16; 16]>,
-) -> DithrResult<()> {
+) -> Result<()> {
     let width = buffer.width;
     let height = buffer.height;
     let mut errors = allocate_gray_error_buffer(width, height)?;
@@ -194,10 +194,10 @@ fn diffuse_variable_gray(
     Ok(())
 }
 
-fn allocate_gray_error_buffer(width: usize, height: usize) -> DithrResult<Vec<i32>> {
+fn allocate_gray_error_buffer(width: usize, height: usize) -> Result<Vec<i32>> {
     let len = width
         .checked_mul(height)
-        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
     Ok(vec![0_i32; len])
 }
 

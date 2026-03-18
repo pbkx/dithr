@@ -5,17 +5,17 @@ use crate::{
         fixed::mul_div_i32,
         utils::{clamp_i16, clamp_u8},
     },
-    quantize_pixel, Buffer, DithrError, DithrResult, PixelFormat, QuantizeMode,
+    quantize_pixel, Buffer, Error, PixelFormat, QuantizeMode, Result,
 };
 
 pub(crate) fn error_diffuse_in_place(
     buffer: &mut Buffer<'_>,
     mode: QuantizeMode<'_>,
     kernel: &ErrorKernel,
-) -> DithrResult<()> {
+) -> Result<()> {
     buffer.validate()?;
     if kernel.weight_den <= 0 {
-        return Err(DithrError::InvalidArgument(
+        return Err(Error::InvalidArgument(
             "kernel denominator must be positive",
         ));
     }
@@ -62,13 +62,13 @@ pub(crate) fn diffuse_gray_row_major(
     buffer: &mut Buffer<'_>,
     mode: QuantizeMode<'_>,
     kernel: &ErrorKernel,
-) -> DithrResult<()> {
+) -> Result<()> {
     let width = buffer.width;
     let height = buffer.height;
     let denominator = i32::from(kernel.weight_den);
     let pixel_count = width
         .checked_mul(height)
-        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
     let mut errors = vec![0_i32; pixel_count];
 
     for y in 0..height {
@@ -109,7 +109,7 @@ pub(crate) fn diffuse_rgb_row_major(
     buffer: &mut Buffer<'_>,
     mode: QuantizeMode<'_>,
     kernel: &ErrorKernel,
-) -> DithrResult<()> {
+) -> Result<()> {
     let width = buffer.width;
     let height = buffer.height;
     let format = buffer.format;
@@ -118,10 +118,10 @@ pub(crate) fn diffuse_rgb_row_major(
     let channels = 3_usize;
     let pixel_count = width
         .checked_mul(height)
-        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
     let error_len = pixel_count
         .checked_mul(channels)
-        .ok_or(DithrError::InvalidArgument("error buffer size overflow"))?;
+        .ok_or(Error::InvalidArgument("error buffer size overflow"))?;
     let mut errors = vec![0_i32; error_len];
     let is_rgba = format == PixelFormat::Rgba8;
 

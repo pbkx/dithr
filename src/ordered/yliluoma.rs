@@ -1,7 +1,7 @@
 use crate::{
     data::BAYER_8X8,
     math::color::{luma_u8, rgb_distance_sq},
-    Buffer, BufferError, DithrResult, Palette, PixelFormat,
+    Buffer, BufferError, Palette, PixelFormat, Result,
 };
 use std::collections::HashMap;
 
@@ -56,7 +56,7 @@ impl<'a> PaletteView<'a> {
     }
 }
 
-pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> DithrResult<()> {
+pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> Result<()> {
     buffer.validate()?;
 
     let view = PaletteView::new(palette);
@@ -120,7 +120,7 @@ pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
     Ok(())
 }
 
-pub(crate) fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> DithrResult<()> {
+pub(crate) fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> Result<()> {
     buffer.validate()?;
 
     let view = PaletteView::new(palette);
@@ -184,7 +184,7 @@ pub(crate) fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
     Ok(())
 }
 
-pub(crate) fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> DithrResult<()> {
+pub(crate) fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> Result<()> {
     buffer.validate()?;
 
     let view = PaletteView::new(palette);

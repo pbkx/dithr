@@ -1,4 +1,4 @@
-use crate::{math::fixed::mul_div_i32, Buffer, DithrError, DithrResult, PixelFormat};
+use crate::{math::fixed::mul_div_i32, Buffer, Error, PixelFormat, Result};
 
 const DBS_KERNEL: [[u32; 3]; 3] = [[1, 2, 1], [2, 4, 2], [1, 2, 1]];
 const LBM_SCALE: i32 = 16_384;
@@ -35,10 +35,10 @@ const ELECTRO_NEIGHBORS: [(isize, isize); 9] = [
     (1, 1),
 ];
 
-pub fn direct_binary_search_in_place(buffer: &mut Buffer<'_>, max_iters: usize) -> DithrResult<()> {
+pub fn direct_binary_search_in_place(buffer: &mut Buffer<'_>, max_iters: usize) -> Result<()> {
     buffer.validate()?;
     if buffer.format != PixelFormat::Gray8 {
-        return Err(DithrError::UnsupportedFormat(
+        return Err(Error::UnsupportedFormat(
             "direct binary search supports Gray8 only",
         ));
     }
@@ -47,7 +47,7 @@ pub fn direct_binary_search_in_place(buffer: &mut Buffer<'_>, max_iters: usize) 
     let height = buffer.height;
     let pixel_count = width
         .checked_mul(height)
-        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
 
     let mut target = Vec::with_capacity(pixel_count);
     let mut binary = Vec::with_capacity(pixel_count);
@@ -137,10 +137,10 @@ pub fn direct_binary_search_in_place(buffer: &mut Buffer<'_>, max_iters: usize) 
     Ok(())
 }
 
-pub fn lattice_boltzmann_in_place(buffer: &mut Buffer<'_>, max_steps: usize) -> DithrResult<()> {
+pub fn lattice_boltzmann_in_place(buffer: &mut Buffer<'_>, max_steps: usize) -> Result<()> {
     buffer.validate()?;
     if buffer.format != PixelFormat::Gray8 {
-        return Err(DithrError::UnsupportedFormat(
+        return Err(Error::UnsupportedFormat(
             "lattice-boltzmann supports Gray8 only",
         ));
     }
@@ -149,7 +149,7 @@ pub fn lattice_boltzmann_in_place(buffer: &mut Buffer<'_>, max_steps: usize) -> 
     let height = buffer.height;
     let pixel_count = width
         .checked_mul(height)
-        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
     let mut target = Vec::with_capacity(pixel_count);
 
     for y in 0..height {
@@ -219,13 +219,10 @@ pub fn lattice_boltzmann_in_place(buffer: &mut Buffer<'_>, max_steps: usize) -> 
     Ok(())
 }
 
-pub fn electrostatic_halftoning_in_place(
-    buffer: &mut Buffer<'_>,
-    max_steps: usize,
-) -> DithrResult<()> {
+pub fn electrostatic_halftoning_in_place(buffer: &mut Buffer<'_>, max_steps: usize) -> Result<()> {
     buffer.validate()?;
     if buffer.format != PixelFormat::Gray8 {
-        return Err(DithrError::UnsupportedFormat(
+        return Err(Error::UnsupportedFormat(
             "electrostatic halftoning supports Gray8 only",
         ));
     }
@@ -234,7 +231,7 @@ pub fn electrostatic_halftoning_in_place(
     let height = buffer.height;
     let pixel_count = width
         .checked_mul(height)
-        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
     let mut darkness = Vec::with_capacity(pixel_count);
 
     for y in 0..height {
@@ -308,7 +305,7 @@ pub fn electrostatic_halftoning_in_place(
     Ok(())
 }
 
-fn dbs_objective(target: &[u8], binary: &[u8], width: usize, height: usize) -> DithrResult<u64> {
+fn dbs_objective(target: &[u8], binary: &[u8], width: usize, height: usize) -> Result<u64> {
     let mut total = 0_u64;
 
     for y in 0..height {
@@ -339,7 +336,7 @@ fn dbs_objective(target: &[u8], binary: &[u8], width: usize, height: usize) -> D
             let sq = (i64::from(diff) * i64::from(diff)) as u64;
             total = total
                 .checked_add(sq)
-                .ok_or(DithrError::InvalidArgument("objective overflow"))?;
+                .ok_or(Error::InvalidArgument("objective overflow"))?;
         }
     }
 

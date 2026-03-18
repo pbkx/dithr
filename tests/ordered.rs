@@ -9,8 +9,8 @@ use dithr::data::{
 use dithr::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
     cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
-    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place, Buffer, DithrError,
-    OrderedError, Palette, PixelFormat, QuantizeMode,
+    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place, Buffer, Error, OrderedError,
+    Palette, PixelFormat, QuantizeMode,
 };
 
 const BAYER_2X2_FLAT: [u8; 4] = [0, 2, 3, 1];
@@ -194,7 +194,7 @@ fn custom_ordered_rejects_empty_map() {
 
     let result = custom_ordered_in_place(&mut buffer, QuantizeMode::GrayBits(1), &[], 0, 0, 64);
 
-    assert_eq!(result, Err(DithrError::Ordered(OrderedError::EmptyMap)));
+    assert_eq!(result, Err(Error::Ordered(OrderedError::EmptyMap)));
 }
 
 #[test]
@@ -211,10 +211,7 @@ fn custom_ordered_rejects_bad_dimensions() {
     let map = [0_u8, 1, 2];
     let result = custom_ordered_in_place(&mut buffer, QuantizeMode::GrayBits(1), &map, 2, 2, 64);
 
-    assert_eq!(
-        result,
-        Err(DithrError::Ordered(OrderedError::InvalidDimensions))
-    );
+    assert_eq!(result, Err(Error::Ordered(OrderedError::InvalidDimensions)));
 }
 
 #[test]

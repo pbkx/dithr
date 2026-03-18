@@ -3,7 +3,7 @@ use crate::{
         color::luma_u8,
         utils::{clamp_i16, clamp_u8},
     },
-    quantize_pixel, Buffer, BufferError, DithrError, DithrResult, PixelFormat, QuantizeMode,
+    quantize_pixel, Buffer, BufferError, Error, PixelFormat, QuantizeMode, Result,
 };
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
@@ -15,7 +15,7 @@ pub(crate) fn ordered_dither_in_place(
     map_w: usize,
     map_h: usize,
     strength: i16,
-) -> DithrResult<()> {
+) -> Result<()> {
     buffer.validate()?;
     validate_map(map, map_w, map_h)?;
 
@@ -79,7 +79,7 @@ pub(crate) fn ordered_dither_in_place_par(
     map_w: usize,
     map_h: usize,
     strength: i16,
-) -> DithrResult<()> {
+) -> Result<()> {
     buffer.validate()?;
     validate_map(map, map_w, map_h)?;
 
@@ -168,18 +168,18 @@ pub(crate) fn ordered_threshold_for_xy(
     map.get(index).copied().unwrap_or_default()
 }
 
-fn validate_map(map: &[u8], map_w: usize, map_h: usize) -> DithrResult<()> {
+fn validate_map(map: &[u8], map_w: usize, map_h: usize) -> Result<()> {
     if map_w == 0 || map_h == 0 {
-        return Err(DithrError::InvalidArgument(
+        return Err(Error::InvalidArgument(
             "ordered map dimensions must be positive",
         ));
     }
 
-    let expected_len = map_w.checked_mul(map_h).ok_or(DithrError::InvalidArgument(
-        "ordered map dimensions overflow",
-    ))?;
+    let expected_len = map_w
+        .checked_mul(map_h)
+        .ok_or(Error::InvalidArgument("ordered map dimensions overflow"))?;
     if map.len() != expected_len {
-        return Err(DithrError::InvalidArgument(
+        return Err(Error::InvalidArgument(
             "ordered map length must match dimensions",
         ));
     }

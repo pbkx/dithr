@@ -3,14 +3,14 @@ use crate::{
         color::luma_u8,
         utils::{clamp_i16, clamp_u8},
     },
-    quantize_pixel, Buffer, DithrError, DithrResult, PixelFormat, QuantizeMode,
+    quantize_pixel, Buffer, Error, PixelFormat, QuantizeMode, Result,
 };
 
 const HISTORY_LEN: usize = 16;
 const HISTORY_WEIGHTS: [i32; HISTORY_LEN] = [1, 1, 2, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 19, 23, 27];
 const HISTORY_WEIGHT_SUM: i32 = 153;
 
-pub fn riemersma_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> DithrResult<()> {
+pub fn riemersma_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Result<()> {
     buffer.validate()?;
 
     let width = buffer.width;
@@ -18,11 +18,11 @@ pub fn riemersma_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Di
     let format = buffer.format;
     let pixel_count = width
         .checked_mul(height)
-        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
     let side = hilbert_side(width.max(height))?;
     let total_steps = side
         .checked_mul(side)
-        .ok_or(DithrError::InvalidArgument("hilbert size overflow"))?;
+        .ok_or(Error::InvalidArgument("hilbert size overflow"))?;
 
     let mut history = [[0_i32; 3]; HISTORY_LEN];
     let mut head = 0_usize;
@@ -139,17 +139,17 @@ fn push_error(
     }
 }
 
-fn hilbert_side(max_dimension: usize) -> DithrResult<usize> {
+fn hilbert_side(max_dimension: usize) -> Result<usize> {
     let mut side = 1_usize;
     while side < max_dimension {
         side = side
             .checked_shl(1)
-            .ok_or(DithrError::InvalidArgument("hilbert side overflow"))?;
+            .ok_or(Error::InvalidArgument("hilbert side overflow"))?;
     }
     Ok(side)
 }
 
-fn hilbert_d2xy(side: usize, distance: usize) -> DithrResult<(usize, usize)> {
+fn hilbert_d2xy(side: usize, distance: usize) -> Result<(usize, usize)> {
     let mut d = distance;
     let mut x = 0_usize;
     let mut y = 0_usize;
@@ -164,7 +164,7 @@ fn hilbert_d2xy(side: usize, distance: usize) -> DithrResult<(usize, usize)> {
         d /= 4;
         s = s
             .checked_shl(1)
-            .ok_or(DithrError::InvalidArgument("hilbert step overflow"))?;
+            .ok_or(Error::InvalidArgument("hilbert step overflow"))?;
     }
 
     Ok((x, y))

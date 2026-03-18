@@ -1,4 +1,4 @@
-use crate::{Buffer, DithrError, DithrResult, PixelFormat};
+use crate::{Buffer, Error, PixelFormat, Result};
 
 pub enum DynamicImageBuffer<'a> {
     Gray(Buffer<'a>),
@@ -39,9 +39,7 @@ pub fn rgba_image_as_buffer(img: &mut image::RgbaImage) -> Buffer<'_> {
     }
 }
 
-pub fn dynamic_image_as_buffer(
-    img: &mut image::DynamicImage,
-) -> DithrResult<DynamicImageBuffer<'_>> {
+pub fn dynamic_image_as_buffer(img: &mut image::DynamicImage) -> Result<DynamicImageBuffer<'_>> {
     match img {
         image::DynamicImage::ImageLuma8(inner) => {
             Ok(DynamicImageBuffer::Gray(gray_image_as_buffer(inner)))
@@ -52,28 +50,28 @@ pub fn dynamic_image_as_buffer(
         image::DynamicImage::ImageRgba8(inner) => {
             Ok(DynamicImageBuffer::Rgba(rgba_image_as_buffer(inner)))
         }
-        image::DynamicImage::ImageLumaA8(_) => Err(DithrError::UnsupportedFormat(
+        image::DynamicImage::ImageLumaA8(_) => Err(Error::UnsupportedFormat(
             "DynamicImage LumaA8 is unsupported",
         )),
-        image::DynamicImage::ImageLuma16(_) => Err(DithrError::UnsupportedFormat(
+        image::DynamicImage::ImageLuma16(_) => Err(Error::UnsupportedFormat(
             "DynamicImage Luma16 is unsupported",
         )),
-        image::DynamicImage::ImageLumaA16(_) => Err(DithrError::UnsupportedFormat(
+        image::DynamicImage::ImageLumaA16(_) => Err(Error::UnsupportedFormat(
             "DynamicImage LumaA16 is unsupported",
         )),
-        image::DynamicImage::ImageRgb16(_) => Err(DithrError::UnsupportedFormat(
+        image::DynamicImage::ImageRgb16(_) => Err(Error::UnsupportedFormat(
             "DynamicImage Rgb16 is unsupported",
         )),
-        image::DynamicImage::ImageRgba16(_) => Err(DithrError::UnsupportedFormat(
+        image::DynamicImage::ImageRgba16(_) => Err(Error::UnsupportedFormat(
             "DynamicImage Rgba16 is unsupported",
         )),
-        image::DynamicImage::ImageRgb32F(_) => Err(DithrError::UnsupportedFormat(
+        image::DynamicImage::ImageRgb32F(_) => Err(Error::UnsupportedFormat(
             "DynamicImage Rgb32F is unsupported",
         )),
-        image::DynamicImage::ImageRgba32F(_) => Err(DithrError::UnsupportedFormat(
+        image::DynamicImage::ImageRgba32F(_) => Err(Error::UnsupportedFormat(
             "DynamicImage Rgba32F is unsupported",
         )),
-        _ => Err(DithrError::UnsupportedFormat(
+        _ => Err(Error::UnsupportedFormat(
             "DynamicImage format is unsupported",
         )),
     }
@@ -89,7 +87,7 @@ fn image_dims(width: u32, height: u32) -> (usize, usize) {
 #[cfg(test)]
 mod tests {
     use super::{dynamic_image_as_buffer, gray_image_as_buffer, DynamicImageBuffer};
-    use crate::{DithrError, PixelFormat};
+    use crate::{Error, PixelFormat};
 
     #[test]
     fn gray_image_adapter_uses_packed_stride() {
@@ -124,7 +122,7 @@ mod tests {
         let result = dynamic_image_as_buffer(&mut img);
 
         match result {
-            Err(DithrError::UnsupportedFormat(message)) => {
+            Err(Error::UnsupportedFormat(message)) => {
                 assert_eq!(message, "DynamicImage LumaA8 is unsupported");
             }
             _ => panic!("expected unsupported format error"),

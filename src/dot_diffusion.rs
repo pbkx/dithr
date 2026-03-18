@@ -3,7 +3,7 @@ use crate::{
         color::luma_u8,
         utils::{clamp_i16, clamp_u8},
     },
-    quantize_pixel, Buffer, DithrError, DithrResult, PixelFormat, QuantizeMode,
+    quantize_pixel, Buffer, Error, PixelFormat, QuantizeMode, Result,
 };
 
 const CLASS_MATRIX_W: usize = 4;
@@ -12,10 +12,7 @@ const CLASS_COUNT: usize = CLASS_MATRIX_W * CLASS_MATRIX_H;
 const CLASS_MATRIX: [[u8; CLASS_MATRIX_W]; CLASS_MATRIX_H] =
     [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 
-pub fn knuth_dot_diffusion_in_place(
-    buffer: &mut Buffer<'_>,
-    mode: QuantizeMode<'_>,
-) -> DithrResult<()> {
+pub fn knuth_dot_diffusion_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Result<()> {
     buffer.validate()?;
     match buffer.format {
         PixelFormat::Gray8 => dot_diffuse_gray(buffer, mode),
@@ -23,12 +20,12 @@ pub fn knuth_dot_diffusion_in_place(
     }
 }
 
-fn dot_diffuse_gray(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> DithrResult<()> {
+fn dot_diffuse_gray(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Result<()> {
     let width = buffer.width;
     let height = buffer.height;
     let pixel_count = width
         .checked_mul(height)
-        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
     let mut errors = vec![0_i32; pixel_count];
 
     for class in 0..CLASS_COUNT as u8 {
@@ -56,7 +53,7 @@ fn dot_diffuse_gray(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> DithrRes
     Ok(())
 }
 
-fn dot_diffuse_rgb(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> DithrResult<()> {
+fn dot_diffuse_rgb(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Result<()> {
     let width = buffer.width;
     let height = buffer.height;
     let format = buffer.format;
@@ -64,10 +61,10 @@ fn dot_diffuse_rgb(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> DithrResu
     let channels = 3_usize;
     let pixel_count = width
         .checked_mul(height)
-        .ok_or(DithrError::InvalidArgument("image dimensions overflow"))?;
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
     let error_len = pixel_count
         .checked_mul(channels)
-        .ok_or(DithrError::InvalidArgument("error buffer size overflow"))?;
+        .ok_or(Error::InvalidArgument("error buffer size overflow"))?;
     let mut errors = vec![0_i32; error_len];
 
     for class in 0..CLASS_COUNT as u8 {

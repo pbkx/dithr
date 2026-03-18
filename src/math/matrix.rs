@@ -1,15 +1,13 @@
 #[must_use]
 pub fn tile_index(x: usize, y: usize, w: usize, h: usize) -> usize {
-    assert!(w > 0, "tile width must be greater than zero");
-    assert!(h > 0, "tile height must be greater than zero");
+    if w == 0 || h == 0 {
+        return 0;
+    }
 
     let tile_x = x % w;
     let tile_y = y % h;
 
-    tile_y
-        .checked_mul(w)
-        .and_then(|base| base.checked_add(tile_x))
-        .expect("tile index overflow")
+    tile_y.saturating_mul(w).saturating_add(tile_x)
 }
 
 #[must_use]

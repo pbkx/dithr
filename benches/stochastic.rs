@@ -20,7 +20,7 @@ fn bench_stochastic(c: &mut Criterion) {
         b.iter(|| {
             let mut data = fixture.clone();
             let mut buffer = gray_buffer(&mut data, width, height);
-            threshold_in_place(&mut buffer, mode_gray_1(), 127);
+            threshold_in_place(&mut buffer, mode_gray_1(), 127).expect("threshold should succeed");
             black_box(data);
         });
     });
@@ -29,7 +29,7 @@ fn bench_stochastic(c: &mut Criterion) {
         b.iter(|| {
             let mut data = fixture.clone();
             let mut buffer = gray_buffer(&mut data, width, height);
-            random_in_place(&mut buffer, mode_gray_1(), 1, 32);
+            random_in_place(&mut buffer, mode_gray_1(), 1, 32).expect("random should succeed");
             black_box(data);
         });
     });
@@ -43,7 +43,8 @@ fn bench_stochastic(c: &mut Criterion) {
         b.iter(|| {
             let mut data = fixture.clone();
             let mut buffer = gray_buffer(&mut data, width, height);
-            threshold_in_place(&mut buffer, mode_palette_bw(), 127);
+            threshold_in_place(&mut buffer, mode_palette_bw(), 127)
+                .expect("threshold should succeed");
             black_box(data);
         });
     });
@@ -52,7 +53,7 @@ fn bench_stochastic(c: &mut Criterion) {
         b.iter(|| {
             let mut data = fixture.clone();
             let mut buffer = gray_buffer(&mut data, width, height);
-            random_in_place(&mut buffer, mode_palette_bw(), 1, 32);
+            random_in_place(&mut buffer, mode_palette_bw(), 1, 32).expect("random should succeed");
             black_box(data);
         });
     });
@@ -68,7 +69,8 @@ fn bench_stochastic(c: &mut Criterion) {
         b.iter(|| {
             let mut data = fixture.clone();
             let mut buffer = rgb_buffer(&mut data, width, height);
-            threshold_in_place(&mut buffer, mode_palette_cga(), 127);
+            threshold_in_place(&mut buffer, mode_palette_cga(), 127)
+                .expect("threshold should succeed");
             black_box(data);
         });
     });
@@ -77,7 +79,7 @@ fn bench_stochastic(c: &mut Criterion) {
         b.iter(|| {
             let mut data = fixture.clone();
             let mut buffer = rgb_buffer(&mut data, width, height);
-            random_in_place(&mut buffer, mode_palette_cga(), 1, 32);
+            random_in_place(&mut buffer, mode_palette_cga(), 1, 32).expect("random should succeed");
             black_box(data);
         });
     });

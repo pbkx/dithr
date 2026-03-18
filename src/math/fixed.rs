@@ -1,11 +1,21 @@
 #[must_use]
 pub fn mul_div_i32(value: i32, numer: i32, denom: i32) -> i32 {
-    assert!(denom != 0, "denominator must not be zero");
+    if denom == 0 {
+        return 0;
+    }
 
     let product = i64::from(value) * i64::from(numer);
     let quotient = product / i64::from(denom);
+    let max = i64::from(i32::MAX);
+    let min = i64::from(i32::MIN);
 
-    i32::try_from(quotient).expect("mul_div_i32 overflow")
+    if quotient > max {
+        i32::MAX
+    } else if quotient < min {
+        i32::MIN
+    } else {
+        quotient as i32
+    }
 }
 
 #[must_use]
@@ -14,7 +24,9 @@ pub fn round_shift_i32(value: i32, shift: u32) -> i32 {
         return value;
     }
 
-    assert!(shift < 32, "shift must be less than 32");
+    if shift >= 32 {
+        return if value >= 0 { 0 } else { -1 };
+    }
 
     let half = 1_i64 << (shift - 1);
     let adjusted = if value >= 0 {
@@ -23,8 +35,16 @@ pub fn round_shift_i32(value: i32, shift: u32) -> i32 {
         i64::from(value) - half
     };
     let shifted = adjusted >> shift;
+    let max = i64::from(i32::MAX);
+    let min = i64::from(i32::MIN);
 
-    i32::try_from(shifted).expect("round_shift_i32 overflow")
+    if shifted > max {
+        i32::MAX
+    } else if shifted < min {
+        i32::MIN
+    } else {
+        shifted as i32
+    }
 }
 
 #[cfg(test)]

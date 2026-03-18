@@ -53,10 +53,8 @@ impl<'a> Buffer<'a> {
         Ok(buffer)
     }
 
-    #[must_use]
-    pub fn width_bytes(&self) -> usize {
+    pub fn width_bytes(&self) -> Result<usize, BufferError> {
         self.try_width_bytes()
-            .expect("width in bytes computation failed")
     }
 
     pub fn try_width_bytes(&self) -> Result<usize, BufferError> {
@@ -91,9 +89,8 @@ impl<'a> Buffer<'a> {
         Ok(())
     }
 
-    #[must_use]
-    pub fn row(&self, y: usize) -> &[u8] {
-        self.try_row(y).expect("row access failed")
+    pub fn row(&self, y: usize) -> Result<&[u8], BufferError> {
+        self.try_row(y)
     }
 
     pub fn try_row(&self, y: usize) -> Result<&[u8], BufferError> {
@@ -113,9 +110,8 @@ impl<'a> Buffer<'a> {
         Ok(&self.data[start..end])
     }
 
-    #[must_use]
-    pub fn row_mut(&mut self, y: usize) -> &mut [u8] {
-        self.try_row_mut(y).expect("row mut access failed")
+    pub fn row_mut(&mut self, y: usize) -> Result<&mut [u8], BufferError> {
+        self.try_row_mut(y)
     }
 
     pub fn try_row_mut(&mut self, y: usize) -> Result<&mut [u8], BufferError> {
@@ -135,10 +131,8 @@ impl<'a> Buffer<'a> {
         Ok(&mut self.data[start..end])
     }
 
-    #[must_use]
-    pub fn pixel_offset(&self, x: usize, y: usize) -> usize {
+    pub fn pixel_offset(&self, x: usize, y: usize) -> Result<usize, BufferError> {
         self.try_pixel_offset(x, y)
-            .expect("pixel offset computation failed")
     }
 
     pub fn try_pixel_offset(&self, x: usize, y: usize) -> Result<usize, BufferError> {

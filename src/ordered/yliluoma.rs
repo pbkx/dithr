@@ -60,8 +60,6 @@ pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
     buffer.validate()?;
 
     let view = PaletteView::new(palette);
-    debug_assert!(!view.colors.is_empty());
-
     let width = buffer.width;
     let height = buffer.height;
     let format = buffer.format;
@@ -124,8 +122,6 @@ pub(crate) fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
     buffer.validate()?;
 
     let view = PaletteView::new(palette);
-    debug_assert!(!view.colors.is_empty());
-
     let width = buffer.width;
     let height = buffer.height;
     let format = buffer.format;
@@ -188,8 +184,6 @@ pub(crate) fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
     buffer.validate()?;
 
     let view = PaletteView::new(palette);
-    debug_assert!(!view.colors.is_empty());
-
     let width = buffer.width;
     let height = buffer.height;
     let format = buffer.format;
@@ -300,21 +294,16 @@ fn devise_color_sequence(target: [u8; 3], palette: &[[u8; 3]], palette_luma: &[u
 
             while amount <= max_test_count {
                 for channel in 0..3 {
-                    sum[channel] = sum[channel]
-                        .checked_add(add[channel])
-                        .expect("sum channel overflow");
-                    add[channel] = add[channel]
-                        .checked_add(add[channel])
-                        .expect("add channel overflow");
+                    sum[channel] = sum[channel].saturating_add(add[channel]);
+                    add[channel] = add[channel].saturating_add(add[channel]);
                 }
 
-                let total = proportion_total
-                    .checked_add(amount)
-                    .expect("proportion total overflow");
+                let total = proportion_total.saturating_add(amount);
+                let total_u32 = total as u32;
                 let tested = [
-                    (sum[0] / u32::try_from(total).expect("total too large")) as u8,
-                    (sum[1] / u32::try_from(total).expect("total too large")) as u8,
-                    (sum[2] / u32::try_from(total).expect("total too large")) as u8,
+                    (sum[0] / total_u32) as u8,
+                    (sum[1] / total_u32) as u8,
+                    (sum[2] / total_u32) as u8,
                 ];
                 let penalty = color_compare_rgb_luma(target, tested);
 
@@ -324,7 +313,7 @@ fn devise_color_sequence(target: [u8; 3], palette: &[[u8; 3]], palette_luma: &[u
                     chosen_amount = amount;
                 }
 
-                amount = amount.checked_mul(2).expect("test amount overflow");
+                amount = amount.saturating_mul(2);
             }
         }
 
@@ -338,16 +327,10 @@ fn devise_color_sequence(target: [u8; 3], palette: &[[u8; 3]], palette_luma: &[u
         }
 
         let chosen = palette[chosen_index];
-        let chosen_amount_u32 = u32::try_from(chosen_amount).expect("chosen amount too large");
-        so_far[0] = so_far[0]
-            .checked_add(u32::from(chosen[0]) * chosen_amount_u32)
-            .expect("so_far red overflow");
-        so_far[1] = so_far[1]
-            .checked_add(u32::from(chosen[1]) * chosen_amount_u32)
-            .expect("so_far green overflow");
-        so_far[2] = so_far[2]
-            .checked_add(u32::from(chosen[2]) * chosen_amount_u32)
-            .expect("so_far blue overflow");
+        let chosen_amount_u32 = chosen_amount as u32;
+        so_far[0] = so_far[0].saturating_add(u32::from(chosen[0]) * chosen_amount_u32);
+        so_far[1] = so_far[1].saturating_add(u32::from(chosen[1]) * chosen_amount_u32);
+        so_far[2] = so_far[2].saturating_add(u32::from(chosen[2]) * chosen_amount_u32);
     }
 
     result.sort_by_key(|&index| palette_luma[index]);
@@ -444,12 +427,8 @@ fn devise_color_sequence_algorithm3(
 
         let portion2 = split_count - portion1;
         counts[split_from] = 0;
-        counts[c1] = counts[c1]
-            .checked_add(portion1)
-            .expect("color count overflow");
-        counts[c2] = counts[c2]
-            .checked_add(portion2)
-            .expect("color count overflow");
+        counts[c1] = counts[c1].saturating_add(portion1);
+        counts[c2] = counts[c2].saturating_add(portion2);
         current_penalty = best_penalty;
     }
 

@@ -81,17 +81,21 @@ fn normalize_bits(bits: u8) -> u8 {
 fn pixel_rgb_alpha(format: PixelFormat, pixel: &[u8]) -> ([u8; 3], u8) {
     match format {
         PixelFormat::Gray8 => {
-            assert!(!pixel.is_empty(), "pixel slice too short for Gray8");
-            let g = pixel[0];
+            let g = pixel.first().copied().unwrap_or_default();
             ([g, g, g], 255)
         }
         PixelFormat::Rgb8 => {
-            assert!(pixel.len() >= 3, "pixel slice too short for Rgb8");
-            ([pixel[0], pixel[1], pixel[2]], 255)
+            let r = pixel.first().copied().unwrap_or_default();
+            let g = pixel.get(1).copied().unwrap_or_default();
+            let b = pixel.get(2).copied().unwrap_or_default();
+            ([r, g, b], 255)
         }
         PixelFormat::Rgba8 => {
-            assert!(pixel.len() >= 4, "pixel slice too short for Rgba8");
-            ([pixel[0], pixel[1], pixel[2]], pixel[3])
+            let r = pixel.first().copied().unwrap_or_default();
+            let g = pixel.get(1).copied().unwrap_or_default();
+            let b = pixel.get(2).copied().unwrap_or_default();
+            let a = pixel.get(3).copied().unwrap_or(255);
+            ([r, g, b], a)
         }
     }
 }
@@ -99,10 +103,7 @@ fn pixel_rgb_alpha(format: PixelFormat, pixel: &[u8]) -> ([u8; 3], u8) {
 #[must_use]
 #[inline]
 fn scale_channel_by_gray(channel: u8, gray: u8) -> u8 {
-    let scaled = u16::from(channel)
-        .checked_mul(u16::from(gray))
-        .expect("scaled channel overflow");
-    let rounded = scaled.checked_add(127).expect("rounded channel overflow");
+    let scaled = (u32::from(channel) * u32::from(gray)) + 127;
 
-    (rounded / 255) as u8
+    (scaled / 255) as u8
 }

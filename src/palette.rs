@@ -35,6 +35,10 @@ impl Palette {
         Ok(Self { colors })
     }
 
+    pub(crate) fn from_colors_trusted(colors: Vec<[u8; 3]>) -> Self {
+        Self { colors }
+    }
+
     #[must_use]
     pub fn len(&self) -> usize {
         self.colors.len()

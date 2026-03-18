@@ -53,5 +53,5 @@ fn grayscale_palette(levels: usize) -> Palette {
 }
 
 fn palette_from_colors(colors: Vec<[u8; 3]>) -> Palette {
-    Palette::new(colors).expect("built-in palette must be valid")
+    Palette::from_colors_trusted(colors)
 }

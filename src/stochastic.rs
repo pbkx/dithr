@@ -266,14 +266,21 @@ pub fn random_binary_in_place_par(
     Ok(())
 }
 
-pub fn threshold_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>, threshold: u8) {
+pub fn threshold_in_place(
+    buffer: &mut Buffer<'_>,
+    mode: QuantizeMode<'_>,
+    threshold: u8,
+) -> Result<()> {
     threshold_binary_in_place(buffer, mode, threshold)
-        .expect("buffer must be valid for threshold dithering");
 }
 
-pub fn random_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>, seed: u64, strength: u8) {
+pub fn random_in_place(
+    buffer: &mut Buffer<'_>,
+    mode: QuantizeMode<'_>,
+    seed: u64,
+    strength: u8,
+) -> Result<()> {
     random_binary_in_place(buffer, mode, seed, strength)
-        .expect("buffer must be valid for random dithering");
 }
 
 fn perturbed_threshold(prng: &mut XorShift64, seed: u64, x: usize, y: usize, strength: u8) -> u8 {

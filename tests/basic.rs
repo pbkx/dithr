@@ -104,7 +104,7 @@ fn buffer_pixel_offset_matches_expected() {
         format: PixelFormat::Rgb8,
     };
 
-    assert_eq!(buffer.pixel_offset(2, 1), 16);
+    assert_eq!(buffer.pixel_offset(2, 1), Ok(16));
 }
 
 #[test]
@@ -118,7 +118,7 @@ fn buffer_row_returns_correct_slice() {
         format: PixelFormat::Gray8,
     };
 
-    assert_eq!(buffer.row(1), &[4, 5, 6, 7]);
+    assert_eq!(buffer.row(1), Ok(&[4, 5, 6, 7][..]));
 }
 
 #[test]

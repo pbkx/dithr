@@ -6,49 +6,55 @@ pub enum DynamicImageBuffer<'a> {
     Rgba(Buffer<'a>),
 }
 
-pub fn gray_image_as_buffer(img: &mut image::GrayImage) -> Buffer<'_> {
-    let (width, height) = image_dims(img.width(), img.height());
-    Buffer {
+pub fn gray_image_as_buffer(img: &mut image::GrayImage) -> Result<Buffer<'_>> {
+    let (width, height) = image_dims(img.width(), img.height())?;
+    Ok(Buffer {
         data: img.as_mut(),
         width,
         height,
         stride: width,
         format: PixelFormat::Gray8,
-    }
+    })
 }
 
-pub fn rgb_image_as_buffer(img: &mut image::RgbImage) -> Buffer<'_> {
-    let (width, height) = image_dims(img.width(), img.height());
-    Buffer {
+pub fn rgb_image_as_buffer(img: &mut image::RgbImage) -> Result<Buffer<'_>> {
+    let (width, height) = image_dims(img.width(), img.height())?;
+    let stride = width
+        .checked_mul(3)
+        .ok_or(Error::InvalidArgument("rgb stride overflow"))?;
+    Ok(Buffer {
         data: img.as_mut(),
         width,
         height,
-        stride: width.checked_mul(3).expect("rgb stride overflow"),
+        stride,
         format: PixelFormat::Rgb8,
-    }
+    })
 }
 
-pub fn rgba_image_as_buffer(img: &mut image::RgbaImage) -> Buffer<'_> {
-    let (width, height) = image_dims(img.width(), img.height());
-    Buffer {
+pub fn rgba_image_as_buffer(img: &mut image::RgbaImage) -> Result<Buffer<'_>> {
+    let (width, height) = image_dims(img.width(), img.height())?;
+    let stride = width
+        .checked_mul(4)
+        .ok_or(Error::InvalidArgument("rgba stride overflow"))?;
+    Ok(Buffer {
         data: img.as_mut(),
         width,
         height,
-        stride: width.checked_mul(4).expect("rgba stride overflow"),
+        stride,
         format: PixelFormat::Rgba8,
-    }
+    })
 }
 
 pub fn dynamic_image_as_buffer(img: &mut image::DynamicImage) -> Result<DynamicImageBuffer<'_>> {
     match img {
         image::DynamicImage::ImageLuma8(inner) => {
-            Ok(DynamicImageBuffer::Gray(gray_image_as_buffer(inner)))
+            gray_image_as_buffer(inner).map(DynamicImageBuffer::Gray)
         }
         image::DynamicImage::ImageRgb8(inner) => {
-            Ok(DynamicImageBuffer::Rgb(rgb_image_as_buffer(inner)))
+            rgb_image_as_buffer(inner).map(DynamicImageBuffer::Rgb)
         }
         image::DynamicImage::ImageRgba8(inner) => {
-            Ok(DynamicImageBuffer::Rgba(rgba_image_as_buffer(inner)))
+            rgba_image_as_buffer(inner).map(DynamicImageBuffer::Rgba)
         }
         image::DynamicImage::ImageLumaA8(_) => Err(Error::UnsupportedFormat(
             "DynamicImage LumaA8 is unsupported",
@@ -77,11 +83,12 @@ pub fn dynamic_image_as_buffer(img: &mut image::DynamicImage) -> Result<DynamicI
     }
 }
 
-fn image_dims(width: u32, height: u32) -> (usize, usize) {
-    (
-        usize::try_from(width).expect("image width does not fit usize"),
-        usize::try_from(height).expect("image height does not fit usize"),
-    )
+fn image_dims(width: u32, height: u32) -> Result<(usize, usize)> {
+    let width = usize::try_from(width)
+        .map_err(|_| Error::InvalidArgument("image width does not fit usize"))?;
+    let height = usize::try_from(height)
+        .map_err(|_| Error::InvalidArgument("image height does not fit usize"))?;
+    Ok((width, height))
 }
 
 #[cfg(test)]
@@ -92,7 +99,7 @@ mod tests {
     #[test]
     fn gray_image_adapter_uses_packed_stride() {
         let mut img = image::GrayImage::new(4, 3);
-        let buffer = gray_image_as_buffer(&mut img);
+        let buffer = gray_image_as_buffer(&mut img).expect("gray should be supported");
 
         assert_eq!(buffer.width, 4);
         assert_eq!(buffer.height, 3);

@@ -48,6 +48,15 @@ jobs:
         env:
           RUST_BACKTRACE: 1
 
+  bench-compile:
+    name: bench-compile
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo bench --workspace --all-features --no-run
+
   docs:
     name: docs
     runs-on: ubuntu-24.04

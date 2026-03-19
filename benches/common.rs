@@ -1,10 +1,72 @@
 use std::sync::OnceLock;
 
+use criterion::{black_box, measurement::WallTime, BatchSize, BenchmarkGroup, Throughput};
 use dithr::{
-    cga_palette, grayscale_16, grayscale_2, grayscale_4, Buffer, Palette, PixelFormat, QuantizeMode,
+    cga_palette, grayscale_16, grayscale_2, grayscale_4, Buffer, Palette, PixelFormat,
+    QuantizeMode, Result as DithrResult,
 };
 
 pub const CUSTOM_2X2_MAP: [u8; 4] = [0, 2, 3, 1];
+
+pub const SEQUENTIAL_ALGORITHMS: [&str; 35] = [
+    "threshold_binary_in_place",
+    "random_binary_in_place",
+    "threshold_in_place",
+    "random_in_place",
+    "bayer_2x2_in_place",
+    "bayer_4x4_in_place",
+    "bayer_8x8_in_place",
+    "bayer_16x16_in_place",
+    "cluster_dot_4x4_in_place",
+    "cluster_dot_8x8_in_place",
+    "custom_ordered_in_place",
+    "yliluoma_1_in_place",
+    "yliluoma_2_in_place",
+    "yliluoma_3_in_place",
+    "floyd_steinberg_in_place",
+    "false_floyd_steinberg_in_place",
+    "jarvis_judice_ninke_in_place",
+    "stucki_in_place",
+    "burkes_in_place",
+    "sierra_in_place",
+    "two_row_sierra_in_place",
+    "sierra_lite_in_place",
+    "stevenson_arce_in_place",
+    "atkinson_in_place",
+    "fan_in_place",
+    "shiau_fan_in_place",
+    "shiau_fan_2_in_place",
+    "ostromoukhov_in_place",
+    "zhou_fang_in_place",
+    "gradient_based_error_diffusion_in_place",
+    "riemersma_in_place",
+    "knuth_dot_diffusion_in_place",
+    "direct_binary_search_in_place",
+    "lattice_boltzmann_in_place",
+    "electrostatic_halftoning_in_place",
+];
+
+#[cfg(feature = "rayon")]
+pub const PARALLEL_ALGORITHMS: [&str; 9] = [
+    "bayer_2x2_in_place_par",
+    "bayer_4x4_in_place_par",
+    "bayer_8x8_in_place_par",
+    "bayer_16x16_in_place_par",
+    "cluster_dot_4x4_in_place_par",
+    "cluster_dot_8x8_in_place_par",
+    "custom_ordered_in_place_par",
+    "threshold_binary_in_place_par",
+    "random_binary_in_place_par",
+];
+
+pub fn coverage_count() -> usize {
+    let mut count = SEQUENTIAL_ALGORITHMS.len();
+    #[cfg(feature = "rayon")]
+    {
+        count += PARALLEL_ALGORITHMS.len();
+    }
+    count
+}
 
 pub fn touch_common() {
     let _ = gray_ramp(2, 2);
@@ -31,6 +93,82 @@ pub fn touch_common() {
     let _ = mode_palette_cga();
 
     let _ = CUSTOM_2X2_MAP;
+    let _ = coverage_count();
+}
+
+#[allow(dead_code)]
+pub fn set_gray_throughput(group: &mut BenchmarkGroup<'_, WallTime>, width: usize, height: usize) {
+    group.throughput(Throughput::Bytes(width.saturating_mul(height) as u64));
+}
+
+pub fn set_rgb_throughput(group: &mut BenchmarkGroup<'_, WallTime>, width: usize, height: usize) {
+    let bytes = width.saturating_mul(height).saturating_mul(3);
+    group.throughput(Throughput::Bytes(bytes as u64));
+}
+
+#[allow(dead_code)]
+pub fn bench_gray_case<F>(
+    group: &mut BenchmarkGroup<'_, WallTime>,
+    name: &str,
+    fixture: &[u8],
+    width: usize,
+    height: usize,
+    mut run: F,
+) where
+    F: FnMut(&mut Buffer<'_>) -> DithrResult<()>,
+{
+    group.bench_function(name, |b| {
+        b.iter_batched(
+            || fixture.to_vec(),
+            |mut data| {
+                let mut buffer = gray_buffer(&mut data, width, height);
+                run(&mut buffer).expect("benchmark case failed");
+                black_box(data);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+pub fn bench_rgb_case<F>(
+    group: &mut BenchmarkGroup<'_, WallTime>,
+    name: &str,
+    fixture: &[u8],
+    width: usize,
+    height: usize,
+    mut run: F,
+) where
+    F: FnMut(&mut Buffer<'_>) -> DithrResult<()>,
+{
+    group.bench_function(name, |b| {
+        b.iter_batched(
+            || fixture.to_vec(),
+            |mut data| {
+                let mut buffer = rgb_buffer(&mut data, width, height);
+                run(&mut buffer).expect("benchmark case failed");
+                black_box(data);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+#[cfg(feature = "rayon")]
+#[allow(dead_code)]
+pub fn assert_gray_seq_par_equal<F, G>(fixture: &[u8], width: usize, height: usize, seq: F, par: G)
+where
+    F: Fn(&mut Buffer<'_>) -> DithrResult<()>,
+    G: Fn(&mut Buffer<'_>) -> DithrResult<()>,
+{
+    let mut seq_data = fixture.to_vec();
+    let mut par_data = fixture.to_vec();
+
+    let mut seq_buffer = gray_buffer(&mut seq_data, width, height);
+    let mut par_buffer = gray_buffer(&mut par_data, width, height);
+
+    seq(&mut seq_buffer).expect("sequential benchmark sanity check failed");
+    par(&mut par_buffer).expect("parallel benchmark sanity check failed");
+    assert_eq!(seq_data, par_data);
 }
 
 pub fn gray_ramp(width: usize, height: usize) -> Vec<u8> {
@@ -43,8 +181,8 @@ pub fn gray_ramp(width: usize, height: usize) -> Vec<u8> {
     }
 
     (0..len)
-        .map(|i| ((i * 255) / (len - 1)) as u8)
-        .collect::<Vec<_>>()
+        .map(|index| ((index * 255) / (len - 1)) as u8)
+        .collect()
 }
 
 pub fn gray_checker(width: usize, height: usize, block: usize) -> Vec<u8> {
@@ -53,12 +191,11 @@ pub fn gray_checker(width: usize, height: usize, block: usize) -> Vec<u8> {
     for y in 0..height {
         for x in 0..width {
             let idx = y * width + x;
-            let value = if ((x / block) + (y / block)) % 2 == 0 {
+            out[idx] = if ((x / block) + (y / block)) % 2 == 0 {
                 0
             } else {
                 255
             };
-            out[idx] = value;
         }
     }
     out
@@ -82,12 +219,9 @@ pub fn rgb_gradient(width: usize, height: usize) -> Vec<u8> {
     for y in 0..height {
         for x in 0..width {
             let idx = (y * width + x) * 3;
-            let r = ((x * 255) / max_x) as u8;
-            let g = ((y * 255) / max_y) as u8;
-            let b = (((x + y) * 255) / (max_x + max_y).max(1)) as u8;
-            out[idx] = r;
-            out[idx + 1] = g;
-            out[idx + 2] = b;
+            out[idx] = ((x * 255) / max_x) as u8;
+            out[idx + 1] = ((y * 255) / max_y) as u8;
+            out[idx + 2] = (((x + y) * 255) / (max_x + max_y).max(1)) as u8;
         }
     }
 

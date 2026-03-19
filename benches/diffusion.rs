@@ -1,9 +1,10 @@
 mod common;
 
 use common::{
-    gray_buffer, gray_ramp, mode_gray_1, mode_palette_cga, rgb_buffer, rgb_gradient, touch_common,
+    bench_gray_case, bench_rgb_case, gray_ramp, mode_gray_1, mode_palette_cga, rgb_gradient,
+    set_gray_throughput, set_rgb_throughput, touch_common,
 };
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use dithr::{
     atkinson_in_place, burkes_in_place, false_floyd_steinberg_in_place, fan_in_place,
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place,
@@ -21,168 +22,154 @@ fn bench_diffusion(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("diffusion_gray_512_classic_smallkernels");
     group.sample_size(20);
+    set_gray_throughput(&mut group, width, height);
 
-    group.bench_function("floyd_steinberg_gray1_512", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = gray_buffer(&mut data, width, height);
-            floyd_steinberg_in_place(&mut buffer, mode_gray_1())
-                .expect("floyd-steinberg should succeed");
-            black_box(data);
-        });
-    });
-
-    group.bench_function("false_floyd_steinberg_gray1_512", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = gray_buffer(&mut data, width, height);
-            false_floyd_steinberg_in_place(&mut buffer, mode_gray_1())
-                .expect("false floyd-steinberg should succeed");
-            black_box(data);
-        });
-    });
-
-    group.bench_function("burkes_gray1_512", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = gray_buffer(&mut data, width, height);
-            burkes_in_place(&mut buffer, mode_gray_1()).expect("burkes should succeed");
-            black_box(data);
-        });
-    });
-
-    group.bench_function("sierra_lite_gray1_512", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = gray_buffer(&mut data, width, height);
-            sierra_lite_in_place(&mut buffer, mode_gray_1()).expect("sierra lite should succeed");
-            black_box(data);
-        });
-    });
-
-    group.bench_function("atkinson_gray1_512", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = gray_buffer(&mut data, width, height);
-            atkinson_in_place(&mut buffer, mode_gray_1()).expect("atkinson should succeed");
-            black_box(data);
-        });
-    });
+    bench_gray_case(
+        &mut group,
+        "floyd_steinberg_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| floyd_steinberg_in_place(buffer, mode_gray_1()),
+    );
+    bench_gray_case(
+        &mut group,
+        "false_floyd_steinberg_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| false_floyd_steinberg_in_place(buffer, mode_gray_1()),
+    );
+    bench_gray_case(
+        &mut group,
+        "burkes_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| burkes_in_place(buffer, mode_gray_1()),
+    );
+    bench_gray_case(
+        &mut group,
+        "sierra_lite_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| sierra_lite_in_place(buffer, mode_gray_1()),
+    );
+    bench_gray_case(
+        &mut group,
+        "atkinson_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| atkinson_in_place(buffer, mode_gray_1()),
+    );
     group.finish();
 
     let mut group = c.benchmark_group("diffusion_gray_512_classic_largekernels");
     group.sample_size(20);
+    set_gray_throughput(&mut group, width, height);
 
-    group.bench_function("jarvis_judice_ninke_gray1_512", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = gray_buffer(&mut data, width, height);
-            jarvis_judice_ninke_in_place(&mut buffer, mode_gray_1())
-                .expect("jarvis-judice-ninke should succeed");
-            black_box(data);
-        });
-    });
-
-    group.bench_function("stucki_gray1_512", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = gray_buffer(&mut data, width, height);
-            stucki_in_place(&mut buffer, mode_gray_1()).expect("stucki should succeed");
-            black_box(data);
-        });
-    });
-
-    group.bench_function("sierra_gray1_512", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = gray_buffer(&mut data, width, height);
-            sierra_in_place(&mut buffer, mode_gray_1()).expect("sierra should succeed");
-            black_box(data);
-        });
-    });
-
-    group.bench_function("two_row_sierra_gray1_512", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = gray_buffer(&mut data, width, height);
-            two_row_sierra_in_place(&mut buffer, mode_gray_1())
-                .expect("two-row sierra should succeed");
-            black_box(data);
-        });
-    });
-
-    group.bench_function("stevenson_arce_gray1_512", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = gray_buffer(&mut data, width, height);
-            stevenson_arce_in_place(&mut buffer, mode_gray_1())
-                .expect("stevenson-arce should succeed");
-            black_box(data);
-        });
-    });
+    bench_gray_case(
+        &mut group,
+        "jarvis_judice_ninke_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| jarvis_judice_ninke_in_place(buffer, mode_gray_1()),
+    );
+    bench_gray_case(
+        &mut group,
+        "stucki_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| stucki_in_place(buffer, mode_gray_1()),
+    );
+    bench_gray_case(
+        &mut group,
+        "sierra_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| sierra_in_place(buffer, mode_gray_1()),
+    );
+    bench_gray_case(
+        &mut group,
+        "two_row_sierra_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| two_row_sierra_in_place(buffer, mode_gray_1()),
+    );
+    bench_gray_case(
+        &mut group,
+        "stevenson_arce_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| stevenson_arce_in_place(buffer, mode_gray_1()),
+    );
     group.finish();
 
     let mut group = c.benchmark_group("diffusion_gray_512_extended");
     group.sample_size(20);
+    set_gray_throughput(&mut group, width, height);
 
-    group.bench_function("fan_gray1_512", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = gray_buffer(&mut data, width, height);
-            fan_in_place(&mut buffer, mode_gray_1()).expect("fan should succeed");
-            black_box(data);
-        });
-    });
-
-    group.bench_function("shiau_fan_gray1_512", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = gray_buffer(&mut data, width, height);
-            shiau_fan_in_place(&mut buffer, mode_gray_1()).expect("shiau-fan should succeed");
-            black_box(data);
-        });
-    });
-
-    group.bench_function("shiau_fan_2_gray1_512", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = gray_buffer(&mut data, width, height);
-            shiau_fan_2_in_place(&mut buffer, mode_gray_1()).expect("shiau-fan-2 should succeed");
-            black_box(data);
-        });
-    });
+    bench_gray_case(
+        &mut group,
+        "fan_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| fan_in_place(buffer, mode_gray_1()),
+    );
+    bench_gray_case(
+        &mut group,
+        "shiau_fan_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| shiau_fan_in_place(buffer, mode_gray_1()),
+    );
+    bench_gray_case(
+        &mut group,
+        "shiau_fan_2_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| shiau_fan_2_in_place(buffer, mode_gray_1()),
+    );
     group.finish();
 
     let mut group = c.benchmark_group("diffusion_gray_512_variable");
     group.sample_size(20);
+    set_gray_throughput(&mut group, width, height);
 
-    group.bench_function("ostromoukhov_gray1_512", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = gray_buffer(&mut data, width, height);
-            ostromoukhov_in_place(&mut buffer, mode_gray_1()).expect("ostromoukhov should succeed");
-            black_box(data);
-        });
-    });
-
-    group.bench_function("zhou_fang_gray1_512", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = gray_buffer(&mut data, width, height);
-            zhou_fang_in_place(&mut buffer, mode_gray_1()).expect("zhou-fang should succeed");
-            black_box(data);
-        });
-    });
-
-    group.bench_function("gradient_based_error_diffusion_gray1_512", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = gray_buffer(&mut data, width, height);
-            gradient_based_error_diffusion_in_place(&mut buffer, mode_gray_1())
-                .expect("gradient-based diffusion should succeed");
-            black_box(data);
-        });
-    });
+    bench_gray_case(
+        &mut group,
+        "ostromoukhov_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| ostromoukhov_in_place(buffer, mode_gray_1()),
+    );
+    bench_gray_case(
+        &mut group,
+        "zhou_fang_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| zhou_fang_in_place(buffer, mode_gray_1()),
+    );
+    bench_gray_case(
+        &mut group,
+        "gradient_based_error_diffusion_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| gradient_based_error_diffusion_in_place(buffer, mode_gray_1()),
+    );
     group.finish();
 
     let width = 256;
@@ -191,53 +178,48 @@ fn bench_diffusion(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("diffusion_rgb_256_representative");
     group.sample_size(20);
+    set_rgb_throughput(&mut group, width, height);
 
-    group.bench_function("floyd_steinberg_rgb_palette_cga_256", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = rgb_buffer(&mut data, width, height);
-            floyd_steinberg_in_place(&mut buffer, mode_palette_cga())
-                .expect("floyd-steinberg should succeed");
-            black_box(data);
-        });
-    });
-
-    group.bench_function("burkes_rgb_palette_cga_256", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = rgb_buffer(&mut data, width, height);
-            burkes_in_place(&mut buffer, mode_palette_cga()).expect("burkes should succeed");
-            black_box(data);
-        });
-    });
-
-    group.bench_function("sierra_lite_rgb_palette_cga_256", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = rgb_buffer(&mut data, width, height);
-            sierra_lite_in_place(&mut buffer, mode_palette_cga())
-                .expect("sierra lite should succeed");
-            black_box(data);
-        });
-    });
-
-    group.bench_function("fan_rgb_palette_cga_256", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = rgb_buffer(&mut data, width, height);
-            fan_in_place(&mut buffer, mode_palette_cga()).expect("fan should succeed");
-            black_box(data);
-        });
-    });
-
-    group.bench_function("shiau_fan_rgb_palette_cga_256", |b| {
-        b.iter(|| {
-            let mut data = fixture.clone();
-            let mut buffer = rgb_buffer(&mut data, width, height);
-            shiau_fan_in_place(&mut buffer, mode_palette_cga()).expect("shiau-fan should succeed");
-            black_box(data);
-        });
-    });
+    bench_rgb_case(
+        &mut group,
+        "floyd_steinberg_rgb_palette_cga_256",
+        &fixture,
+        width,
+        height,
+        |buffer| floyd_steinberg_in_place(buffer, mode_palette_cga()),
+    );
+    bench_rgb_case(
+        &mut group,
+        "burkes_rgb_palette_cga_256",
+        &fixture,
+        width,
+        height,
+        |buffer| burkes_in_place(buffer, mode_palette_cga()),
+    );
+    bench_rgb_case(
+        &mut group,
+        "sierra_lite_rgb_palette_cga_256",
+        &fixture,
+        width,
+        height,
+        |buffer| sierra_lite_in_place(buffer, mode_palette_cga()),
+    );
+    bench_rgb_case(
+        &mut group,
+        "fan_rgb_palette_cga_256",
+        &fixture,
+        width,
+        height,
+        |buffer| fan_in_place(buffer, mode_palette_cga()),
+    );
+    bench_rgb_case(
+        &mut group,
+        "shiau_fan_rgb_palette_cga_256",
+        &fixture,
+        width,
+        height,
+        |buffer| shiau_fan_in_place(buffer, mode_palette_cga()),
+    );
     group.finish();
 }
 

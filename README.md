@@ -32,7 +32,7 @@ from git:
 dependencies are: rust>=1.75.0
 
 ```
-git clone https://github.com/maxch/dithr
+git clone https://github.com/pbkx/dithr
 cd dithr
 cargo build --release
 cargo test --all-features
@@ -55,10 +55,7 @@ fn main() -> Result<()> {
 
     Ok(())
 }
-```
-
 core types:
-
 - Buffer
 - PixelFormat
 - Palette
@@ -68,27 +65,23 @@ core types:
 - Result
 
 pixel formats:
-
 - Gray8
 - Rgb8
 - Rgba8
 
 quantize modes:
-
 - GrayBits(bits)
 - RgbBits(bits)
 - Palette(&Palette)
 - SingleColor { fg, bits }
 
 public quantization helpers:
-
 - quantize_gray_u8
 - quantize_rgb_u8
 - quantize_pixel
 - quantize_error
 
 buffer methods:
-
 - new
 - validate
 - required_len
@@ -102,7 +95,6 @@ buffer methods:
 - width_bytes
 
 palette methods:
-
 - new
 - len
 - is_empty
@@ -113,7 +105,6 @@ palette methods:
 - nearest_rgb_color
 
 ordered dithering:
-
 - bayer_2x2_in_place
 - bayer_4x4_in_place
 - bayer_8x8_in_place
@@ -126,7 +117,6 @@ ordered dithering:
 - yliluoma_3_in_place
 
 classic error diffusion:
-
 - floyd_steinberg_in_place
 - false_floyd_steinberg_in_place
 - jarvis_judice_ninke_in_place
@@ -139,7 +129,6 @@ classic error diffusion:
 - atkinson_in_place
 
 extended and variable diffusion:
-
 - fan_in_place
 - shiau_fan_in_place
 - shiau_fan_2_in_place
@@ -148,14 +137,12 @@ extended and variable diffusion:
 - gradient_based_error_diffusion_in_place
 
 stochastic:
-
 - threshold_binary_in_place
 - random_binary_in_place
 - threshold_in_place
 - random_in_place
 
 other families:
-
 - riemersma_in_place
 - knuth_dot_diffusion_in_place
 - direct_binary_search_in_place
@@ -163,47 +150,72 @@ other families:
 - electrostatic_halftoning_in_place
 
 notes about format support:
-
 - direct_binary_search_in_place supports Gray8 only
 - lattice_boltzmann_in_place supports Gray8 only
 - electrostatic_halftoning_in_place supports Gray8 only
 - all functions are deterministic for same input and parameters
+```
 
-# features
+# basic example usage
 
-default features:
+```
+$ cargo run --example gray_buffer
+pixels=256 black=128 white=128
 
-- std
+$ cargo run --example rgb_buffer
+pixels=4096 palette_entries=16
 
-optional features:
+$ cargo run --example indexed_palette
+pixels=1024 palette_entries=4 used_indices=4
 
-- rayon
-- image
+$ cargo run --example image_bayer_png --features image -- input.png output.png
+wrote output.png
 
-rayon adds explicit parallel apis:
+$ cargo run --example image_palette_png --features image -- input.png output.png
+wrote output.png
+```
 
-- bayer_2x2_in_place_par
-- bayer_4x4_in_place_par
-- bayer_8x8_in_place_par
-- bayer_16x16_in_place_par
-- cluster_dot_4x4_in_place_par
-- cluster_dot_8x8_in_place_par
-- custom_ordered_in_place_par
-- threshold_binary_in_place_par
-- random_binary_in_place_par
+### more advanced usage
 
-image adds thin adapters:
+```
+use dithr::{
+    floyd_steinberg_in_place, random_binary_in_place, Buffer, Palette, PixelFormat,
+    QuantizeMode, Result,
+};
 
-- gray_image_as_buffer
-- rgb_image_as_buffer
-- rgba_image_as_buffer
-- dynamic_image_as_buffer
-- DynamicImageBuffer::{Gray,Rgb,Rgba}
+fn main() -> Result<()> {
+    let width = 128;
+    let height = 128;
+    let mut rgb = vec![0_u8; width * height * 3];
 
-dynamic image support:
+    for y in 0..height {
+        for x in 0..width {
+            let i = (y * width + x) * 3;
+            rgb[i] = (x * 255 / (width - 1)) as u8;
+            rgb[i + 1] = (y * 255 / (height - 1)) as u8;
+            rgb[i + 2] = ((x + y) * 255 / (width + height - 2)) as u8;
+        }
+    }
 
-- supported: Luma8, Rgb8, Rgba8
-- rejected: LumaA8, Luma16, LumaA16, Rgb16, Rgba16, Rgb32F, Rgba32F
+    let palette = Palette::new(vec![
+        [0, 0, 0],
+        [255, 255, 255],
+        [255, 85, 85],
+        [85, 170, 255],
+    ])?;
+
+    let mut rgb_buffer = Buffer::new(&mut rgb, width, height, width * 3, PixelFormat::Rgb8)?;
+    floyd_steinberg_in_place(&mut rgb_buffer, QuantizeMode::Palette(&palette))?;
+
+    let mut gray = (0..(width * height))
+        .map(|i| (i * 255 / (width * height - 1)) as u8)
+        .collect::<Vec<_>>();
+    let mut gray_buffer = Buffer::new(&mut gray, width, height, width, PixelFormat::Gray8)?;
+    random_binary_in_place(&mut gray_buffer, QuantizeMode::GrayBits(1), 42, 64)?;
+
+    Ok(())
+}
+```
 
 # examples
 

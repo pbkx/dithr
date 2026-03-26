@@ -175,7 +175,7 @@ $ cargo run --example image_palette_png --features image -- input.png output.png
 wrote output.png
 ```
 
-### more advanced usage
+# more advanced usage
 
 ```
 use dithr::{

@@ -279,8 +279,7 @@ test layout:
 
 golden tests use deterministic fixtures and fnv-1a hashes for regression locking.
 
-References
-----------
+# references
 
 |     | Source |
 | --- | --- |

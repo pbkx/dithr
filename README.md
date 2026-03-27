@@ -19,7 +19,7 @@ the crate is designed for:
 - wasm/canvas pipelines
 - custom tooling
 
-# Install Instructions
+# install instructions
 
 for crates.io:
 ```cargo add dithr```
@@ -27,7 +27,7 @@ for crates.io:
 from git:
 ```cargo add dithr --git https://github.com/pbkx/dithr```
 
-# Build Instructions
+# build instructions
 
 dependencies are: rust>=1.75.0
 
@@ -38,7 +38,7 @@ cargo build --release
 cargo test --all-features
 ```
 
-# Usage
+# usage
 
 ```
 use dithr::{
@@ -156,7 +156,7 @@ notes about format support:
 - all functions are deterministic for same input and parameters
 ```
 
-# Basic Example Usage
+# basic example usage
 
 ```
 $ cargo run --example gray_buffer
@@ -175,7 +175,7 @@ $ cargo run --example image_palette_png --features image -- input.png output.png
 wrote output.png
 ```
 
-# More Advanced Usage
+# more advanced usage
 
 ```
 use dithr::{
@@ -217,7 +217,7 @@ fn main() -> Result<()> {
 }
 ```
 
-# Examples
+# examples
 
 raw buffer examples:
 
@@ -234,7 +234,7 @@ cargo run --example image_bayer_png --features image -- input.png output.png
 cargo run --example image_palette_png --features image -- input.png output.png
 ```
 
-# Benchmarks
+# benchmarks
 
 criterion benches are split by family:
 
@@ -261,7 +261,7 @@ with rayon:
 cargo bench --features rayon --no-run
 ```
 
-# Tests
+# tests
 
 ```
 cargo fmt --all -- --check
@@ -279,8 +279,10 @@ test layout:
 
 golden tests use deterministic fixtures and fnv-1a hashes for regression locking.
 
-# References
+# references
 
+|     | source |
+| --- | --- |
 | [1] | Dither<br>https://en.wikipedia.org/wiki/Dither |
 | [2] | Ordered dithering<br>https://en.wikipedia.org/wiki/Ordered_dithering |
 | [3] | Error diffusion<br>https://en.wikipedia.org/wiki/Error_diffusion |

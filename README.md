@@ -282,28 +282,18 @@ golden tests use deterministic fixtures and fnv-1a hashes for regression locking
 References
 ----------
 
-.. [1] Dither (https://en.wikipedia.org/wiki/Dither)
-
-.. [2] Ordered dithering (https://en.wikipedia.org/wiki/Ordered_dithering)
-
-.. [3] Error diffusion (https://en.wikipedia.org/wiki/Error_diffusion)
-
-.. [4] Yliluoma positional dithering (https://bisqwit.iki.fi/story/howto/dither/jy/)
-
-.. [5] Dithering eleven algorithms (https://tannerhelland.com/2012/12/28/dithering-eleven-algorithms-source-code.html)
-
-.. [6] Error diffusion study (https://caca.zoy.org/study/part3.html)
-
-.. [7] Ostromoukhov variable-coefficient error diffusion (https://www.iro.umontreal.ca/~ostrom/publications/pdf/SIGGRAPH01_varcoeffED.pdf)
-
-.. [8] Zhou-Fang threshold modulation (https://history.siggraph.org/learning/improving-mid-tone-quality-of-variable-coefficient-error-diffusion-using-threshold-modulation-by-zhou-and-fang/)
-
-.. [9] Riemersma dithering (https://www.compuphase.com/riemer.htm)
-
-.. [10] Knuth dot diffusion (https://dl.acm.org/doi/10.1145/35039.35040)
-
-.. [11] Direct binary search halftoning (https://www.spiedigitallibrary.org/conference-proceedings-of-spie/1666/1/Model-based-halftoning-using-direct-binary-search/10.1117/12.135959.full)
-
-.. [12] Lattice-Boltzmann halftoning (https://www.mia.uni-saarland.de/Publications/hagenburg-isvc09.pdf)
-
-.. [13] Electrostatic halftoning (https://onlinelibrary.wiley.com/doi/10.1111/j.1467-8659.2010.01716.x)
+|     | Source |
+| --- | --- |
+| [1] | Dither<br>https://en.wikipedia.org/wiki/Dither |
+| [2] | Ordered dithering<br>https://en.wikipedia.org/wiki/Ordered_dithering |
+| [3] | Error diffusion<br>https://en.wikipedia.org/wiki/Error_diffusion |
+| [4] | Yliluoma positional dithering<br>https://bisqwit.iki.fi/story/howto/dither/jy/ |
+| [5] | Dithering eleven algorithms<br>https://tannerhelland.com/2012/12/28/dithering-eleven-algorithms-source-code.html |
+| [6] | Error diffusion study<br>https://caca.zoy.org/study/part3.html |
+| [7] | Ostromoukhov variable-coefficient error diffusion<br>https://www.iro.umontreal.ca/~ostrom/publications/pdf/SIGGRAPH01_varcoeffED.pdf |
+| [8] | Zhou-Fang threshold modulation<br>https://history.siggraph.org/learning/improving-mid-tone-quality-of-variable-coefficient-error-diffusion-using-threshold-modulation-by-zhou-and-fang/ |
+| [9] | Riemersma dithering<br>https://www.compuphase.com/riemer.htm |
+| [10] | Knuth dot diffusion<br>https://dl.acm.org/doi/10.1145/35039.35040 |
+| [11] | Direct binary search halftoning<br>https://www.spiedigitallibrary.org/conference-proceedings-of-spie/1666/1/Model-based-halftoning-using-direct-binary-search/10.1117/12.135959.full |
+| [12] | Lattice-Boltzmann halftoning<br>https://www.mia.uni-saarland.de/Publications/hagenburg-isvc09.pdf |
+| [13] | Electrostatic halftoning<br>https://onlinelibrary.wiley.com/doi/10.1111/j.1467-8659.2010.01716.x |

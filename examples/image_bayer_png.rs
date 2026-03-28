@@ -1,34 +1,34 @@
 #[cfg(feature = "image")]
 use dithr::{
-    bayer_8x8_in_place, cga_palette, dynamic_image_as_buffer, DynamicImageBuffer, Error,
-    QuantizeMode, Result,
+    bayer_8x8_in_place, cga_palette, dynamic_image_as_buffer, DynamicImageBuffer, QuantizeMode,
 };
 #[cfg(feature = "image")]
 use std::path::PathBuf;
 
 #[cfg(feature = "image")]
-fn main() -> Result<()> {
+fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let Some((input, output)) = parse_paths() else {
         print_usage();
         return Ok(());
     };
 
-    let mut image =
-        image::open(&input).map_err(|_| Error::InvalidArgument("failed to open image"))?;
+    let mut image = image::open(&input)?;
     let palette = cga_palette();
 
-    match dynamic_image_as_buffer(&mut image)? {
+    match dynamic_image_as_buffer(&mut image)
+        .map_err(|err| std::io::Error::other(format!("failed to adapt image buffer: {err:?}")))?
+    {
         DynamicImageBuffer::Gray(mut buffer) => {
-            bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1))?;
+            bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+                .map_err(|err| std::io::Error::other(format!("failed to dither image: {err:?}")))?;
         }
         DynamicImageBuffer::Rgb(mut buffer) | DynamicImageBuffer::Rgba(mut buffer) => {
-            bayer_8x8_in_place(&mut buffer, QuantizeMode::Palette(&palette))?;
+            bayer_8x8_in_place(&mut buffer, QuantizeMode::Palette(&palette))
+                .map_err(|err| std::io::Error::other(format!("failed to dither image: {err:?}")))?;
         }
     }
 
-    image
-        .save(&output)
-        .map_err(|_| Error::InvalidArgument("failed to save image"))?;
+    image.save(&output)?;
     println!("wrote {}", output.display());
     Ok(())
 }

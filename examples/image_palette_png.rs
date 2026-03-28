@@ -1,20 +1,19 @@
 #[cfg(feature = "image")]
 use dithr::{
     dynamic_image_as_buffer, floyd_steinberg_in_place, yliluoma_2_in_place, DynamicImageBuffer,
-    Error, Palette, QuantizeMode, Result,
+    Palette, QuantizeMode,
 };
 #[cfg(feature = "image")]
 use std::path::PathBuf;
 
 #[cfg(feature = "image")]
-fn main() -> Result<()> {
+fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let Some((input, output)) = parse_paths() else {
         print_usage();
         return Ok(());
     };
 
-    let mut image =
-        image::open(&input).map_err(|_| Error::InvalidArgument("failed to open image"))?;
+    let mut image = image::open(&input)?;
     let palette = Palette::new(vec![
         [0, 0, 0],
         [32, 32, 32],
@@ -24,20 +23,23 @@ fn main() -> Result<()> {
         [255, 255, 255],
         [255, 96, 0],
         [0, 160, 255],
-    ])?;
+    ])
+    .map_err(|err| std::io::Error::other(format!("failed to build palette: {err:?}")))?;
 
-    match dynamic_image_as_buffer(&mut image)? {
+    match dynamic_image_as_buffer(&mut image)
+        .map_err(|err| std::io::Error::other(format!("failed to adapt image buffer: {err:?}")))?
+    {
         DynamicImageBuffer::Gray(mut buffer) => {
-            floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))?;
+            floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+                .map_err(|err| std::io::Error::other(format!("failed to dither image: {err:?}")))?;
         }
         DynamicImageBuffer::Rgb(mut buffer) | DynamicImageBuffer::Rgba(mut buffer) => {
-            yliluoma_2_in_place(&mut buffer, &palette)?;
+            yliluoma_2_in_place(&mut buffer, &palette)
+                .map_err(|err| std::io::Error::other(format!("failed to dither image: {err:?}")))?;
         }
     }
 
-    image
-        .save(&output)
-        .map_err(|_| Error::InvalidArgument("failed to save image"))?;
+    image.save(&output)?;
     println!("wrote {}", output.display());
     Ok(())
 }

@@ -29,6 +29,29 @@ impl From<OrderedError> for Error {
     }
 }
 
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Buffer(err) => write!(f, "buffer error: {err}"),
+            Self::Palette(err) => write!(f, "palette error: {err}"),
+            Self::Ordered(err) => write!(f, "ordered dithering error: {err}"),
+            Self::UnsupportedFormat(message) => write!(f, "unsupported format: {message}"),
+            Self::InvalidArgument(message) => write!(f, "invalid argument: {message}"),
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Buffer(err) => Some(err),
+            Self::Palette(err) => Some(err),
+            Self::Ordered(err) => Some(err),
+            Self::UnsupportedFormat(_) | Self::InvalidArgument(_) => None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Error, Result};
@@ -56,5 +79,18 @@ mod tests {
     fn dithr_result_alias_behaves_like_result() {
         let value: Result<u8> = Ok(7);
         assert_eq!(value, Ok(7));
+    }
+
+    #[test]
+    fn error_display_contains_variant_context() {
+        let err = Error::UnsupportedFormat("Gray16");
+        assert_eq!(err.to_string(), "unsupported format: Gray16");
+    }
+
+    #[test]
+    fn wrapped_error_exposes_source() {
+        let err: Error = BufferError::DataTooShort.into();
+        let source = std::error::Error::source(&err).expect("source should be present");
+        assert_eq!(source.to_string(), BufferError::DataTooShort.to_string());
     }
 }

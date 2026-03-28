@@ -11,6 +11,17 @@ pub enum PaletteError {
     TooLarge,
 }
 
+impl std::fmt::Display for PaletteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Empty => f.write_str("palette must contain at least one color"),
+            Self::TooLarge => f.write_str("palette cannot contain more than 256 colors"),
+        }
+    }
+}
+
+impl std::error::Error for PaletteError {}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IndexedImage {
     pub indices: Vec<u8>,

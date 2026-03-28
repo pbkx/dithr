@@ -20,6 +20,20 @@ pub enum OrderedError {
     ValueOutOfRange,
 }
 
+impl std::fmt::Display for OrderedError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EmptyMap => f.write_str("ordered threshold map must not be empty"),
+            Self::InvalidDimensions => f.write_str("ordered threshold map dimensions are invalid"),
+            Self::ValueOutOfRange => {
+                f.write_str("ordered threshold map contains values out of range")
+            }
+        }
+    }
+}
+
+impl std::error::Error for OrderedError {}
+
 #[doc(hidden)]
 pub(crate) fn ordered_dither_in_place(
     buffer: &mut Buffer<'_>,

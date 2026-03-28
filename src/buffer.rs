@@ -26,6 +26,21 @@ pub enum BufferError {
     OutOfBounds,
 }
 
+impl std::fmt::Display for BufferError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StrideTooSmall => f.write_str("buffer stride is smaller than row width"),
+            Self::DataTooShort => f.write_str("buffer data is shorter than required length"),
+            Self::ZeroDimensions => f.write_str("buffer width and height must be non-zero"),
+            Self::RowOutOfBounds => f.write_str("row index is out of bounds"),
+            Self::PixelOutOfBounds => f.write_str("pixel coordinates are out of bounds"),
+            Self::OutOfBounds => f.write_str("buffer arithmetic overflow or out-of-bounds access"),
+        }
+    }
+}
+
+impl std::error::Error for BufferError {}
+
 pub struct Buffer<'a> {
     pub data: &'a mut [u8],
     pub width: usize,

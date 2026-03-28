@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
 autobenches = false
-license = "GPL-3.0-only"
+license = "MIT"
 description = "Buffer-first dithering and halftoning algorithms."
 
 [features]

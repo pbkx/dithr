@@ -8,7 +8,7 @@ use dithr::{
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place,
     jarvis_judice_ninke_in_place, ostromoukhov_in_place, shiau_fan_2_in_place, shiau_fan_in_place,
     sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place,
-    two_row_sierra_in_place, zhou_fang_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
+    two_row_sierra_in_place, zhou_fang_in_place, Buffer, Error, Palette, PixelFormat, QuantizeMode,
 };
 
 #[test]
@@ -324,6 +324,113 @@ fn gradient_based_error_diffusion_runs() {
         .expect("gradient-based diffusion should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn ostromoukhov_rejects_non_gray_formats() {
+    let mut rgb = vec![128_u8; 4 * 4 * 3];
+    let mut rgb_buffer = Buffer {
+        data: &mut rgb,
+        width: 4,
+        height: 4,
+        stride: 12,
+        format: PixelFormat::Rgb8,
+    };
+    let rgb_result = ostromoukhov_in_place(&mut rgb_buffer, QuantizeMode::GrayBits(1));
+    assert!(matches!(
+        rgb_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support Gray8 only"
+        ))
+    ));
+
+    let mut rgba = vec![128_u8; 4 * 4 * 4];
+    let mut rgba_buffer = Buffer {
+        data: &mut rgba,
+        width: 4,
+        height: 4,
+        stride: 16,
+        format: PixelFormat::Rgba8,
+    };
+    let rgba_result = ostromoukhov_in_place(&mut rgba_buffer, QuantizeMode::GrayBits(1));
+    assert!(matches!(
+        rgba_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support Gray8 only"
+        ))
+    ));
+}
+
+#[test]
+fn zhou_fang_rejects_non_gray_formats() {
+    let mut rgb = vec![128_u8; 4 * 4 * 3];
+    let mut rgb_buffer = Buffer {
+        data: &mut rgb,
+        width: 4,
+        height: 4,
+        stride: 12,
+        format: PixelFormat::Rgb8,
+    };
+    let rgb_result = zhou_fang_in_place(&mut rgb_buffer, QuantizeMode::GrayBits(1));
+    assert!(matches!(
+        rgb_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support Gray8 only"
+        ))
+    ));
+
+    let mut rgba = vec![128_u8; 4 * 4 * 4];
+    let mut rgba_buffer = Buffer {
+        data: &mut rgba,
+        width: 4,
+        height: 4,
+        stride: 16,
+        format: PixelFormat::Rgba8,
+    };
+    let rgba_result = zhou_fang_in_place(&mut rgba_buffer, QuantizeMode::GrayBits(1));
+    assert!(matches!(
+        rgba_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support Gray8 only"
+        ))
+    ));
+}
+
+#[test]
+fn gradient_based_error_diffusion_rejects_non_gray_formats() {
+    let mut rgb = vec![128_u8; 4 * 4 * 3];
+    let mut rgb_buffer = Buffer {
+        data: &mut rgb,
+        width: 4,
+        height: 4,
+        stride: 12,
+        format: PixelFormat::Rgb8,
+    };
+    let rgb_result =
+        gradient_based_error_diffusion_in_place(&mut rgb_buffer, QuantizeMode::GrayBits(1));
+    assert!(matches!(
+        rgb_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support Gray8 only"
+        ))
+    ));
+
+    let mut rgba = vec![128_u8; 4 * 4 * 4];
+    let mut rgba_buffer = Buffer {
+        data: &mut rgba,
+        width: 4,
+        height: 4,
+        stride: 16,
+        format: PixelFormat::Rgba8,
+    };
+    let rgba_result =
+        gradient_based_error_diffusion_in_place(&mut rgba_buffer, QuantizeMode::GrayBits(1));
+    assert!(matches!(
+        rgba_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support Gray8 only"
+        ))
+    ));
 }
 
 #[test]

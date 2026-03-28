@@ -1,6 +1,6 @@
-use super::{core::add_error_to_pixel, error_diffuse_in_place};
+use super::core::add_error_to_pixel;
 use crate::{
-    data::{FLOYD_STEINBERG, OSTROMOUKHOV_COEFFS, ZHOU_FANG_MODULATION},
+    data::{OSTROMOUKHOV_COEFFS, ZHOU_FANG_MODULATION},
     math::{
         color::luma_u8,
         fixed::mul_div_i32,
@@ -17,29 +17,21 @@ enum GrayOnlyVariableAlgorithm {
 }
 
 pub fn ostromoukhov_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Result<()> {
-    diffuse_gray_only_variable_or_floyd_steinberg(
-        buffer,
-        mode,
-        GrayOnlyVariableAlgorithm::Ostromoukhov,
-    )
+    diffuse_gray_only_variable(buffer, mode, GrayOnlyVariableAlgorithm::Ostromoukhov)
 }
 
 pub fn zhou_fang_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Result<()> {
-    diffuse_gray_only_variable_or_floyd_steinberg(buffer, mode, GrayOnlyVariableAlgorithm::ZhouFang)
+    diffuse_gray_only_variable(buffer, mode, GrayOnlyVariableAlgorithm::ZhouFang)
 }
 
 pub fn gradient_based_error_diffusion_in_place(
     buffer: &mut Buffer<'_>,
     mode: QuantizeMode<'_>,
 ) -> Result<()> {
-    diffuse_gray_only_variable_or_floyd_steinberg(
-        buffer,
-        mode,
-        GrayOnlyVariableAlgorithm::GradientBased,
-    )
+    diffuse_gray_only_variable(buffer, mode, GrayOnlyVariableAlgorithm::GradientBased)
 }
 
-fn diffuse_gray_only_variable_or_floyd_steinberg(
+fn diffuse_gray_only_variable(
     buffer: &mut Buffer<'_>,
     mode: QuantizeMode<'_>,
     algorithm: GrayOnlyVariableAlgorithm,
@@ -47,7 +39,9 @@ fn diffuse_gray_only_variable_or_floyd_steinberg(
     buffer.validate()?;
 
     if buffer.format != PixelFormat::Gray8 {
-        return error_diffuse_in_place(buffer, mode, &FLOYD_STEINBERG);
+        return Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support Gray8 only",
+        ));
     }
 
     match algorithm {

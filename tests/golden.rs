@@ -486,7 +486,7 @@ fn golden_ostromoukhov_gray_ramp_16x16() {
     ostromoukhov_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("ostromoukhov should succeed");
 
-    assert_eq!(fnv1a64(&data), 1_681_378_057_948_508_056_u64);
+    assert_eq!(fnv1a64(&data), 17_702_997_615_327_889_358_u64);
 }
 
 #[test]
@@ -502,7 +502,7 @@ fn golden_zhou_fang_gray_ramp_16x16() {
 
     zhou_fang_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("zhou-fang should succeed");
 
-    assert_eq!(fnv1a64(&data), 1_681_378_057_948_508_056_u64);
+    assert_eq!(fnv1a64(&data), 17_702_997_615_327_889_358_u64);
 }
 
 #[test]

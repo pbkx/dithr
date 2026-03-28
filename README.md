@@ -4,20 +4,14 @@
 
 buffer-first rust dithering and halftoning library.
 
-core crate does in-memory pixel transforms only:
+core crate provides in-memory pixel transforms:
 
-- no png/jpeg/gif/webp decoding in core
-- no ffmpeg/video decoding in core
-- no cli parsing in core
-- no filesystem path handling in core
-
-the crate is designed for:
-
-- image pipelines
-- video frame pipelines
-- game/rendering integrations
-- wasm/canvas pipelines
-- custom tooling
+- supports Gray8, Rgb8, and Rgba8 buffer formats
+- provides quantization via bit-depth, arbitrary palette, and single-color modes
+- includes ordered dithering, error diffusion, stochastic dithering, and advanced halftoning families
+- exposes both sequential and feature-gated parallel ordered/stochastic APIs
+- includes deterministic outputs validated by golden-hash regression tests
+- includes optional image adapters for zero-copy bridge into `image` crate buffers
 
 # install instructions
 

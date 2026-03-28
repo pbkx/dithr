@@ -1,4 +1,4 @@
-use crate::{math::color::luma_u8, Palette, PixelFormat};
+use crate::{math::color::luma_u8, Error, Palette, PixelFormat, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QuantizeMode<'a> {
@@ -28,11 +28,14 @@ pub fn quantize_rgb_u8(rgb: [u8; 3], bits: u8) -> [u8; 3] {
     ]
 }
 
-#[must_use]
-pub fn quantize_pixel(format: PixelFormat, pixel: &[u8], mode: QuantizeMode<'_>) -> [u8; 4] {
-    let (rgb, alpha) = pixel_rgb_alpha(format, pixel);
+pub fn quantize_pixel(
+    format: PixelFormat,
+    pixel: &[u8],
+    mode: QuantizeMode<'_>,
+) -> Result<[u8; 4]> {
+    let (rgb, alpha) = pixel_rgb_alpha(format, pixel)?;
 
-    match mode {
+    let out = match mode {
         QuantizeMode::GrayBits(bits) => {
             let g = quantize_gray_u8(luma_u8(rgb), bits);
             [g, g, g, alpha]
@@ -55,21 +58,29 @@ pub fn quantize_pixel(format: PixelFormat, pixel: &[u8], mode: QuantizeMode<'_>)
                 alpha,
             ]
         }
-    }
+    };
+
+    Ok(out)
 }
 
-#[must_use]
 #[inline]
-pub fn quantize_error(original: &[u8], quantized: &[u8]) -> [i16; 4] {
-    let mut out = [0_i16; 4];
-
-    for (idx, item) in out.iter_mut().enumerate() {
-        let o = original.get(idx).copied().unwrap_or_default();
-        let q = quantized.get(idx).copied().unwrap_or_default();
-        *item = i16::from(o) - i16::from(q);
+pub fn quantize_error(original: &[u8], quantized: &[u8]) -> Result<[i16; 4]> {
+    let len = original.len();
+    if len != quantized.len() {
+        return Err(Error::InvalidArgument(
+            "original and quantized pixel lengths must match",
+        ));
+    }
+    if len == 0 || len > 4 {
+        return Err(Error::InvalidArgument("pixel length must be in 1..=4"));
     }
 
-    out
+    let mut out = [0_i16; 4];
+    for idx in 0..len {
+        out[idx] = i16::from(original[idx]) - i16::from(quantized[idx]);
+    }
+
+    Ok(out)
 }
 
 #[must_use]
@@ -78,25 +89,25 @@ fn normalize_bits(bits: u8) -> u8 {
 }
 
 #[must_use]
-fn pixel_rgb_alpha(format: PixelFormat, pixel: &[u8]) -> ([u8; 3], u8) {
+fn expected_pixel_len(format: PixelFormat) -> usize {
+    format.bytes_per_pixel()
+}
+
+fn pixel_rgb_alpha(format: PixelFormat, pixel: &[u8]) -> Result<([u8; 3], u8)> {
+    let expected = expected_pixel_len(format);
+    if pixel.len() != expected {
+        return Err(Error::InvalidArgument(
+            "pixel slice length does not match format",
+        ));
+    }
+
     match format {
         PixelFormat::Gray8 => {
-            let g = pixel.first().copied().unwrap_or_default();
-            ([g, g, g], 255)
+            let g = pixel[0];
+            Ok(([g, g, g], 255))
         }
-        PixelFormat::Rgb8 => {
-            let r = pixel.first().copied().unwrap_or_default();
-            let g = pixel.get(1).copied().unwrap_or_default();
-            let b = pixel.get(2).copied().unwrap_or_default();
-            ([r, g, b], 255)
-        }
-        PixelFormat::Rgba8 => {
-            let r = pixel.first().copied().unwrap_or_default();
-            let g = pixel.get(1).copied().unwrap_or_default();
-            let b = pixel.get(2).copied().unwrap_or_default();
-            let a = pixel.get(3).copied().unwrap_or(255);
-            ([r, g, b], a)
-        }
+        PixelFormat::Rgb8 => Ok(([pixel[0], pixel[1], pixel[2]], 255)),
+        PixelFormat::Rgba8 => Ok(([pixel[0], pixel[1], pixel[2]], pixel[3])),
     }
 }
 

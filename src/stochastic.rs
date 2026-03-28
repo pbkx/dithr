@@ -27,7 +27,7 @@ pub fn threshold_binary_in_place(
                 PixelFormat::Gray8 => {
                     let light = row[offset] > threshold;
                     let sample = if light { [255_u8] } else { [0_u8] };
-                    let quantized = quantize_pixel(PixelFormat::Gray8, &sample, mode);
+                    let quantized = quantize_pixel(PixelFormat::Gray8, &sample, mode)?;
                     row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
                 }
                 PixelFormat::Rgb8 => {
@@ -38,7 +38,7 @@ pub fn threshold_binary_in_place(
                     } else {
                         [0_u8, 0_u8, 0_u8]
                     };
-                    let quantized = quantize_pixel(PixelFormat::Rgb8, &sample, mode);
+                    let quantized = quantize_pixel(PixelFormat::Rgb8, &sample, mode)?;
                     row[offset] = quantized[0];
                     row[offset + 1] = quantized[1];
                     row[offset + 2] = quantized[2];
@@ -52,7 +52,7 @@ pub fn threshold_binary_in_place(
                     } else {
                         [0_u8, 0_u8, 0_u8, alpha]
                     };
-                    let quantized = quantize_pixel(PixelFormat::Rgba8, &sample, mode);
+                    let quantized = quantize_pixel(PixelFormat::Rgba8, &sample, mode)?;
                     row[offset] = quantized[0];
                     row[offset + 1] = quantized[1];
                     row[offset + 2] = quantized[2];
@@ -90,7 +90,7 @@ pub fn random_binary_in_place(
                 PixelFormat::Gray8 => {
                     let light = row[offset] > threshold;
                     let sample = if light { [255_u8] } else { [0_u8] };
-                    let quantized = quantize_pixel(PixelFormat::Gray8, &sample, mode);
+                    let quantized = quantize_pixel(PixelFormat::Gray8, &sample, mode)?;
                     row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
                 }
                 PixelFormat::Rgb8 => {
@@ -101,7 +101,7 @@ pub fn random_binary_in_place(
                     } else {
                         [0_u8, 0_u8, 0_u8]
                     };
-                    let quantized = quantize_pixel(PixelFormat::Rgb8, &sample, mode);
+                    let quantized = quantize_pixel(PixelFormat::Rgb8, &sample, mode)?;
                     row[offset] = quantized[0];
                     row[offset + 1] = quantized[1];
                     row[offset + 2] = quantized[2];
@@ -115,7 +115,7 @@ pub fn random_binary_in_place(
                     } else {
                         [0_u8, 0_u8, 0_u8, alpha]
                     };
-                    let quantized = quantize_pixel(PixelFormat::Rgba8, &sample, mode);
+                    let quantized = quantize_pixel(PixelFormat::Rgba8, &sample, mode)?;
                     row[offset] = quantized[0];
                     row[offset + 1] = quantized[1];
                     row[offset + 2] = quantized[2];
@@ -146,14 +146,14 @@ pub fn threshold_binary_in_place_par(
         .data
         .par_chunks_mut(stride)
         .take(height)
-        .for_each(|row| {
+        .try_for_each(|row| -> Result<()> {
             for x in 0..width {
                 let offset = x * bpp;
                 match format {
                     PixelFormat::Gray8 => {
                         let light = row[offset] > threshold;
                         let sample = if light { [255_u8] } else { [0_u8] };
-                        let quantized = quantize_pixel(PixelFormat::Gray8, &sample, mode);
+                        let quantized = quantize_pixel(PixelFormat::Gray8, &sample, mode)?;
                         row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
                     }
                     PixelFormat::Rgb8 => {
@@ -164,7 +164,7 @@ pub fn threshold_binary_in_place_par(
                         } else {
                             [0_u8, 0_u8, 0_u8]
                         };
-                        let quantized = quantize_pixel(PixelFormat::Rgb8, &sample, mode);
+                        let quantized = quantize_pixel(PixelFormat::Rgb8, &sample, mode)?;
                         row[offset] = quantized[0];
                         row[offset + 1] = quantized[1];
                         row[offset + 2] = quantized[2];
@@ -178,7 +178,7 @@ pub fn threshold_binary_in_place_par(
                         } else {
                             [0_u8, 0_u8, 0_u8, alpha]
                         };
-                        let quantized = quantize_pixel(PixelFormat::Rgba8, &sample, mode);
+                        let quantized = quantize_pixel(PixelFormat::Rgba8, &sample, mode)?;
                         row[offset] = quantized[0];
                         row[offset + 1] = quantized[1];
                         row[offset + 2] = quantized[2];
@@ -186,7 +186,8 @@ pub fn threshold_binary_in_place_par(
                     }
                 }
             }
-        });
+            Ok(())
+        })?;
 
     Ok(())
 }
@@ -219,7 +220,7 @@ pub fn random_binary_in_place_par(
         .par_chunks_mut(stride)
         .take(height)
         .enumerate()
-        .for_each(|(y, row)| {
+        .try_for_each(|(y, row)| -> Result<()> {
             for x in 0..width {
                 let threshold = thresholds[y * width + x];
                 let offset = x * bpp;
@@ -228,7 +229,7 @@ pub fn random_binary_in_place_par(
                     PixelFormat::Gray8 => {
                         let light = row[offset] > threshold;
                         let sample = if light { [255_u8] } else { [0_u8] };
-                        let quantized = quantize_pixel(PixelFormat::Gray8, &sample, mode);
+                        let quantized = quantize_pixel(PixelFormat::Gray8, &sample, mode)?;
                         row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
                     }
                     PixelFormat::Rgb8 => {
@@ -239,7 +240,7 @@ pub fn random_binary_in_place_par(
                         } else {
                             [0_u8, 0_u8, 0_u8]
                         };
-                        let quantized = quantize_pixel(PixelFormat::Rgb8, &sample, mode);
+                        let quantized = quantize_pixel(PixelFormat::Rgb8, &sample, mode)?;
                         row[offset] = quantized[0];
                         row[offset + 1] = quantized[1];
                         row[offset + 2] = quantized[2];
@@ -253,7 +254,7 @@ pub fn random_binary_in_place_par(
                         } else {
                             [0_u8, 0_u8, 0_u8, alpha]
                         };
-                        let quantized = quantize_pixel(PixelFormat::Rgba8, &sample, mode);
+                        let quantized = quantize_pixel(PixelFormat::Rgba8, &sample, mode)?;
                         row[offset] = quantized[0];
                         row[offset + 1] = quantized[1];
                         row[offset + 2] = quantized[2];
@@ -261,7 +262,8 @@ pub fn random_binary_in_place_par(
                     }
                 }
             }
-        });
+            Ok(())
+        })?;
 
     Ok(())
 }

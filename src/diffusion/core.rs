@@ -79,7 +79,7 @@ pub(crate) fn diffuse_gray_row_major(
             let idx = row_base + x;
             let original = *value;
             let adjusted = clamp_u8(i32::from(original) + errors[idx]);
-            let quantized = quantize_pixel(PixelFormat::Gray8, &[adjusted], mode);
+            let quantized = quantize_pixel(PixelFormat::Gray8, &[adjusted], mode)?;
             let quantized_gray = luma_u8([quantized[0], quantized[1], quantized[2]]);
             *value = quantized_gray;
 
@@ -138,12 +138,12 @@ pub(crate) fn diffuse_rgb_row_major(
                 clamp_u8(i32::from(row[offset + 2]) + errors[error_base + 2]),
             ];
             let alpha = if is_rgba { row[offset + 3] } else { 255 };
-            let pixel = if is_rgba {
-                [adjusted[0], adjusted[1], adjusted[2], alpha]
+            let quantized = if is_rgba {
+                let pixel = [adjusted[0], adjusted[1], adjusted[2], alpha];
+                quantize_pixel(PixelFormat::Rgba8, &pixel, mode)?
             } else {
-                [adjusted[0], adjusted[1], adjusted[2], 255]
+                quantize_pixel(PixelFormat::Rgb8, &adjusted, mode)?
             };
-            let quantized = quantize_pixel(format, &pixel, mode);
 
             row[offset] = quantized[0];
             row[offset + 1] = quantized[1];

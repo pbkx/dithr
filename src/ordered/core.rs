@@ -36,7 +36,7 @@ pub(crate) fn ordered_dither_in_place(
             match format {
                 PixelFormat::Gray8 => {
                     let value = apply_bias(row[offset], bias);
-                    let quantized = quantize_pixel(PixelFormat::Gray8, &[value], mode);
+                    let quantized = quantize_pixel(PixelFormat::Gray8, &[value], mode)?;
                     row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
                 }
                 PixelFormat::Rgb8 => {
@@ -45,7 +45,7 @@ pub(crate) fn ordered_dither_in_place(
                         apply_bias(row[offset + 1], bias),
                         apply_bias(row[offset + 2], bias),
                     ];
-                    let quantized = quantize_pixel(PixelFormat::Rgb8, &adjusted, mode);
+                    let quantized = quantize_pixel(PixelFormat::Rgb8, &adjusted, mode)?;
                     row[offset] = quantized[0];
                     row[offset + 1] = quantized[1];
                     row[offset + 2] = quantized[2];
@@ -58,7 +58,7 @@ pub(crate) fn ordered_dither_in_place(
                         apply_bias(row[offset + 2], bias),
                         alpha,
                     ];
-                    let quantized = quantize_pixel(PixelFormat::Rgba8, &adjusted, mode);
+                    let quantized = quantize_pixel(PixelFormat::Rgba8, &adjusted, mode)?;
                     row[offset] = quantized[0];
                     row[offset + 1] = quantized[1];
                     row[offset + 2] = quantized[2];
@@ -95,7 +95,7 @@ pub(crate) fn ordered_dither_in_place_par(
         .par_chunks_mut(stride)
         .take(height)
         .enumerate()
-        .for_each(|(y, row)| {
+        .try_for_each(|(y, row)| -> Result<()> {
             for x in 0..width {
                 let threshold = ordered_threshold_for_xy(x, y, map, map_w, map_h);
                 let bias = threshold_bias(threshold, map_max, strength);
@@ -104,7 +104,7 @@ pub(crate) fn ordered_dither_in_place_par(
                 match format {
                     PixelFormat::Gray8 => {
                         let value = apply_bias(row[offset], bias);
-                        let quantized = quantize_pixel(PixelFormat::Gray8, &[value], mode);
+                        let quantized = quantize_pixel(PixelFormat::Gray8, &[value], mode)?;
                         row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
                     }
                     PixelFormat::Rgb8 => {
@@ -113,7 +113,7 @@ pub(crate) fn ordered_dither_in_place_par(
                             apply_bias(row[offset + 1], bias),
                             apply_bias(row[offset + 2], bias),
                         ];
-                        let quantized = quantize_pixel(PixelFormat::Rgb8, &adjusted, mode);
+                        let quantized = quantize_pixel(PixelFormat::Rgb8, &adjusted, mode)?;
                         row[offset] = quantized[0];
                         row[offset + 1] = quantized[1];
                         row[offset + 2] = quantized[2];
@@ -126,7 +126,7 @@ pub(crate) fn ordered_dither_in_place_par(
                             apply_bias(row[offset + 2], bias),
                             alpha,
                         ];
-                        let quantized = quantize_pixel(PixelFormat::Rgba8, &adjusted, mode);
+                        let quantized = quantize_pixel(PixelFormat::Rgba8, &adjusted, mode)?;
                         row[offset] = quantized[0];
                         row[offset + 1] = quantized[1];
                         row[offset + 2] = quantized[2];
@@ -134,7 +134,8 @@ pub(crate) fn ordered_dither_in_place_par(
                     }
                 }
             }
-        });
+            Ok(())
+        })?;
 
     Ok(())
 }

@@ -40,7 +40,7 @@ fn dot_diffuse_gray(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Result<(
                 let idx = y * width + x;
 
                 let adjusted = clamp_u8(i32::from(*value) + errors[idx]);
-                let quantized = quantize_pixel(PixelFormat::Gray8, &[adjusted], mode);
+                let quantized = quantize_pixel(PixelFormat::Gray8, &[adjusted], mode)?;
                 let quantized_gray = luma_u8([quantized[0], quantized[1], quantized[2]]);
                 *value = quantized_gray;
 
@@ -89,12 +89,12 @@ fn dot_diffuse_rgb(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Result<()
                 } else {
                     255
                 };
-                let pixel = if format == PixelFormat::Rgba8 {
-                    [adjusted[0], adjusted[1], adjusted[2], alpha]
+                let quantized = if format == PixelFormat::Rgba8 {
+                    let pixel = [adjusted[0], adjusted[1], adjusted[2], alpha];
+                    quantize_pixel(PixelFormat::Rgba8, &pixel, mode)?
                 } else {
-                    [adjusted[0], adjusted[1], adjusted[2], 255]
+                    quantize_pixel(PixelFormat::Rgb8, &adjusted, mode)?
                 };
-                let quantized = quantize_pixel(format, &pixel, mode);
 
                 row[offset] = quantized[0];
                 row[offset + 1] = quantized[1];

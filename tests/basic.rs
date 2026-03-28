@@ -6,7 +6,7 @@ use common::{
 use dithr::{
     cga_palette, grayscale_16, grayscale_2, grayscale_4, quantize_error, quantize_gray_u8,
     quantize_pixel, quantize_rgb_u8, random_binary_in_place, threshold_binary_in_place, Buffer,
-    BufferError, IndexedImage, Palette, PaletteError, PixelFormat, QuantizeMode,
+    BufferError, Error, IndexedImage, Palette, PaletteError, PixelFormat, QuantizeMode,
 };
 
 #[test]
@@ -289,7 +289,8 @@ fn quantize_palette_output_is_palette_member() {
         PixelFormat::Rgb8,
         &[100, 110, 120],
         QuantizeMode::Palette(&palette),
-    );
+    )
+    .expect("palette quantization should succeed");
     let rgb = [quantized[0], quantized[1], quantized[2]];
 
     assert!(palette.as_slice().contains(&rgb));
@@ -303,6 +304,7 @@ fn quantize_single_color_preserves_intermediate_levels() {
 
     for value in 0_u16..=255 {
         let quantized = quantize_pixel(PixelFormat::Gray8, &[value as u8], mode);
+        let quantized = quantized.expect("single-color quantization should succeed");
         let rgb = [quantized[0], quantized[1], quantized[2]];
         assert!(rgb[0] <= fg[0]);
         assert!(rgb[1] <= fg[1]);
@@ -314,11 +316,13 @@ fn quantize_single_color_preserves_intermediate_levels() {
     }
 
     assert_eq!(
-        quantize_pixel(PixelFormat::Gray8, &[0], mode),
+        quantize_pixel(PixelFormat::Gray8, &[0], mode)
+            .expect("single-color quantization should succeed"),
         [0, 0, 0, 255]
     );
     assert_eq!(
-        quantize_pixel(PixelFormat::Gray8, &[255], mode),
+        quantize_pixel(PixelFormat::Gray8, &[255], mode)
+            .expect("single-color quantization should succeed"),
         [fg[0], fg[1], fg[2], 255]
     );
     assert!(saw_mid);
@@ -326,9 +330,41 @@ fn quantize_single_color_preserves_intermediate_levels() {
 
 #[test]
 fn quantize_error_sign_and_magnitude_correct() {
-    let error = quantize_error(&[10, 200, 50, 255], &[20, 180, 60, 200]);
+    let error = quantize_error(&[10, 200, 50, 255], &[20, 180, 60, 200])
+        .expect("quantize error should succeed");
 
     assert_eq!(error, [-10, 20, -10, 55]);
+}
+
+#[test]
+fn quantize_pixel_rejects_short_slice_for_format() {
+    let result = quantize_pixel(PixelFormat::Rgb8, &[10, 20], QuantizeMode::RgbBits(2));
+    assert_eq!(
+        result,
+        Err(Error::InvalidArgument(
+            "pixel slice length does not match format"
+        ))
+    );
+}
+
+#[test]
+fn quantize_error_rejects_mismatched_lengths() {
+    let result = quantize_error(&[10, 20, 30], &[10, 20]);
+    assert_eq!(
+        result,
+        Err(Error::InvalidArgument(
+            "original and quantized pixel lengths must match"
+        ))
+    );
+}
+
+#[test]
+fn quantize_error_rejects_empty_slice() {
+    let result = quantize_error(&[], &[]);
+    assert_eq!(
+        result,
+        Err(Error::InvalidArgument("pixel length must be in 1..=4"))
+    );
 }
 
 #[test]

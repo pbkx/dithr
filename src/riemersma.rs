@@ -44,7 +44,7 @@ pub fn riemersma_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Re
         let new_error = match format {
             PixelFormat::Gray8 => {
                 let adjusted = clamp_u8(i32::from(buffer.data[offset]) + weighted[0]);
-                let quantized = quantize_pixel(PixelFormat::Gray8, &[adjusted], mode);
+                let quantized = quantize_pixel(PixelFormat::Gray8, &[adjusted], mode)?;
                 let quantized_gray = luma_u8([quantized[0], quantized[1], quantized[2]]);
                 buffer.data[offset] = quantized_gray;
                 [
@@ -59,7 +59,7 @@ pub fn riemersma_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Re
                     clamp_u8(i32::from(buffer.data[offset + 1]) + weighted[1]),
                     clamp_u8(i32::from(buffer.data[offset + 2]) + weighted[2]),
                 ];
-                let quantized = quantize_pixel(PixelFormat::Rgb8, &adjusted, mode);
+                let quantized = quantize_pixel(PixelFormat::Rgb8, &adjusted, mode)?;
                 buffer.data[offset] = quantized[0];
                 buffer.data[offset + 1] = quantized[1];
                 buffer.data[offset + 2] = quantized[2];
@@ -77,7 +77,7 @@ pub fn riemersma_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Re
                     clamp_u8(i32::from(buffer.data[offset + 2]) + weighted[2]),
                     alpha,
                 ];
-                let quantized = quantize_pixel(PixelFormat::Rgba8, &adjusted, mode);
+                let quantized = quantize_pixel(PixelFormat::Rgba8, &adjusted, mode)?;
                 buffer.data[offset] = quantized[0];
                 buffer.data[offset + 1] = quantized[1];
                 buffer.data[offset + 2] = quantized[2];

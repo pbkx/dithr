@@ -1,6 +1,7 @@
 #[cfg(feature = "image")]
 pub mod adapter;
 pub mod buffer;
+pub mod core;
 pub mod data;
 pub mod dbs;
 pub mod diffusion;

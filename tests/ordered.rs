@@ -398,6 +398,116 @@ fn yliluoma_3_output_is_always_palette_member() {
 }
 
 #[test]
+fn yliluoma_u16_palette_member_invariant() {
+    let width = 8_usize;
+    let height = 8_usize;
+    let mut data = vec![0_u16; width * height * 3];
+    for y in 0..height {
+        for x in 0..width {
+            let offset = (y * width + x) * 3;
+            data[offset] = ((x * 65_535) / (width - 1)) as u16;
+            data[offset + 1] = ((y * 65_535) / (height - 1)) as u16;
+            data[offset + 2] = (((x + y) * 65_535) / (width + height - 2)) as u16;
+        }
+    }
+    let palette = Palette::<u16>::new(vec![
+        [0, 0, 0],
+        [65_535, 65_535, 65_535],
+        [65_535, 0, 0],
+        [0, 65_535, 0],
+        [0, 0, 65_535],
+        [65_535, 65_535, 0],
+        [0, 65_535, 65_535],
+        [65_535, 0, 65_535],
+    ])
+    .expect("palette should be valid");
+    let mut buffer = Buffer {
+        data: &mut data,
+        width,
+        height,
+        stride: width * 3,
+        format: PixelFormat::<()>::Rgb16,
+    };
+
+    yliluoma_1_in_place(&mut buffer, &palette).expect("yliluoma 1 should succeed");
+
+    for chunk in data.chunks_exact(3) {
+        let rgb = [chunk[0], chunk[1], chunk[2]];
+        assert!(palette.contains(rgb));
+    }
+}
+
+#[test]
+fn yliluoma_f32_palette_member_invariant() {
+    let width = 8_usize;
+    let height = 8_usize;
+    let mut data = vec![0.0_f32; width * height * 3];
+    for y in 0..height {
+        for x in 0..width {
+            let offset = (y * width + x) * 3;
+            data[offset] = x as f32 / (width - 1) as f32;
+            data[offset + 1] = y as f32 / (height - 1) as f32;
+            data[offset + 2] = (x + y) as f32 / (width + height - 2) as f32;
+        }
+    }
+    let palette = Palette::<f32>::new(vec![
+        [0.0, 0.0, 0.0],
+        [1.0, 1.0, 1.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [1.0, 1.0, 0.0],
+        [0.0, 1.0, 1.0],
+        [1.0, 0.0, 1.0],
+    ])
+    .expect("palette should be valid");
+    let mut buffer = Buffer {
+        data: &mut data,
+        width,
+        height,
+        stride: width * 3,
+        format: PixelFormat::<()>::Rgb32F,
+    };
+
+    yliluoma_1_in_place(&mut buffer, &palette).expect("yliluoma 1 should succeed");
+
+    for chunk in data.chunks_exact(3) {
+        let rgb = [chunk[0], chunk[1], chunk[2]];
+        assert!(palette.contains(rgb));
+    }
+}
+
+#[test]
+fn yliluoma_rgba_alpha_preserved_u16() {
+    let width = 8_usize;
+    let height = 8_usize;
+    let mut data: Vec<u16> = (0_u32..(width * height * 4) as u32)
+        .map(|v| ((v * 977) % 65_536) as u16)
+        .collect();
+    let before_alpha: Vec<u16> = data.iter().skip(3).step_by(4).copied().collect();
+    let palette = Palette::<u16>::new(vec![
+        [0, 0, 0],
+        [65_535, 65_535, 65_535],
+        [65_535, 0, 0],
+        [0, 65_535, 0],
+        [0, 0, 65_535],
+    ])
+    .expect("palette should be valid");
+    let mut buffer = Buffer {
+        data: &mut data,
+        width,
+        height,
+        stride: width * 4,
+        format: PixelFormat::<()>::Rgba16,
+    };
+
+    yliluoma_2_in_place(&mut buffer, &palette).expect("yliluoma 2 should succeed");
+
+    let after_alpha: Vec<u16> = data.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_alpha, after_alpha);
+}
+
+#[test]
 fn ordered_engine_gray_uses_only_quantized_values() {
     let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
     let mut buffer = Buffer {

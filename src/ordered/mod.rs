@@ -192,15 +192,24 @@ pub fn custom_ordered_in_place_par<S: Sample, L: PixelLayout>(
     )
 }
 
-pub fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> Result<()> {
+pub fn yliluoma_1_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    palette: &Palette<S>,
+) -> Result<()> {
     yliluoma::yliluoma_1_in_place(buffer, palette)
 }
 
-pub fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> Result<()> {
+pub fn yliluoma_2_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    palette: &Palette<S>,
+) -> Result<()> {
     yliluoma::yliluoma_2_in_place(buffer, palette)
 }
 
-pub fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> Result<()> {
+pub fn yliluoma_3_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    palette: &Palette<S>,
+) -> Result<()> {
     yliluoma::yliluoma_3_in_place(buffer, palette)
 }
 

@@ -1,7 +1,8 @@
 use crate::{
+    core::{PixelLayout, Sample},
     data::BAYER_8X8,
-    math::color::{luma_u8, rgb_distance_sq},
-    Buffer, BufferError, Palette, PixelFormat, Result,
+    math::color::rgb_distance_sq,
+    Buffer, BufferError, Error, Palette, PixelFormat, Result,
 };
 use std::collections::HashMap;
 
@@ -16,36 +17,47 @@ struct MixingPlan {
     ratio: u8,
 }
 
-struct PaletteView<'a> {
-    colors: &'a [[u8; 3]],
+struct PaletteView<'a, S: Sample> {
+    colors: &'a [[S; 3]],
+    colors_u8: Vec<[u8; 3]>,
     luma: Vec<u32>,
     packed: Vec<u32>,
 }
 
-impl<'a> PaletteView<'a> {
-    fn new(palette: &'a Palette) -> Self {
+impl<'a, S: Sample> PaletteView<'a, S> {
+    fn new(palette: &'a Palette<S>) -> Self {
         let colors = palette.as_slice();
+        let mut colors_u8 = Vec::with_capacity(colors.len());
         let mut luma = Vec::with_capacity(colors.len());
         let mut packed = Vec::with_capacity(colors.len());
 
         for &color in colors {
+            let color_u8 = [
+                sample_to_byte(color[0]),
+                sample_to_byte(color[1]),
+                sample_to_byte(color[2]),
+            ];
+            colors_u8.push(color_u8);
             luma.push(
-                u32::from(color[0]) * 299 + u32::from(color[1]) * 587 + u32::from(color[2]) * 114,
+                u32::from(color_u8[0]) * 299
+                    + u32::from(color_u8[1]) * 587
+                    + u32::from(color_u8[2]) * 114,
             );
-            packed.push(pack_rgb(color));
+            packed.push(pack_rgb(color_u8));
         }
 
         Self {
             colors,
+            colors_u8,
             luma,
             packed,
         }
     }
 
     fn gamma_table(&self) -> Vec<[f64; 3]> {
-        self.colors
+        self.colors_u8
             .iter()
-            .map(|color| {
+            .map(|&color| {
                 [
                     gamma_correct_channel(color[0]),
                     gamma_correct_channel(color[1]),
@@ -56,32 +68,38 @@ impl<'a> PaletteView<'a> {
     }
 }
 
-pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> Result<()> {
+pub(crate) fn yliluoma_1_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    palette: &Palette<S>,
+) -> Result<()> {
     buffer.validate()?;
 
     let view = PaletteView::new(palette);
     let width = buffer.width;
     let height = buffer.height;
     let format = buffer.format;
-    let bpp = format.bytes_per_pixel();
+    let channels = format.channels();
     let mut cache = HashMap::<u32, MixingPlan>::new();
 
     for y in 0..height {
         let row = buffer.try_row_mut(y)?;
 
         for x in 0..width {
-            let offset = x.checked_mul(bpp).ok_or(BufferError::OutOfBounds)?;
+            let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
             let source_rgb = match format {
-                PixelFormat::Gray8 => {
-                    let g = row[offset];
-                    [g, g, g]
-                }
-                PixelFormat::Rgb8 | PixelFormat::Rgba8 => {
-                    [row[offset], row[offset + 1], row[offset + 2]]
-                }
+                PixelFormat::Rgb8
+                | PixelFormat::Rgb16
+                | PixelFormat::Rgb32F
+                | PixelFormat::Rgba8
+                | PixelFormat::Rgba16
+                | PixelFormat::Rgba32F => [
+                    sample_to_byte(row[offset]),
+                    sample_to_byte(row[offset + 1]),
+                    sample_to_byte(row[offset + 2]),
+                ],
                 _ => {
-                    return Err(crate::Error::UnsupportedFormat(
-                        "yliluoma ordered dithering supports Gray8, Rgb8, and Rgba8 only",
+                    return Err(Error::UnsupportedFormat(
+                        "yliluoma ordered dithering supports Rgb and Rgba formats only",
                     ));
                 }
             };
@@ -89,7 +107,7 @@ pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
             let plan = if let Some(&cached) = cache.get(&key) {
                 cached
             } else {
-                let computed = devise_best_mixing_plan(source_rgb, view.colors);
+                let computed = devise_best_mixing_plan(source_rgb, &view.colors_u8);
                 cache.insert(key, computed);
                 computed
             };
@@ -101,15 +119,12 @@ pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
             };
 
             match format {
-                PixelFormat::Gray8 => {
-                    row[offset] = luma_u8(chosen);
-                }
-                PixelFormat::Rgb8 => {
+                PixelFormat::Rgb8 | PixelFormat::Rgb16 | PixelFormat::Rgb32F => {
                     row[offset] = chosen[0];
                     row[offset + 1] = chosen[1];
                     row[offset + 2] = chosen[2];
                 }
-                PixelFormat::Rgba8 => {
+                PixelFormat::Rgba8 | PixelFormat::Rgba16 | PixelFormat::Rgba32F => {
                     let alpha = row[offset + 3];
                     row[offset] = chosen[0];
                     row[offset + 1] = chosen[1];
@@ -117,8 +132,8 @@ pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
                     row[offset + 3] = alpha;
                 }
                 _ => {
-                    return Err(crate::Error::UnsupportedFormat(
-                        "yliluoma ordered dithering supports Gray8, Rgb8, and Rgba8 only",
+                    return Err(Error::UnsupportedFormat(
+                        "yliluoma ordered dithering supports Rgb and Rgba formats only",
                     ));
                 }
             }
@@ -128,40 +143,46 @@ pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
     Ok(())
 }
 
-pub(crate) fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> Result<()> {
+pub(crate) fn yliluoma_2_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    palette: &Palette<S>,
+) -> Result<()> {
     buffer.validate()?;
 
     let view = PaletteView::new(palette);
     let width = buffer.width;
     let height = buffer.height;
     let format = buffer.format;
-    let bpp = format.bytes_per_pixel();
+    let channels = format.channels();
     let mut cache = HashMap::<u32, Vec<usize>>::new();
 
     for y in 0..height {
         let row = buffer.try_row_mut(y)?;
 
         for x in 0..width {
-            let offset = x.checked_mul(bpp).ok_or(BufferError::OutOfBounds)?;
+            let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
             let source_rgb = match format {
-                PixelFormat::Gray8 => {
-                    let g = row[offset];
-                    [g, g, g]
-                }
-                PixelFormat::Rgb8 | PixelFormat::Rgba8 => {
-                    [row[offset], row[offset + 1], row[offset + 2]]
-                }
+                PixelFormat::Rgb8
+                | PixelFormat::Rgb16
+                | PixelFormat::Rgb32F
+                | PixelFormat::Rgba8
+                | PixelFormat::Rgba16
+                | PixelFormat::Rgba32F => [
+                    sample_to_byte(row[offset]),
+                    sample_to_byte(row[offset + 1]),
+                    sample_to_byte(row[offset + 2]),
+                ],
                 _ => {
-                    return Err(crate::Error::UnsupportedFormat(
-                        "yliluoma ordered dithering supports Gray8, Rgb8, and Rgba8 only",
+                    return Err(Error::UnsupportedFormat(
+                        "yliluoma ordered dithering supports Rgb and Rgba formats only",
                     ));
                 }
             };
             let key = pack_rgb(source_rgb);
             let selected = {
-                let plan = cache
-                    .entry(key)
-                    .or_insert_with(|| devise_color_sequence(source_rgb, view.colors, &view.luma));
+                let plan = cache.entry(key).or_insert_with(|| {
+                    devise_color_sequence(source_rgb, &view.colors_u8, &view.luma)
+                });
                 let map_value = usize::from(BAYER_8X8[y % 8][x % 8]);
                 let plan_index = map_value
                     .checked_mul(plan.len())
@@ -173,15 +194,12 @@ pub(crate) fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
             let chosen = view.colors[selected];
 
             match format {
-                PixelFormat::Gray8 => {
-                    row[offset] = luma_u8(chosen);
-                }
-                PixelFormat::Rgb8 => {
+                PixelFormat::Rgb8 | PixelFormat::Rgb16 | PixelFormat::Rgb32F => {
                     row[offset] = chosen[0];
                     row[offset + 1] = chosen[1];
                     row[offset + 2] = chosen[2];
                 }
-                PixelFormat::Rgba8 => {
+                PixelFormat::Rgba8 | PixelFormat::Rgba16 | PixelFormat::Rgba32F => {
                     let alpha = row[offset + 3];
                     row[offset] = chosen[0];
                     row[offset + 1] = chosen[1];
@@ -189,8 +207,8 @@ pub(crate) fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
                     row[offset + 3] = alpha;
                 }
                 _ => {
-                    return Err(crate::Error::UnsupportedFormat(
-                        "yliluoma ordered dithering supports Gray8, Rgb8, and Rgba8 only",
+                    return Err(Error::UnsupportedFormat(
+                        "yliluoma ordered dithering supports Rgb and Rgba formats only",
                     ));
                 }
             }
@@ -200,14 +218,17 @@ pub(crate) fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
     Ok(())
 }
 
-pub(crate) fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) -> Result<()> {
+pub(crate) fn yliluoma_3_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    palette: &Palette<S>,
+) -> Result<()> {
     buffer.validate()?;
 
     let view = PaletteView::new(palette);
     let width = buffer.width;
     let height = buffer.height;
     let format = buffer.format;
-    let bpp = format.bytes_per_pixel();
+    let channels = format.channels();
     let mut cache = HashMap::<u32, Vec<usize>>::new();
     let palette_gamma = view.gamma_table();
 
@@ -215,18 +236,21 @@ pub(crate) fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
         let row = buffer.try_row_mut(y)?;
 
         for x in 0..width {
-            let offset = x.checked_mul(bpp).ok_or(BufferError::OutOfBounds)?;
+            let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
             let source_rgb = match format {
-                PixelFormat::Gray8 => {
-                    let g = row[offset];
-                    [g, g, g]
-                }
-                PixelFormat::Rgb8 | PixelFormat::Rgba8 => {
-                    [row[offset], row[offset + 1], row[offset + 2]]
-                }
+                PixelFormat::Rgb8
+                | PixelFormat::Rgb16
+                | PixelFormat::Rgb32F
+                | PixelFormat::Rgba8
+                | PixelFormat::Rgba16
+                | PixelFormat::Rgba32F => [
+                    sample_to_byte(row[offset]),
+                    sample_to_byte(row[offset + 1]),
+                    sample_to_byte(row[offset + 2]),
+                ],
                 _ => {
-                    return Err(crate::Error::UnsupportedFormat(
-                        "yliluoma ordered dithering supports Gray8, Rgb8, and Rgba8 only",
+                    return Err(Error::UnsupportedFormat(
+                        "yliluoma ordered dithering supports Rgb and Rgba formats only",
                     ));
                 }
             };
@@ -246,15 +270,12 @@ pub(crate) fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
             let chosen = view.colors[selected];
 
             match format {
-                PixelFormat::Gray8 => {
-                    row[offset] = luma_u8(chosen);
-                }
-                PixelFormat::Rgb8 => {
+                PixelFormat::Rgb8 | PixelFormat::Rgb16 | PixelFormat::Rgb32F => {
                     row[offset] = chosen[0];
                     row[offset + 1] = chosen[1];
                     row[offset + 2] = chosen[2];
                 }
-                PixelFormat::Rgba8 => {
+                PixelFormat::Rgba8 | PixelFormat::Rgba16 | PixelFormat::Rgba32F => {
                     let alpha = row[offset + 3];
                     row[offset] = chosen[0];
                     row[offset + 1] = chosen[1];
@@ -262,8 +283,8 @@ pub(crate) fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
                     row[offset + 3] = alpha;
                 }
                 _ => {
-                    return Err(crate::Error::UnsupportedFormat(
-                        "yliluoma ordered dithering supports Gray8, Rgb8, and Rgba8 only",
+                    return Err(Error::UnsupportedFormat(
+                        "yliluoma ordered dithering supports Rgb and Rgba formats only",
                     ));
                 }
             }
@@ -381,9 +402,9 @@ fn color_compare_rgb_luma(a: [u8; 3], b: [u8; 3]) -> f64 {
         + luma_diff * luma_diff
 }
 
-fn devise_color_sequence_algorithm3(
+fn devise_color_sequence_algorithm3<S: Sample>(
     target: [u8; 3],
-    view: &PaletteView<'_>,
+    view: &PaletteView<'_, S>,
     palette_gamma: &[[f64; 3]],
 ) -> Vec<usize> {
     let palette_len = view.colors.len();
@@ -504,16 +525,16 @@ fn evaluate_penalty_with_counts(
     color_compare_rgb_luma(target, mixed)
 }
 
-fn nearest_palette_index(target: [u8; 3], view: &PaletteView<'_>) -> usize {
+fn nearest_palette_index<S: Sample>(target: [u8; 3], view: &PaletteView<'_, S>) -> usize {
     let packed = pack_rgb(target);
     if let Some(index) = view.packed.iter().position(|&entry| entry == packed) {
         return index;
     }
 
     let mut best_index = 0_usize;
-    let mut best_error = rgb_distance_sq(target, view.colors[0]);
+    let mut best_error = rgb_distance_sq(target, view.colors_u8[0]);
 
-    for (index, &color) in view.colors.iter().enumerate().skip(1) {
+    for (index, &color) in view.colors_u8.iter().enumerate().skip(1) {
         let error = rgb_distance_sq(target, color);
         if error < best_error {
             best_error = error;
@@ -550,4 +571,8 @@ fn interpolate_channel(a: u8, b: u8, ratio: u8, levels: u8) -> u8 {
 
 fn pack_rgb(rgb: [u8; 3]) -> u32 {
     (u32::from(rgb[0]) << 16) | (u32::from(rgb[1]) << 8) | u32::from(rgb[2])
+}
+
+fn sample_to_byte<S: Sample>(value: S) -> u8 {
+    (value.to_unit_f32().clamp(0.0, 1.0) * 255.0).round() as u8
 }

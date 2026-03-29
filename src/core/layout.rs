@@ -4,6 +4,12 @@ pub trait PixelLayout: Copy + Send + Sync + 'static {
     const HAS_ALPHA: bool;
 }
 
+impl PixelLayout for () {
+    const CHANNELS: usize = 0;
+    const COLOR_CHANNELS: usize = 0;
+    const HAS_ALPHA: bool = false;
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Gray;
 

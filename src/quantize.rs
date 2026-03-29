@@ -110,6 +110,9 @@ fn pixel_rgb_alpha(format: PixelFormat, pixel: &[u8]) -> Result<([u8; 3], u8)> {
         }
         PixelFormat::Rgb8 => Ok(([pixel[0], pixel[1], pixel[2]], 255)),
         PixelFormat::Rgba8 => Ok(([pixel[0], pixel[1], pixel[2]], pixel[3])),
+        _ => Err(Error::UnsupportedFormat(
+            "quantize helpers support Gray8, Rgb8, and Rgba8 pixel formats only",
+        )),
     }
 }
 

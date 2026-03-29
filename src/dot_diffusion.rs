@@ -19,6 +19,9 @@ pub fn knuth_dot_diffusion_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<
     match buffer.format {
         PixelFormat::Gray8 => dot_diffuse_gray(buffer, mode),
         PixelFormat::Rgb8 | PixelFormat::Rgba8 => dot_diffuse_rgb(buffer, mode),
+        _ => Err(Error::UnsupportedFormat(
+            "knuth dot diffusion supports Gray8, Rgb8, and Rgba8 only",
+        )),
     }
 }
 

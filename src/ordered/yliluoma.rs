@@ -79,6 +79,11 @@ pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
                 PixelFormat::Rgb8 | PixelFormat::Rgba8 => {
                     [row[offset], row[offset + 1], row[offset + 2]]
                 }
+                _ => {
+                    return Err(crate::Error::UnsupportedFormat(
+                        "yliluoma ordered dithering supports Gray8, Rgb8, and Rgba8 only",
+                    ));
+                }
             };
             let key = pack_rgb(source_rgb);
             let plan = if let Some(&cached) = cache.get(&key) {
@@ -111,6 +116,11 @@ pub(crate) fn yliluoma_1_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
                     row[offset + 2] = chosen[2];
                     row[offset + 3] = alpha;
                 }
+                _ => {
+                    return Err(crate::Error::UnsupportedFormat(
+                        "yliluoma ordered dithering supports Gray8, Rgb8, and Rgba8 only",
+                    ));
+                }
             }
         }
     }
@@ -140,6 +150,11 @@ pub(crate) fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
                 }
                 PixelFormat::Rgb8 | PixelFormat::Rgba8 => {
                     [row[offset], row[offset + 1], row[offset + 2]]
+                }
+                _ => {
+                    return Err(crate::Error::UnsupportedFormat(
+                        "yliluoma ordered dithering supports Gray8, Rgb8, and Rgba8 only",
+                    ));
                 }
             };
             let key = pack_rgb(source_rgb);
@@ -173,6 +188,11 @@ pub(crate) fn yliluoma_2_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
                     row[offset + 2] = chosen[2];
                     row[offset + 3] = alpha;
                 }
+                _ => {
+                    return Err(crate::Error::UnsupportedFormat(
+                        "yliluoma ordered dithering supports Gray8, Rgb8, and Rgba8 only",
+                    ));
+                }
             }
         }
     }
@@ -203,6 +223,11 @@ pub(crate) fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
                 }
                 PixelFormat::Rgb8 | PixelFormat::Rgba8 => {
                     [row[offset], row[offset + 1], row[offset + 2]]
+                }
+                _ => {
+                    return Err(crate::Error::UnsupportedFormat(
+                        "yliluoma ordered dithering supports Gray8, Rgb8, and Rgba8 only",
+                    ));
                 }
             };
             let key = pack_rgb(source_rgb);
@@ -235,6 +260,11 @@ pub(crate) fn yliluoma_3_in_place(buffer: &mut Buffer<'_>, palette: &Palette) ->
                     row[offset + 1] = chosen[1];
                     row[offset + 2] = chosen[2];
                     row[offset + 3] = alpha;
+                }
+                _ => {
+                    return Err(crate::Error::UnsupportedFormat(
+                        "yliluoma ordered dithering supports Gray8, Rgb8, and Rgba8 only",
+                    ));
                 }
             }
         }

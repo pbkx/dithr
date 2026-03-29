@@ -88,6 +88,11 @@ pub fn riemersma_in_place(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Re
                     i32::from(clamp_i16(i32::from(adjusted[2]) - i32::from(quantized[2]))),
                 ]
             }
+            _ => {
+                return Err(Error::UnsupportedFormat(
+                    "riemersma supports Gray8, Rgb8, and Rgba8 only",
+                ));
+            }
         };
 
         push_error(&mut history, &mut head, &mut filled, new_error);

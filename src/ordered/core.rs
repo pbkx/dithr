@@ -65,6 +65,11 @@ pub(crate) fn ordered_dither_in_place(
                     row[offset + 2] = quantized[2];
                     row[offset + 3] = alpha;
                 }
+                _ => {
+                    return Err(Error::UnsupportedFormat(
+                        "ordered dithering supports Gray8, Rgb8, and Rgba8 only",
+                    ));
+                }
             }
         }
     }
@@ -133,6 +138,11 @@ pub(crate) fn ordered_dither_in_place_par(
                         row[offset + 1] = quantized[1];
                         row[offset + 2] = quantized[2];
                         row[offset + 3] = alpha;
+                    }
+                    _ => {
+                        return Err(Error::UnsupportedFormat(
+                            "ordered dithering supports Gray8, Rgb8, and Rgba8 only",
+                        ));
                     }
                 }
             }

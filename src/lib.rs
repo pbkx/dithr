@@ -19,7 +19,11 @@ pub use adapter::{
     dynamic_image_as_buffer, gray_image_as_buffer, rgb_image_as_buffer, rgba_image_as_buffer,
     DynamicImageBuffer,
 };
-pub use buffer::{Buffer, BufferError, PixelFormat};
+pub use buffer::{
+    gray_u16, gray_u8, rgb_u16, rgb_u8, rgba_u16, rgba_u8, Buffer, BufferError, GrayBuffer,
+    GrayBuffer16, GrayBuffer8, PixelFormat, RgbBuffer, RgbBuffer16, RgbBuffer32F, RgbBuffer8,
+    RgbaBuffer, RgbaBuffer16, RgbaBuffer32F, RgbaBuffer8,
+};
 pub use data::{cga_palette, grayscale_16, grayscale_2, grayscale_4};
 pub use dbs::{
     direct_binary_search_in_place, electrostatic_halftoning_in_place, lattice_boltzmann_in_place,

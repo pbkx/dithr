@@ -19,7 +19,7 @@ fn main() -> Result<()> {
         &mut data,
         width,
         height,
-        width * PixelFormat::Rgb8.bytes_per_pixel(),
+        width * PixelFormat::<()>::Rgb8.bytes_per_pixel(),
         PixelFormat::Rgb8,
     )?;
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::Palette(&palette))?;

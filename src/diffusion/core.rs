@@ -23,6 +23,9 @@ pub(crate) fn error_diffuse_in_place(
     match buffer.format {
         PixelFormat::Gray8 => diffuse_gray_row_major(buffer, mode, kernel),
         PixelFormat::Rgb8 | PixelFormat::Rgba8 => diffuse_rgb_row_major(buffer, mode, kernel),
+        _ => Err(Error::UnsupportedFormat(
+            "error diffusion core supports Gray8, Rgb8, and Rgba8 only",
+        )),
     }
 }
 

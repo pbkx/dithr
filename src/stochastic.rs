@@ -58,6 +58,11 @@ pub fn threshold_binary_in_place(
                     row[offset + 2] = quantized[2];
                     row[offset + 3] = alpha;
                 }
+                _ => {
+                    return Err(crate::Error::UnsupportedFormat(
+                        "stochastic dithering supports Gray8, Rgb8, and Rgba8 only",
+                    ));
+                }
             }
         }
     }
@@ -121,6 +126,11 @@ pub fn random_binary_in_place(
                     row[offset + 2] = quantized[2];
                     row[offset + 3] = alpha;
                 }
+                _ => {
+                    return Err(crate::Error::UnsupportedFormat(
+                        "stochastic dithering supports Gray8, Rgb8, and Rgba8 only",
+                    ));
+                }
             }
         }
     }
@@ -183,6 +193,11 @@ pub fn threshold_binary_in_place_par(
                         row[offset + 1] = quantized[1];
                         row[offset + 2] = quantized[2];
                         row[offset + 3] = alpha;
+                    }
+                    _ => {
+                        return Err(crate::Error::UnsupportedFormat(
+                            "stochastic dithering supports Gray8, Rgb8, and Rgba8 only",
+                        ));
                     }
                 }
             }
@@ -259,6 +274,11 @@ pub fn random_binary_in_place_par(
                         row[offset + 1] = quantized[1];
                         row[offset + 2] = quantized[2];
                         row[offset + 3] = alpha;
+                    }
+                    _ => {
+                        return Err(crate::Error::UnsupportedFormat(
+                            "stochastic dithering supports Gray8, Rgb8, and Rgba8 only",
+                        ));
                     }
                 }
             }

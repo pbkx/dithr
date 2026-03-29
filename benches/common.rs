@@ -87,7 +87,7 @@ pub fn touch_common() {
 
     let _ = mode_gray_1();
     let _ = mode_gray_2();
-    let _ = mode_rgb_332();
+    let _ = mode_rgb_bits3();
     let _ = mode_palette_bw();
     let _ = mode_palette_gray4();
     let _ = mode_palette_cga();
@@ -282,7 +282,7 @@ pub fn mode_gray_2() -> QuantizeMode<'static> {
     QuantizeMode::GrayBits(2)
 }
 
-pub fn mode_rgb_332() -> QuantizeMode<'static> {
+pub fn mode_rgb_bits3() -> QuantizeMode<'static> {
     QuantizeMode::RgbBits(3)
 }
 

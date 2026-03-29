@@ -105,6 +105,24 @@ fn dbs_objective_nonincreasing_over_iterations() {
 }
 
 #[test]
+fn dbs_u16_smoke() {
+    let mut data: Vec<u16> = (0_u32..64)
+        .map(|value| ((value * 1024) % 65_536) as u16)
+        .collect();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::<()>::Gray16,
+    };
+
+    direct_binary_search_in_place(&mut buffer, 4).expect("direct binary search should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+}
+
+#[test]
 fn lattice_boltzmann_runs_small_fixture() {
     let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
     let mut buffer = Buffer {
@@ -134,6 +152,24 @@ fn lattice_boltzmann_binary_only_output() {
     lattice_boltzmann_in_place(&mut buffer, 8).expect("lattice-boltzmann should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn lattice_boltzmann_u16_smoke() {
+    let mut data: Vec<u16> = (0_u32..64)
+        .map(|value| ((value * 1024) % 65_536) as u16)
+        .collect();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::<()>::Gray16,
+    };
+
+    lattice_boltzmann_in_place(&mut buffer, 8).expect("lattice-boltzmann should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
 }
 
 #[test]
@@ -168,6 +204,25 @@ fn electrostatic_halftoning_binary_only_output() {
         .expect("electrostatic halftoning should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn electrostatic_halftoning_u16_smoke() {
+    let mut data: Vec<u16> = (0_u32..64)
+        .map(|value| ((value * 1024) % 65_536) as u16)
+        .collect();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::<()>::Gray16,
+    };
+
+    electrostatic_halftoning_in_place(&mut buffer, 10)
+        .expect("electrostatic halftoning should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
 }
 
 #[test]

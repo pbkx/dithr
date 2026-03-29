@@ -18,21 +18,22 @@ pub fn tile_index(x: usize, y: usize, w: usize, h: usize) -> Result<usize> {
     Ok(idx)
 }
 
-#[must_use]
-pub fn normalize_threshold_u8(value: u8, levels: u8) -> i16 {
+pub fn normalize_threshold_u8(value: u8, levels: u8) -> Result<i16> {
     if levels <= 1 {
-        return 0;
+        return Err(Error::InvalidArgument(
+            "threshold levels must be greater than one",
+        ));
     }
 
     let levels_i32 = i32::from(levels);
     let scaled = (i32::from(value) * levels_i32) / 256;
 
-    (scaled - (levels_i32 / 2)) as i16
+    Ok((scaled - (levels_i32 / 2)) as i16)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::tile_index;
+    use super::{normalize_threshold_u8, tile_index};
     use crate::Error;
 
     #[test]
@@ -57,5 +58,21 @@ mod tests {
                 "tile dimensions must be greater than zero"
             ))
         );
+    }
+
+    #[test]
+    fn normalize_threshold_u8_rejects_invalid_levels() {
+        assert_eq!(
+            normalize_threshold_u8(128, 1),
+            Err(Error::InvalidArgument(
+                "threshold levels must be greater than one"
+            ))
+        );
+    }
+
+    #[test]
+    fn normalize_threshold_u8_maps_valid_input() {
+        assert_eq!(normalize_threshold_u8(0, 4), Ok(-2));
+        assert_eq!(normalize_threshold_u8(255, 4), Ok(1));
     }
 }

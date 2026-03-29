@@ -52,8 +52,8 @@ pub use ordered::{
 };
 pub use palette::{IndexedImage, Palette, Palette16, Palette32F, Palette8, PaletteError};
 pub use quantize::{
-    quantize_error, quantize_gray, quantize_gray_u8, quantize_pixel, quantize_rgb, quantize_rgb_u8,
-    QuantizeMode,
+    levels_from_bits, quantize_error, quantize_gray, quantize_gray_u8, quantize_pixel,
+    quantize_rgb, quantize_rgb_u8, QuantizeError, QuantizeMode,
 };
 pub use riemersma::riemersma_in_place;
 pub use stochastic::{

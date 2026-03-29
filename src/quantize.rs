@@ -4,6 +4,8 @@ use crate::{
     Error, Palette, Result,
 };
 
+pub type QuantizeError = Error;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum QuantizeMode<'a, S: Sample = u8> {
     GrayLevels(u16),
@@ -13,17 +15,35 @@ pub enum QuantizeMode<'a, S: Sample = u8> {
 }
 
 impl<'a> QuantizeMode<'a, u8> {
-    #[allow(non_snake_case)]
     #[must_use]
-    pub const fn GrayBits(bits: u8) -> Self {
-        Self::GrayLevels(bits_to_levels(bits))
+    pub fn gray_bits(bits: u8) -> Self {
+        Self::GrayLevels(bits_to_levels_compat(bits))
+    }
+
+    #[must_use]
+    pub fn rgb_bits(bits: u8) -> Self {
+        Self::RgbLevels(bits_to_levels_compat(bits))
     }
 
     #[allow(non_snake_case)]
     #[must_use]
-    pub const fn RgbBits(bits: u8) -> Self {
-        Self::RgbLevels(bits_to_levels(bits))
+    pub fn GrayBits(bits: u8) -> Self {
+        Self::gray_bits(bits)
     }
+
+    #[allow(non_snake_case)]
+    #[must_use]
+    pub fn RgbBits(bits: u8) -> Self {
+        Self::rgb_bits(bits)
+    }
+}
+
+pub fn levels_from_bits(bits: u8) -> std::result::Result<u16, QuantizeError> {
+    if !(1..=8).contains(&bits) {
+        return Err(Error::InvalidArgument("quantization bits must be in 1..=8"));
+    }
+
+    Ok(1_u16 << bits)
 }
 
 pub fn quantize_gray<S: Sample>(value: S, levels: u16) -> Result<S> {
@@ -149,13 +169,13 @@ pub fn quantize_error<S: Sample, L: PixelLayout>(
 
 #[inline]
 pub fn quantize_gray_u8(value: u8, bits: u8) -> Result<u8> {
-    let levels = levels_from_bits_u8(bits)?;
+    let levels = levels_from_bits(bits)?;
     quantize_gray(value, levels)
 }
 
 #[inline]
 pub fn quantize_rgb_u8(rgb: [u8; 3], bits: u8) -> Result<[u8; 3]> {
-    let levels = levels_from_bits_u8(bits)?;
+    let levels = levels_from_bits(bits)?;
     quantize_rgb(rgb, levels)
 }
 
@@ -169,15 +189,7 @@ fn validate_levels(levels: u16) -> Result<()> {
     }
 }
 
-fn levels_from_bits_u8(bits: u8) -> Result<u16> {
-    if !(1..=8).contains(&bits) {
-        return Err(Error::InvalidArgument("quantization bits must be in 1..=8"));
-    }
-
-    Ok(1_u16 << bits)
-}
-
-const fn bits_to_levels(bits: u8) -> u16 {
+const fn bits_to_levels_compat(bits: u8) -> u16 {
     if bits == 0 {
         0
     } else if bits >= 16 {

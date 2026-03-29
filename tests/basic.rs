@@ -6,10 +6,10 @@ use common::{
 };
 use dithr::{
     bayer_8x8_rgb16_in_place, cga_palette, floyd_steinberg_in_place, gray_u16, gray_u8,
-    grayscale_16, grayscale_2, grayscale_4, quantize_error, quantize_gray_u8, quantize_pixel,
-    quantize_rgb_u8, random_binary_in_place, rgb_u16, rgb_u8, rgba_u8, threshold_binary_in_place,
-    Buffer, BufferError, Error, GrayBuffer16, GrayBuffer8, IndexedImage, Palette, PaletteError,
-    PixelFormat, QuantizeMode, RgbBuffer32F, RgbBuffer8, RgbaBuffer8,
+    grayscale_16, grayscale_2, grayscale_4, levels_from_bits, quantize_error, quantize_gray_u8,
+    quantize_pixel, quantize_rgb_u8, random_binary_in_place, rgb_u16, rgb_u8, rgba_u8,
+    threshold_binary_in_place, Buffer, BufferError, Error, GrayBuffer16, GrayBuffer8, IndexedImage,
+    Palette, PaletteError, PixelFormat, QuantizeMode, RgbBuffer32F, RgbBuffer8, RgbaBuffer8,
 };
 
 #[test]
@@ -369,6 +369,24 @@ fn quantize_gray_1bit_binary_only() {
 }
 
 #[test]
+fn gray_bits_1_maps_to_gray_levels_2() {
+    assert_eq!(levels_from_bits(1), Ok(2));
+    assert_eq!(QuantizeMode::gray_bits(1), QuantizeMode::GrayLevels(2));
+}
+
+#[test]
+fn rgb_bits_8_maps_to_rgb_levels_256() {
+    assert_eq!(levels_from_bits(8), Ok(256));
+    assert_eq!(QuantizeMode::rgb_bits(8), QuantizeMode::RgbLevels(256));
+}
+
+#[test]
+fn quantize_mode_gray_levels_is_canonical() {
+    let mode = QuantizeMode::GrayBits(4);
+    assert!(matches!(mode, QuantizeMode::GrayLevels(_)));
+}
+
+#[test]
 fn quantize_gray_8bit_identity() {
     for value in 0_u16..=255 {
         let input = value as u8;
@@ -419,6 +437,14 @@ fn quantize_gray_u16_binary_only() {
 }
 
 #[test]
+fn quantize_gray_u16_levels_binary_only() {
+    for value in [0_u16, 1, 12_345, 32_767, 65_534, 65_535] {
+        let quantized = dithr::quantize_gray(value, 2).expect("valid levels");
+        assert!(quantized == 0 || quantized == 65_535);
+    }
+}
+
+#[test]
 fn quantize_rgb_u16_binary_only() {
     let quantized = dithr::quantize_rgb([1_u16, 32_767, 65_535], 2).expect("valid levels");
     for channel in quantized {
@@ -433,6 +459,15 @@ fn quantize_gray_f32_identity_high_levels() {
         let quantized = dithr::quantize_gray(value, 65_535).expect("valid levels");
         assert!((quantized - value).abs() < 2e-5);
     }
+}
+
+#[test]
+fn quantize_rgb_f32_levels_identity_high_resolution() {
+    let rgb = [0.15_f32, 0.5_f32, 0.85_f32];
+    let quantized = dithr::quantize_rgb(rgb, 65_535).expect("valid levels");
+    assert!((quantized[0] - rgb[0]).abs() < 2e-5);
+    assert!((quantized[1] - rgb[1]).abs() < 2e-5);
+    assert!((quantized[2] - rgb[2]).abs() < 2e-5);
 }
 
 #[test]
@@ -506,6 +541,33 @@ fn quantize_single_color_preserves_intermediate_levels() {
         [fg[0], fg[1], fg[2], 255]
     );
     assert!(saw_mid);
+}
+
+#[test]
+fn single_color_levels_generic_u16() {
+    let fg = [50_000_u16, 32_767_u16, 16_383_u16];
+    let mode = QuantizeMode::SingleColor {
+        fg,
+        levels: 4,
+    };
+    let quantized = quantize_pixel::<u16, dithr::core::Gray>(&[32_768], mode)
+        .expect("single-color quantization should succeed");
+    assert!(quantized[0] <= fg[0]);
+    assert!(quantized[1] <= fg[1]);
+    assert!(quantized[2] <= fg[2]);
+}
+
+#[test]
+fn single_color_levels_generic_f32() {
+    let mode = QuantizeMode::SingleColor {
+        fg: [1.0_f32, 0.5_f32, 0.25_f32],
+        levels: 8,
+    };
+    let quantized = quantize_pixel::<f32, dithr::core::Rgb>(&[0.25, 0.5, 0.75], mode)
+        .expect("single-color quantization should succeed");
+    assert!((0.0..=1.0).contains(&quantized[0]));
+    assert!((0.0..=0.5).contains(&quantized[1]));
+    assert!((0.0..=0.25).contains(&quantized[2]));
 }
 
 #[test]

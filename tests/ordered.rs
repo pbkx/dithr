@@ -215,6 +215,31 @@ fn custom_ordered_rejects_bad_dimensions() {
 }
 
 #[test]
+fn custom_ordered_accepts_normalized_map_values() {
+    let mut data = gray_ramp_8x8();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::Gray8,
+    };
+    let normalized_map = [0_u8, 85, 170, 255];
+
+    custom_ordered_in_place(
+        &mut buffer,
+        QuantizeMode::GrayBits(1),
+        &normalized_map,
+        2,
+        2,
+        64,
+    )
+    .expect("normalized custom map should be accepted");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
 fn custom_ordered_2x2_matches_manual_small_case() {
     let mut data_a: Vec<u8> = (0_u8..16).map(|value| value.saturating_mul(16)).collect();
     let mut data_b = data_a.clone();

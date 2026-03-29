@@ -8,24 +8,22 @@ pub enum QuantizeMode<'a> {
     SingleColor { fg: [u8; 3], bits: u8 },
 }
 
-#[must_use]
 #[inline]
-pub fn quantize_gray_u8(value: u8, bits: u8) -> u8 {
-    let bits = normalize_bits(bits);
+pub fn quantize_gray_u8(value: u8, bits: u8) -> Result<u8> {
+    let bits = validate_bits(bits)?;
     let levels = (1_u16 << bits) - 1;
     let q = ((u32::from(value) * u32::from(levels)) + 127) / 255;
 
-    (((q * 255) + (u32::from(levels) / 2)) / u32::from(levels)) as u8
+    Ok((((q * 255) + (u32::from(levels) / 2)) / u32::from(levels)) as u8)
 }
 
-#[must_use]
 #[inline]
-pub fn quantize_rgb_u8(rgb: [u8; 3], bits: u8) -> [u8; 3] {
-    [
-        quantize_gray_u8(rgb[0], bits),
-        quantize_gray_u8(rgb[1], bits),
-        quantize_gray_u8(rgb[2], bits),
-    ]
+pub fn quantize_rgb_u8(rgb: [u8; 3], bits: u8) -> Result<[u8; 3]> {
+    Ok([
+        quantize_gray_u8(rgb[0], bits)?,
+        quantize_gray_u8(rgb[1], bits)?,
+        quantize_gray_u8(rgb[2], bits)?,
+    ])
 }
 
 pub fn quantize_pixel(
@@ -37,11 +35,11 @@ pub fn quantize_pixel(
 
     let out = match mode {
         QuantizeMode::GrayBits(bits) => {
-            let g = quantize_gray_u8(luma_u8(rgb), bits);
+            let g = quantize_gray_u8(luma_u8(rgb), bits)?;
             [g, g, g, alpha]
         }
         QuantizeMode::RgbBits(bits) => {
-            let q = quantize_rgb_u8(rgb, bits);
+            let q = quantize_rgb_u8(rgb, bits)?;
             [q[0], q[1], q[2], alpha]
         }
         QuantizeMode::Palette(palette) => {
@@ -50,7 +48,7 @@ pub fn quantize_pixel(
             [q[0], q[1], q[2], alpha]
         }
         QuantizeMode::SingleColor { fg, bits } => {
-            let g = quantize_gray_u8(luma_u8(rgb), bits);
+            let g = quantize_gray_u8(luma_u8(rgb), bits)?;
             [
                 scale_channel_by_gray(fg[0], g),
                 scale_channel_by_gray(fg[1], g),
@@ -83,9 +81,13 @@ pub fn quantize_error(original: &[u8], quantized: &[u8]) -> Result<[i16; 4]> {
     Ok(out)
 }
 
-#[must_use]
-fn normalize_bits(bits: u8) -> u8 {
-    bits.clamp(1, 8)
+#[inline]
+fn validate_bits(bits: u8) -> Result<u8> {
+    if (1..=8).contains(&bits) {
+        Ok(bits)
+    } else {
+        Err(Error::InvalidArgument("quantization bits must be in 1..=8"))
+    }
 }
 
 #[must_use]

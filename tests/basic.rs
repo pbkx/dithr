@@ -255,30 +255,54 @@ fn indexed_image_stores_dimensions_and_palette() {
 #[test]
 fn quantize_gray_1bit_binary_only() {
     for value in 0_u16..=255 {
-        let quantized = quantize_gray_u8(value as u8, 1);
+        let quantized = quantize_gray_u8(value as u8, 1).expect("valid bit depth");
         assert!(quantized == 0 || quantized == 255);
     }
 
-    assert_eq!(quantize_gray_u8(127, 1), 0);
-    assert_eq!(quantize_gray_u8(128, 1), 255);
+    assert_eq!(quantize_gray_u8(127, 1), Ok(0));
+    assert_eq!(quantize_gray_u8(128, 1), Ok(255));
 }
 
 #[test]
 fn quantize_gray_8bit_identity() {
     for value in 0_u16..=255 {
         let input = value as u8;
-        assert_eq!(quantize_gray_u8(input, 8), input);
+        assert_eq!(quantize_gray_u8(input, 8), Ok(input));
     }
 }
 
 #[test]
 fn quantize_rgb_1bit_channels_binary_only() {
-    let quantized = quantize_rgb_u8([1, 127, 128], 1);
+    let quantized = quantize_rgb_u8([1, 127, 128], 1).expect("valid bit depth");
 
     assert_eq!(quantized, [0, 0, 255]);
     for channel in quantized {
         assert!(channel == 0 || channel == 255);
     }
+}
+
+#[test]
+fn quantize_gray_rejects_invalid_bits() {
+    assert_eq!(
+        quantize_gray_u8(42, 0),
+        Err(Error::InvalidArgument("quantization bits must be in 1..=8"))
+    );
+    assert_eq!(
+        quantize_gray_u8(42, 9),
+        Err(Error::InvalidArgument("quantization bits must be in 1..=8"))
+    );
+}
+
+#[test]
+fn quantize_rgb_rejects_invalid_bits() {
+    assert_eq!(
+        quantize_rgb_u8([10, 20, 30], 0),
+        Err(Error::InvalidArgument("quantization bits must be in 1..=8"))
+    );
+    assert_eq!(
+        quantize_rgb_u8([10, 20, 30], 10),
+        Err(Error::InvalidArgument("quantization bits must be in 1..=8"))
+    );
 }
 
 #[test]

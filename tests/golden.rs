@@ -506,6 +506,40 @@ fn golden_zhou_fang_gray_ramp_16x16() {
 }
 
 #[test]
+fn golden_variable_diffusion_distinguishes_ostromoukhov_and_zhou_fang() {
+    let mut ostromoukhov_data = Vec::with_capacity(64 * 64);
+    for y in 0..64_usize {
+        for x in 0..64_usize {
+            let value = ((x * 17 + y * 31 + ((x * y) % 97)) % 256) as u8;
+            ostromoukhov_data.push(value);
+        }
+    }
+    let mut zhou_fang_data = ostromoukhov_data.clone();
+
+    let mut ostromoukhov_buffer = Buffer {
+        data: &mut ostromoukhov_data,
+        width: 64,
+        height: 64,
+        stride: 64,
+        format: PixelFormat::Gray8,
+    };
+    let mut zhou_fang_buffer = Buffer {
+        data: &mut zhou_fang_data,
+        width: 64,
+        height: 64,
+        stride: 64,
+        format: PixelFormat::Gray8,
+    };
+
+    ostromoukhov_in_place(&mut ostromoukhov_buffer, QuantizeMode::GrayBits(2))
+        .expect("ostromoukhov should succeed");
+    zhou_fang_in_place(&mut zhou_fang_buffer, QuantizeMode::GrayBits(2))
+        .expect("zhou-fang should succeed");
+
+    assert_ne!(fnv1a64(&ostromoukhov_data), fnv1a64(&zhou_fang_data));
+}
+
+#[test]
 fn golden_gradient_based_error_diffusion_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
     let mut buffer = Buffer {

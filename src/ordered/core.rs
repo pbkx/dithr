@@ -29,7 +29,7 @@ pub(crate) fn ordered_dither_in_place(
         let row = buffer.try_row_mut(y)?;
 
         for x in 0..width {
-            let threshold = ordered_threshold_for_xy(x, y, map, map_w, map_h);
+            let threshold = ordered_threshold_for_xy(x, y, map, map_w, map_h)?;
             let bias = threshold_bias(threshold, map_max, strength);
             let offset = x.checked_mul(bpp).ok_or(BufferError::OutOfBounds)?;
 
@@ -97,7 +97,7 @@ pub(crate) fn ordered_dither_in_place_par(
         .enumerate()
         .try_for_each(|(y, row)| -> Result<()> {
             for x in 0..width {
-                let threshold = ordered_threshold_for_xy(x, y, map, map_w, map_h);
+                let threshold = ordered_threshold_for_xy(x, y, map, map_w, map_h)?;
                 let bias = threshold_bias(threshold, map_max, strength);
                 let offset = x * bpp;
 
@@ -146,15 +146,19 @@ pub(crate) fn ordered_threshold_for_xy(
     map: &[u8],
     map_w: usize,
     map_h: usize,
-) -> u8 {
+) -> Result<u8> {
     if map_w == 0 || map_h == 0 {
-        return 0;
+        return Err(Error::InvalidArgument(
+            "ordered map dimensions must be positive",
+        ));
     }
     let Some(map_len) = map_w.checked_mul(map_h) else {
-        return 0;
+        return Err(Error::InvalidArgument("ordered map dimensions overflow"));
     };
     if map.len() != map_len {
-        return 0;
+        return Err(Error::InvalidArgument(
+            "ordered map length must match dimensions",
+        ));
     }
 
     let map_x = x % map_w;
@@ -163,10 +167,12 @@ pub(crate) fn ordered_threshold_for_xy(
         .checked_mul(map_w)
         .and_then(|row_start| row_start.checked_add(map_x))
     else {
-        return 0;
+        return Err(Error::InvalidArgument("ordered threshold index overflow"));
     };
 
-    map.get(index).copied().unwrap_or_default()
+    map.get(index).copied().ok_or(Error::InvalidArgument(
+        "ordered threshold index out of bounds",
+    ))
 }
 
 fn validate_map(map: &[u8], map_w: usize, map_h: usize) -> Result<()> {

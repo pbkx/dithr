@@ -170,9 +170,5 @@ fn validate_custom_map(
         return Err(OrderedError::InvalidDimensions);
     }
 
-    if map.iter().any(|&value| usize::from(value) >= map.len()) {
-        return Err(OrderedError::ValueOutOfRange);
-    }
-
     Ok(())
 }

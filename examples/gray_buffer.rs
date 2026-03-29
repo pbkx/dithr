@@ -1,4 +1,4 @@
-use dithr::{bayer_8x8_in_place, Buffer, PixelFormat, QuantizeMode, Result};
+use dithr::{bayer_8x8_in_place, gray_u8, QuantizeMode, Result};
 
 fn main() -> Result<()> {
     let width = 16_usize;
@@ -12,7 +12,7 @@ fn main() -> Result<()> {
         }
     }
 
-    let mut buffer = Buffer::new(&mut data, width, height, width, PixelFormat::Gray8)?;
+    let mut buffer = gray_u8(&mut data, width, height, width)?;
     bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1))?;
 
     let black = data.iter().filter(|&&value| value == 0).count();

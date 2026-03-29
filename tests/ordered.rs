@@ -69,7 +69,7 @@ fn bayer_2x2_quantizes_only_to_allowed_values() {
         width: 8,
         height: 8,
         stride: 8,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     bayer_2x2_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 2x2 should succeed");
@@ -85,7 +85,7 @@ fn bayer_4x4_periodicity_matches_4() {
         width: 8,
         height: 8,
         stride: 8,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     bayer_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 4x4 should succeed");
@@ -111,7 +111,7 @@ fn bayer_8x8_periodicity_matches_8() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 8x8 should succeed");
@@ -137,7 +137,7 @@ fn bayer_16x16_runs_on_16x16_without_panic() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     bayer_16x16_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -155,7 +155,7 @@ fn cluster_dot_4x4_runs_and_quantizes() {
         width: 8,
         height: 8,
         stride: 8,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     cluster_dot_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -172,7 +172,7 @@ fn cluster_dot_8x8_runs_and_quantizes() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     cluster_dot_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -189,7 +189,7 @@ fn custom_ordered_rejects_empty_map() {
         width: 2,
         height: 2,
         stride: 2,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     let result = custom_ordered_in_place(&mut buffer, QuantizeMode::GrayBits(1), &[], 0, 0, 64);
@@ -205,7 +205,7 @@ fn custom_ordered_rejects_bad_dimensions() {
         width: 2,
         height: 2,
         stride: 2,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     let map = [0_u8, 1, 2];
@@ -215,28 +215,26 @@ fn custom_ordered_rejects_bad_dimensions() {
 }
 
 #[test]
-fn custom_ordered_accepts_normalized_map_values() {
+fn custom_ordered_rejects_out_of_range_map_values() {
     let mut data = gray_ramp_8x8();
     let mut buffer = Buffer {
         data: &mut data,
         width: 8,
         height: 8,
         stride: 8,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
     let normalized_map = [0_u8, 85, 170, 255];
 
-    custom_ordered_in_place(
+    let result = custom_ordered_in_place(
         &mut buffer,
         QuantizeMode::GrayBits(1),
         &normalized_map,
         2,
         2,
         64,
-    )
-    .expect("normalized custom map should be accepted");
-
-    assert!(data.iter().all(|&value| value == 0 || value == 255));
+    );
+    assert_eq!(result, Err(Error::Ordered(OrderedError::ValueOutOfRange)));
 }
 
 #[test]
@@ -249,14 +247,14 @@ fn custom_ordered_2x2_matches_manual_small_case() {
         width: 4,
         height: 4,
         stride: 4,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
     let mut buffer_b = Buffer {
         data: &mut data_b,
         width: 4,
         height: 4,
         stride: 4,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     custom_ordered_in_place(
@@ -277,7 +275,7 @@ fn custom_ordered_2x2_matches_manual_small_case() {
 fn yliluoma_1_output_is_always_palette_member() {
     let mut data = rgb_gradient_8x8();
     let palette = Palette::new(vec![
-        [0, 0, 0],
+        [0_u8, 0, 0],
         [255, 255, 255],
         [255, 0, 0],
         [0, 255, 0],
@@ -292,7 +290,7 @@ fn yliluoma_1_output_is_always_palette_member() {
         width: 8,
         height: 8,
         stride: 24,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
 
     yliluoma_1_in_place(&mut buffer, &palette).expect("yliluoma 1 should succeed");
@@ -308,7 +306,7 @@ fn yliluoma_1_deterministic_rgb_fixture() {
     let mut data_a = rgb_gradient_8x8();
     let mut data_b = rgb_gradient_8x8();
     let palette = Palette::new(vec![
-        [0, 0, 0],
+        [0_u8, 0, 0],
         [255, 255, 255],
         [255, 0, 0],
         [0, 255, 0],
@@ -323,14 +321,14 @@ fn yliluoma_1_deterministic_rgb_fixture() {
         width: 8,
         height: 8,
         stride: 24,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
     let mut buffer_b = Buffer {
         data: &mut data_b,
         width: 8,
         height: 8,
         stride: 24,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
 
     yliluoma_1_in_place(&mut buffer_a, &palette).expect("yliluoma 1 should succeed");
@@ -343,7 +341,7 @@ fn yliluoma_1_deterministic_rgb_fixture() {
 fn yliluoma_2_output_is_always_palette_member() {
     let mut data = rgb_gradient_8x8();
     let palette = Palette::new(vec![
-        [0, 0, 0],
+        [0_u8, 0, 0],
         [255, 255, 255],
         [255, 0, 0],
         [0, 255, 0],
@@ -358,7 +356,7 @@ fn yliluoma_2_output_is_always_palette_member() {
         width: 8,
         height: 8,
         stride: 24,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
 
     yliluoma_2_in_place(&mut buffer, &palette).expect("yliluoma 2 should succeed");
@@ -373,7 +371,7 @@ fn yliluoma_2_output_is_always_palette_member() {
 fn yliluoma_3_output_is_always_palette_member() {
     let mut data = rgb_gradient_8x8();
     let palette = Palette::new(vec![
-        [0, 0, 0],
+        [0_u8, 0, 0],
         [255, 255, 255],
         [255, 0, 0],
         [0, 255, 0],
@@ -388,7 +386,7 @@ fn yliluoma_3_output_is_always_palette_member() {
         width: 8,
         height: 8,
         stride: 24,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
 
     yliluoma_3_in_place(&mut buffer, &palette).expect("yliluoma 3 should succeed");
@@ -407,7 +405,7 @@ fn ordered_engine_gray_uses_only_quantized_values() {
         width: 8,
         height: 8,
         stride: 8,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     custom_ordered_in_place(
@@ -431,7 +429,7 @@ fn ordered_engine_rgb_palette_output_is_palette_member() {
         104, 120, 136, 152, 168, 184, 200, 216,
     ];
     let palette = Palette::new(vec![
-        [0, 0, 0],
+        [0_u8, 0, 0],
         [255, 255, 255],
         [255, 0, 0],
         [0, 255, 0],
@@ -443,7 +441,7 @@ fn ordered_engine_rgb_palette_output_is_palette_member() {
         width: 4,
         height: 4,
         stride: 12,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
 
     custom_ordered_in_place(
@@ -475,14 +473,14 @@ fn ordered_engine_is_deterministic() {
         width: 8,
         height: 5,
         stride: 24,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
     let mut buffer_b = Buffer {
         data: &mut b,
         width: 8,
         height: 5,
         stride: 24,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
 
     custom_ordered_in_place(
@@ -518,7 +516,7 @@ fn ordered_engine_preserves_alpha_channel() {
         width: 4,
         height: 5,
         stride: 16,
-        format: PixelFormat::Rgba8,
+        format: PixelFormat::<()>::Rgba8,
     };
 
     custom_ordered_in_place(
@@ -536,6 +534,89 @@ fn ordered_engine_preserves_alpha_channel() {
 }
 
 #[test]
+fn bayer_8x8_u16_runs_and_quantizes() {
+    let mut data: Vec<u16> = (0_u32..256)
+        .map(|value| ((value * 257) % 65_536) as u16)
+        .collect();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 16,
+        height: 16,
+        stride: 16,
+        format: PixelFormat::<()>::Gray16,
+    };
+
+    bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayLevels(2)).expect("bayer 8x8 should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+}
+
+#[test]
+fn bayer_8x8_f32_runs_and_quantizes() {
+    let mut data: Vec<f32> = (0_u32..(16 * 16 * 3))
+        .map(|value| (value % 256) as f32 / 255.0)
+        .collect();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 16,
+        height: 16,
+        stride: 48,
+        format: PixelFormat::<()>::Rgb32F,
+    };
+
+    bayer_8x8_in_place(&mut buffer, QuantizeMode::RgbLevels(2)).expect("bayer 8x8 should succeed");
+
+    assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
+}
+
+#[test]
+fn ordered_engine_preserves_alpha_across_u8_u16_f32() {
+    let map = [0_u8, 2, 3, 1];
+
+    let mut rgba_u8: Vec<u8> = (0_u16..64).map(|v| (v * 3) as u8).collect();
+    let before_u8: Vec<u8> = rgba_u8.iter().skip(3).step_by(4).copied().collect();
+    let mut buffer_u8 = Buffer {
+        data: &mut rgba_u8,
+        width: 4,
+        height: 4,
+        stride: 16,
+        format: PixelFormat::<()>::Rgba8,
+    };
+    custom_ordered_in_place(&mut buffer_u8, QuantizeMode::RgbBits(2), &map, 2, 2, 48)
+        .expect("u8 ordered dithering should succeed");
+    let after_u8: Vec<u8> = rgba_u8.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_u8, after_u8);
+
+    let mut rgba_u16: Vec<u16> = (0_u32..64).map(|v| ((v * 1009) % 65_536) as u16).collect();
+    let before_u16: Vec<u16> = rgba_u16.iter().skip(3).step_by(4).copied().collect();
+    let mut buffer_u16 = Buffer {
+        data: &mut rgba_u16,
+        width: 4,
+        height: 4,
+        stride: 16,
+        format: PixelFormat::<()>::Rgba16,
+    };
+    custom_ordered_in_place(&mut buffer_u16, QuantizeMode::RgbLevels(4), &map, 2, 2, 48)
+        .expect("u16 ordered dithering should succeed");
+    let after_u16: Vec<u16> = rgba_u16.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_u16, after_u16);
+
+    let mut rgba_f32: Vec<f32> = (0_u32..64).map(|v| (v as f32) / 63.0).collect();
+    let before_f32: Vec<f32> = rgba_f32.iter().skip(3).step_by(4).copied().collect();
+    let mut buffer_f32 = Buffer {
+        data: &mut rgba_f32,
+        width: 4,
+        height: 4,
+        stride: 16,
+        format: PixelFormat::<()>::Rgba32F,
+    };
+    custom_ordered_in_place(&mut buffer_f32, QuantizeMode::RgbLevels(4), &map, 2, 2, 48)
+        .expect("f32 ordered dithering should succeed");
+    let after_f32: Vec<f32> = rgba_f32.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_f32, after_f32);
+}
+
+#[test]
 fn custom_ordered_map_tiling_is_consistent() {
     let mut data = vec![127_u8; 64];
     let mut buffer = Buffer {
@@ -543,7 +624,7 @@ fn custom_ordered_map_tiling_is_consistent() {
         width: 8,
         height: 8,
         stride: 8,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     custom_ordered_in_place(
@@ -605,14 +686,14 @@ fn bayer_8x8_parallel_matches_sequential() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
     let mut par_buffer = Buffer {
         data: &mut par,
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     bayer_8x8_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1))
@@ -635,14 +716,14 @@ fn cluster_dot_8x8_parallel_matches_sequential() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
     let mut par_buffer = Buffer {
         data: &mut par,
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     cluster_dot_8x8_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1))
@@ -666,14 +747,14 @@ fn custom_ordered_parallel_matches_sequential() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
     let mut par_buffer = Buffer {
         data: &mut par,
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     custom_ordered_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1), &map, 2, 2, 64)

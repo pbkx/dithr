@@ -1,10 +1,10 @@
 pub const BAYER_2X2: [[u8; 2]; 2] = [[0, 2], [3, 1]];
 
-pub const BAYER_2X2_FLAT: [u8; 4] = [0, 2, 3, 1];
+pub const BAYER_2X2_FLAT: [u16; 4] = [0, 2, 3, 1];
 
 pub const BAYER_4X4: [[u8; 4]; 4] = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 
-pub const BAYER_4X4_FLAT: [u8; 16] = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+pub const BAYER_4X4_FLAT: [u16; 16] = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 
 pub const BAYER_8X8: [[u8; 8]; 8] = [
     [0, 32, 8, 40, 2, 34, 10, 42],
@@ -17,7 +17,7 @@ pub const BAYER_8X8: [[u8; 8]; 8] = [
     [63, 31, 55, 23, 61, 29, 53, 21],
 ];
 
-pub const BAYER_8X8_FLAT: [u8; 64] = [
+pub const BAYER_8X8_FLAT: [u16; 64] = [
     0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60,
     28, 52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41, 51, 19, 59, 27, 49, 17, 57, 25, 15,
     47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21,
@@ -26,7 +26,7 @@ pub const BAYER_8X8_FLAT: [u8; 64] = [
 pub const CLUSTER_DOT_4X4: [[u8; 4]; 4] =
     [[12, 5, 6, 13], [4, 0, 1, 7], [11, 3, 2, 8], [15, 10, 9, 14]];
 
-pub const CLUSTER_DOT_4X4_FLAT: [u8; 16] = [12, 5, 6, 13, 4, 0, 1, 7, 11, 3, 2, 8, 15, 10, 9, 14];
+pub const CLUSTER_DOT_4X4_FLAT: [u16; 16] = [12, 5, 6, 13, 4, 0, 1, 7, 11, 3, 2, 8, 15, 10, 9, 14];
 
 pub const CLUSTER_DOT_8X8: [[u8; 8]; 8] = [
     [24, 10, 12, 26, 35, 47, 49, 37],
@@ -39,7 +39,7 @@ pub const CLUSTER_DOT_8X8: [[u8; 8]; 8] = [
     [32, 40, 54, 38, 31, 21, 19, 29],
 ];
 
-pub const CLUSTER_DOT_8X8_FLAT: [u8; 64] = [
+pub const CLUSTER_DOT_8X8_FLAT: [u16; 64] = [
     24, 10, 12, 26, 35, 47, 49, 37, 8, 0, 2, 14, 45, 59, 61, 51, 22, 6, 4, 16, 43, 57, 63, 53, 30,
     20, 18, 28, 33, 41, 55, 39, 34, 46, 48, 36, 25, 11, 13, 27, 44, 58, 60, 50, 9, 1, 3, 15, 42,
     56, 62, 52, 23, 7, 5, 17, 32, 40, 54, 38, 31, 21, 19, 29,
@@ -61,13 +61,13 @@ pub fn generate_bayer_16x16() -> [[u8; 16]; 16] {
 }
 
 #[must_use]
-pub fn generate_bayer_16x16_flat() -> [u8; 256] {
+pub fn generate_bayer_16x16_flat() -> [u16; 256] {
     let map = generate_bayer_16x16();
-    let mut flat = [0_u8; 256];
+    let mut flat = [0_u16; 256];
 
     for (y, row) in map.iter().enumerate() {
         for (x, value) in row.iter().enumerate() {
-            flat[y * 16 + x] = *value;
+            flat[y * 16 + x] = u16::from(*value);
         }
     }
 

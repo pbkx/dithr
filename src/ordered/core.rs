@@ -1,20 +1,17 @@
 use crate::{
-    math::{
-        color::luma_u8,
-        utils::{clamp_i16, clamp_u8},
-    },
+    core::{PixelLayout, Sample},
     quantize_pixel, Buffer, BufferError, Error, PixelFormat, QuantizeMode, Result,
 };
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
-pub(crate) fn ordered_dither_in_place(
-    buffer: &mut Buffer<'_>,
-    mode: QuantizeMode<'_>,
-    map: &[u8],
+pub(crate) fn ordered_dither_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+    map: &[u16],
     map_w: usize,
     map_h: usize,
-    strength: i16,
+    strength: f32,
 ) -> Result<()> {
     buffer.validate()?;
     validate_map(map, map_w, map_h)?;
@@ -24,42 +21,42 @@ pub(crate) fn ordered_dither_in_place(
     let width = buffer.width;
     let height = buffer.height;
     let format = buffer.format;
-    let bpp = buffer.format.bytes_per_pixel();
+    let channels = format.channels();
 
     for y in 0..height {
         let row = buffer.try_row_mut(y)?;
 
         for x in 0..width {
-            let threshold = ordered_threshold_for_xy(x, y, map, map_w, map_h)?;
-            let bias = threshold_bias(threshold, map_min, map_max, strength);
-            let offset = x.checked_mul(bpp).ok_or(BufferError::OutOfBounds)?;
+            let threshold = ordered_threshold_for_xy(x, y, map, map_w, map_h);
+            let bias = threshold_bias_unit(threshold, map_min, map_max, strength);
+            let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
 
             match format {
-                PixelFormat::Gray8 => {
-                    let value = apply_bias(row[offset], bias);
-                    let quantized = quantize_pixel::<u8, crate::core::Gray>(&[value], mode)?;
-                    row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
+                PixelFormat::Gray8 | PixelFormat::Gray16 => {
+                    let value = apply_bias_unit(row[offset], bias);
+                    let quantized = quantize_pixel::<S, crate::core::Gray>(&[value], mode)?;
+                    row[offset] = quantized[0];
                 }
-                PixelFormat::Rgb8 => {
+                PixelFormat::Rgb8 | PixelFormat::Rgb16 | PixelFormat::Rgb32F => {
                     let adjusted = [
-                        apply_bias(row[offset], bias),
-                        apply_bias(row[offset + 1], bias),
-                        apply_bias(row[offset + 2], bias),
+                        apply_bias_unit(row[offset], bias),
+                        apply_bias_unit(row[offset + 1], bias),
+                        apply_bias_unit(row[offset + 2], bias),
                     ];
-                    let quantized = quantize_pixel::<u8, crate::core::Rgb>(&adjusted, mode)?;
+                    let quantized = quantize_pixel::<S, crate::core::Rgb>(&adjusted, mode)?;
                     row[offset] = quantized[0];
                     row[offset + 1] = quantized[1];
                     row[offset + 2] = quantized[2];
                 }
-                PixelFormat::Rgba8 => {
+                PixelFormat::Rgba8 | PixelFormat::Rgba16 | PixelFormat::Rgba32F => {
                     let alpha = row[offset + 3];
                     let adjusted = [
-                        apply_bias(row[offset], bias),
-                        apply_bias(row[offset + 1], bias),
-                        apply_bias(row[offset + 2], bias),
+                        apply_bias_unit(row[offset], bias),
+                        apply_bias_unit(row[offset + 1], bias),
+                        apply_bias_unit(row[offset + 2], bias),
                         alpha,
                     ];
-                    let quantized = quantize_pixel::<u8, crate::core::Rgba>(&adjusted, mode)?;
+                    let quantized = quantize_pixel::<S, crate::core::Rgba>(&adjusted, mode)?;
                     row[offset] = quantized[0];
                     row[offset + 1] = quantized[1];
                     row[offset + 2] = quantized[2];
@@ -67,7 +64,7 @@ pub(crate) fn ordered_dither_in_place(
                 }
                 _ => {
                     return Err(Error::UnsupportedFormat(
-                        "ordered dithering supports Gray8, Rgb8, and Rgba8 only",
+                        "ordered dithering supports Gray, Rgb, and Rgba formats only",
                     ));
                 }
             }
@@ -78,13 +75,13 @@ pub(crate) fn ordered_dither_in_place(
 }
 
 #[cfg(feature = "rayon")]
-pub(crate) fn ordered_dither_in_place_par(
-    buffer: &mut Buffer<'_>,
-    mode: QuantizeMode<'_>,
-    map: &[u8],
+pub(crate) fn ordered_dither_in_place_par<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+    map: &[u16],
     map_w: usize,
     map_h: usize,
-    strength: i16,
+    strength: f32,
 ) -> Result<()> {
     buffer.validate()?;
     validate_map(map, map_w, map_h)?;
@@ -94,7 +91,7 @@ pub(crate) fn ordered_dither_in_place_par(
     let width = buffer.width;
     let height = buffer.height;
     let format = buffer.format;
-    let bpp = buffer.format.bytes_per_pixel();
+    let channels = format.channels();
     let stride = buffer.stride;
 
     buffer
@@ -104,36 +101,36 @@ pub(crate) fn ordered_dither_in_place_par(
         .enumerate()
         .try_for_each(|(y, row)| -> Result<()> {
             for x in 0..width {
-                let threshold = ordered_threshold_for_xy(x, y, map, map_w, map_h)?;
-                let bias = threshold_bias(threshold, map_min, map_max, strength);
-                let offset = x * bpp;
+                let threshold = ordered_threshold_for_xy(x, y, map, map_w, map_h);
+                let bias = threshold_bias_unit(threshold, map_min, map_max, strength);
+                let offset = x * channels;
 
                 match format {
-                    PixelFormat::Gray8 => {
-                        let value = apply_bias(row[offset], bias);
-                        let quantized = quantize_pixel::<u8, crate::core::Gray>(&[value], mode)?;
-                        row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
+                    PixelFormat::Gray8 | PixelFormat::Gray16 => {
+                        let value = apply_bias_unit(row[offset], bias);
+                        let quantized = quantize_pixel::<S, crate::core::Gray>(&[value], mode)?;
+                        row[offset] = quantized[0];
                     }
-                    PixelFormat::Rgb8 => {
+                    PixelFormat::Rgb8 | PixelFormat::Rgb16 | PixelFormat::Rgb32F => {
                         let adjusted = [
-                            apply_bias(row[offset], bias),
-                            apply_bias(row[offset + 1], bias),
-                            apply_bias(row[offset + 2], bias),
+                            apply_bias_unit(row[offset], bias),
+                            apply_bias_unit(row[offset + 1], bias),
+                            apply_bias_unit(row[offset + 2], bias),
                         ];
-                        let quantized = quantize_pixel::<u8, crate::core::Rgb>(&adjusted, mode)?;
+                        let quantized = quantize_pixel::<S, crate::core::Rgb>(&adjusted, mode)?;
                         row[offset] = quantized[0];
                         row[offset + 1] = quantized[1];
                         row[offset + 2] = quantized[2];
                     }
-                    PixelFormat::Rgba8 => {
+                    PixelFormat::Rgba8 | PixelFormat::Rgba16 | PixelFormat::Rgba32F => {
                         let alpha = row[offset + 3];
                         let adjusted = [
-                            apply_bias(row[offset], bias),
-                            apply_bias(row[offset + 1], bias),
-                            apply_bias(row[offset + 2], bias),
+                            apply_bias_unit(row[offset], bias),
+                            apply_bias_unit(row[offset + 1], bias),
+                            apply_bias_unit(row[offset + 2], bias),
                             alpha,
                         ];
-                        let quantized = quantize_pixel::<u8, crate::core::Rgba>(&adjusted, mode)?;
+                        let quantized = quantize_pixel::<S, crate::core::Rgba>(&adjusted, mode)?;
                         row[offset] = quantized[0];
                         row[offset + 1] = quantized[1];
                         row[offset + 2] = quantized[2];
@@ -141,7 +138,7 @@ pub(crate) fn ordered_dither_in_place_par(
                     }
                     _ => {
                         return Err(Error::UnsupportedFormat(
-                            "ordered dithering supports Gray8, Rgb8, and Rgba8 only",
+                            "ordered dithering supports Gray, Rgb, and Rgba formats only",
                         ));
                     }
                 }
@@ -155,39 +152,20 @@ pub(crate) fn ordered_dither_in_place_par(
 pub(crate) fn ordered_threshold_for_xy(
     x: usize,
     y: usize,
-    map: &[u8],
+    map: &[u16],
     map_w: usize,
     map_h: usize,
-) -> Result<u8> {
-    if map_w == 0 || map_h == 0 {
-        return Err(Error::InvalidArgument(
-            "ordered map dimensions must be positive",
-        ));
-    }
-    let Some(map_len) = map_w.checked_mul(map_h) else {
-        return Err(Error::InvalidArgument("ordered map dimensions overflow"));
-    };
-    if map.len() != map_len {
-        return Err(Error::InvalidArgument(
-            "ordered map length must match dimensions",
-        ));
-    }
+) -> u16 {
+    debug_assert!(map_w > 0);
+    debug_assert!(map_h > 0);
+    debug_assert_eq!(map.len(), map_w * map_h);
 
     let map_x = x % map_w;
     let map_y = y % map_h;
-    let Some(index) = map_y
-        .checked_mul(map_w)
-        .and_then(|row_start| row_start.checked_add(map_x))
-    else {
-        return Err(Error::InvalidArgument("ordered threshold index overflow"));
-    };
-
-    map.get(index).copied().ok_or(Error::InvalidArgument(
-        "ordered threshold index out of bounds",
-    ))
+    map[map_y * map_w + map_x]
 }
 
-fn validate_map(map: &[u8], map_w: usize, map_h: usize) -> Result<()> {
+fn validate_map(map: &[u16], map_w: usize, map_h: usize) -> Result<()> {
     if map_w == 0 || map_h == 0 {
         return Err(Error::InvalidArgument(
             "ordered map dimensions must be positive",
@@ -206,20 +184,20 @@ fn validate_map(map: &[u8], map_w: usize, map_h: usize) -> Result<()> {
     Ok(())
 }
 
-fn threshold_bias(threshold: u8, map_min: u8, map_max: u8, strength: i16) -> i16 {
-    if map_min >= map_max || strength == 0 {
-        return 0;
+fn threshold_bias_unit(threshold: u16, map_min: u16, map_max: u16, strength: f32) -> f32 {
+    if map_min >= map_max || strength == 0.0 {
+        return 0.0;
     }
 
     let min = i32::from(map_min);
     let max = i32::from(map_max);
     let centered = i32::from(threshold) * 2 - (min + max);
-    let range = max - min;
-    let scaled = centered * i32::from(strength) / range;
-
-    clamp_i16(scaled)
+    let range = (max - min) as f32;
+    let strength_steps = strength * 255.0;
+    let scaled_steps = (centered as f32 * strength_steps / range).trunc();
+    scaled_steps / 255.0
 }
 
-fn apply_bias(value: u8, bias: i16) -> u8 {
-    clamp_u8(i32::from(value) + i32::from(bias))
+fn apply_bias_unit<S: Sample>(value: S, bias: f32) -> S {
+    S::from_unit_f32((value.to_unit_f32() + bias).clamp(0.0, 1.0))
 }

@@ -16,17 +16,17 @@ fn main() -> Result<()> {
     }
 
     let palette = Palette::new(vec![
-        [0, 0, 0],
+        [0_u8, 0, 0],
         [255, 255, 255],
         [255, 64, 64],
         [64, 192, 255],
     ])?;
-    let mut buffer = Buffer::new(
+    let mut buffer: Buffer<'_, u8> = Buffer::new(
         &mut data,
         width,
         height,
         width * PixelFormat::<()>::Rgb8.bytes_per_pixel(),
-        PixelFormat::Rgb8,
+        PixelFormat::<()>::Rgb8,
     )?;
 
     yliluoma_1_in_place(&mut buffer, &palette)?;

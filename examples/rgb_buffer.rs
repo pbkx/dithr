@@ -15,12 +15,12 @@ fn main() -> Result<()> {
     }
 
     let palette = cga_palette();
-    let mut buffer = Buffer::new(
+    let mut buffer: Buffer<'_, u8> = Buffer::new(
         &mut data,
         width,
         height,
         width * PixelFormat::<()>::Rgb8.bytes_per_pixel(),
-        PixelFormat::Rgb8,
+        PixelFormat::<()>::Rgb8,
     )?;
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::Palette(&palette))?;
 

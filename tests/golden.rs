@@ -45,7 +45,7 @@ fn golden_threshold_gray_ramp_8x8() {
         width: 8,
         height: 8,
         stride: 8,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     threshold_binary_in_place(&mut buffer, QuantizeMode::GrayBits(1), 127)
@@ -62,7 +62,7 @@ fn golden_random_seed_1_gray_ramp_8x8() {
         width: 8,
         height: 8,
         stride: 8,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     random_binary_in_place(&mut buffer, QuantizeMode::GrayBits(1), 1, 64)
@@ -79,7 +79,7 @@ fn golden_bayer_2x2_gray_ramp_8x8() {
         width: 8,
         height: 8,
         stride: 8,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     bayer_2x2_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 2x2 should succeed");
@@ -95,7 +95,7 @@ fn golden_bayer_4x4_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     bayer_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 4x4 should succeed");
@@ -111,7 +111,7 @@ fn golden_bayer_8x8_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 8x8 should succeed");
@@ -127,7 +127,7 @@ fn golden_bayer_16x16_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     bayer_16x16_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -144,7 +144,7 @@ fn golden_cluster_dot_4x4_gray_ramp_8x8() {
         width: 8,
         height: 8,
         stride: 8,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     cluster_dot_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -161,7 +161,7 @@ fn golden_cluster_dot_8x8_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     cluster_dot_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -178,7 +178,7 @@ fn golden_custom_ordered_2x2_gray_ramp_8x8() {
         width: 8,
         height: 8,
         stride: 8,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
     let map = [0_u8, 2, 3, 1];
 
@@ -192,7 +192,7 @@ fn golden_custom_ordered_2x2_gray_ramp_8x8() {
 fn golden_yliluoma_1_rgb_gradient_8x8() {
     let mut data = rgb_gradient_8x8();
     let palette = Palette::new(vec![
-        [0, 0, 0],
+        [0_u8, 0, 0],
         [255, 255, 255],
         [255, 0, 0],
         [0, 255, 0],
@@ -207,7 +207,7 @@ fn golden_yliluoma_1_rgb_gradient_8x8() {
         width: 8,
         height: 8,
         stride: 24,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
 
     yliluoma_1_in_place(&mut buffer, &palette).expect("yliluoma 1 should succeed");
@@ -219,7 +219,7 @@ fn golden_yliluoma_1_rgb_gradient_8x8() {
 fn golden_yliluoma_2_rgb_gradient_8x8() {
     let mut data = rgb_gradient_8x8();
     let palette = Palette::new(vec![
-        [0, 0, 0],
+        [0_u8, 0, 0],
         [255, 255, 255],
         [255, 0, 0],
         [0, 255, 0],
@@ -234,7 +234,7 @@ fn golden_yliluoma_2_rgb_gradient_8x8() {
         width: 8,
         height: 8,
         stride: 24,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
 
     yliluoma_2_in_place(&mut buffer, &palette).expect("yliluoma 2 should succeed");
@@ -246,7 +246,7 @@ fn golden_yliluoma_2_rgb_gradient_8x8() {
 fn golden_yliluoma_3_rgb_gradient_8x8() {
     let mut data = rgb_gradient_8x8();
     let palette = Palette::new(vec![
-        [0, 0, 0],
+        [0_u8, 0, 0],
         [255, 255, 255],
         [255, 0, 0],
         [0, 255, 0],
@@ -261,7 +261,7 @@ fn golden_yliluoma_3_rgb_gradient_8x8() {
         width: 8,
         height: 8,
         stride: 24,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
 
     yliluoma_3_in_place(&mut buffer, &palette).expect("yliluoma 3 should succeed");
@@ -277,7 +277,7 @@ fn golden_floyd_steinberg_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -294,7 +294,7 @@ fn golden_false_floyd_steinberg_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     false_floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -311,7 +311,7 @@ fn golden_jarvis_judice_ninke_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     jarvis_judice_ninke_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -328,7 +328,7 @@ fn golden_stucki_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     stucki_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("stucki should succeed");
@@ -344,7 +344,7 @@ fn golden_burkes_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     burkes_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("burkes should succeed");
@@ -360,7 +360,7 @@ fn golden_sierra_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("sierra should succeed");
@@ -376,7 +376,7 @@ fn golden_two_row_sierra_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     two_row_sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -393,7 +393,7 @@ fn golden_sierra_lite_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     sierra_lite_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -410,7 +410,7 @@ fn golden_stevenson_arce_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     stevenson_arce_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -427,7 +427,7 @@ fn golden_atkinson_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     atkinson_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("atkinson should succeed");
@@ -443,7 +443,7 @@ fn golden_fan_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     fan_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("fan should succeed");
@@ -459,7 +459,7 @@ fn golden_shiau_fan_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     shiau_fan_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("shiau-fan should succeed");
@@ -475,7 +475,7 @@ fn golden_shiau_fan_2_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     shiau_fan_2_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -492,7 +492,7 @@ fn golden_ostromoukhov_gray_challenge_64x64() {
         width: 64,
         height: 64,
         stride: 64,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     ostromoukhov_in_place(&mut buffer, QuantizeMode::GrayBits(2))
@@ -509,7 +509,7 @@ fn golden_zhou_fang_gray_challenge_64x64() {
         width: 64,
         height: 64,
         stride: 64,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     zhou_fang_in_place(&mut buffer, QuantizeMode::GrayBits(2)).expect("zhou-fang should succeed");
@@ -527,14 +527,14 @@ fn golden_variable_diffusion_distinguishes_ostromoukhov_and_zhou_fang() {
         width: 64,
         height: 64,
         stride: 64,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
     let mut zhou_fang_buffer = Buffer {
         data: &mut zhou_fang_data,
         width: 64,
         height: 64,
         stride: 64,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     ostromoukhov_in_place(&mut ostromoukhov_buffer, QuantizeMode::GrayBits(2))
@@ -553,7 +553,7 @@ fn golden_gradient_based_error_diffusion_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     gradient_based_error_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -570,7 +570,7 @@ fn golden_riemersma_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     riemersma_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("riemersma should succeed");
@@ -586,7 +586,7 @@ fn golden_knuth_dot_diffusion_gray_ramp_16x16() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     knuth_dot_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -603,7 +603,7 @@ fn golden_dbs_gray_ramp_8x8() {
         width: 8,
         height: 8,
         stride: 8,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     direct_binary_search_in_place(&mut buffer, 4).expect("direct binary search should succeed");
@@ -619,7 +619,7 @@ fn golden_lattice_boltzmann_gray_ramp_8x8() {
         width: 8,
         height: 8,
         stride: 8,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     lattice_boltzmann_in_place(&mut buffer, 8).expect("lattice-boltzmann should succeed");
@@ -635,7 +635,7 @@ fn golden_electrostatic_halftoning_gray_ramp_8x8() {
         width: 8,
         height: 8,
         stride: 8,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     electrostatic_halftoning_in_place(&mut buffer, 10)

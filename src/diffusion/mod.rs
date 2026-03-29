@@ -3,7 +3,11 @@ pub(crate) mod core;
 pub mod extended;
 pub mod variable;
 
-use crate::{data::ErrorKernel, Buffer, QuantizeMode, Result};
+use crate::{
+    core::{PixelLayout, Sample},
+    data::ErrorKernel,
+    Buffer, QuantizeMode, Result,
+};
 
 pub use classic::{
     atkinson_in_place, burkes_in_place, false_floyd_steinberg_in_place, floyd_steinberg_in_place,
@@ -16,9 +20,9 @@ pub use variable::{
 };
 
 #[doc(hidden)]
-pub(crate) fn error_diffuse_in_place(
-    buffer: &mut Buffer<'_>,
-    mode: QuantizeMode<'_>,
+pub(crate) fn error_diffuse_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
     kernel: &ErrorKernel,
 ) -> Result<()> {
     core::error_diffuse_in_place(buffer, mode, kernel)

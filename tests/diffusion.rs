@@ -11,6 +11,9 @@ use dithr::{
     two_row_sierra_in_place, zhou_fang_in_place, Buffer, Error, Palette, PixelFormat, QuantizeMode,
 };
 
+type DiffusionWrapperU16 = fn(&mut Buffer<'_, u16>, QuantizeMode<'_, u16>) -> dithr::Result<()>;
+type DiffusionWrapperF32 = fn(&mut Buffer<'_, f32>, QuantizeMode<'_, f32>) -> dithr::Result<()>;
+
 #[test]
 fn diffusion_engine_gray_binary_output_for_graybits1() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
@@ -19,7 +22,7 @@ fn diffusion_engine_gray_binary_output_for_graybits1() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -36,7 +39,7 @@ fn floyd_steinberg_gray_bits1_binary_only() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -53,7 +56,7 @@ fn false_floyd_steinberg_runs() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     false_floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -70,7 +73,7 @@ fn jarvis_judice_ninke_runs() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     jarvis_judice_ninke_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -87,7 +90,7 @@ fn stucki_runs() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     stucki_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("stucki should succeed");
@@ -103,7 +106,7 @@ fn burkes_runs() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     burkes_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("burkes should succeed");
@@ -119,7 +122,7 @@ fn sierra_runs() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("sierra should succeed");
@@ -135,7 +138,7 @@ fn two_row_sierra_runs() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     two_row_sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -152,7 +155,7 @@ fn sierra_lite_runs() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     sierra_lite_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -169,7 +172,7 @@ fn stevenson_arce_runs() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     stevenson_arce_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -186,7 +189,7 @@ fn atkinson_runs() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     atkinson_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("atkinson should succeed");
@@ -202,7 +205,7 @@ fn fan_runs() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     fan_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("fan should succeed");
@@ -218,7 +221,7 @@ fn shiau_fan_runs() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     shiau_fan_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("shiau-fan should succeed");
@@ -234,7 +237,7 @@ fn shiau_fan_2_runs() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     shiau_fan_2_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -251,7 +254,7 @@ fn ostromoukhov_runs_gray() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     ostromoukhov_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -268,7 +271,7 @@ fn ostromoukhov_coeff_index_in_range() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     ostromoukhov_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -285,7 +288,7 @@ fn zhou_fang_runs_gray() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     zhou_fang_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("zhou-fang should succeed");
@@ -301,7 +304,7 @@ fn zhou_fang_modulation_in_range() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     zhou_fang_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("zhou-fang should succeed");
@@ -317,7 +320,7 @@ fn gradient_based_error_diffusion_runs() {
         width: 16,
         height: 16,
         stride: 16,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     gradient_based_error_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -334,13 +337,13 @@ fn ostromoukhov_rejects_non_gray_formats() {
         width: 4,
         height: 4,
         stride: 12,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
     let rgb_result = ostromoukhov_in_place(&mut rgb_buffer, QuantizeMode::GrayBits(1));
     assert!(matches!(
         rgb_result,
         Err(Error::UnsupportedFormat(
-            "variable diffusion algorithms support Gray8 only"
+            "variable diffusion algorithms support grayscale formats only"
         ))
     ));
 
@@ -350,13 +353,13 @@ fn ostromoukhov_rejects_non_gray_formats() {
         width: 4,
         height: 4,
         stride: 16,
-        format: PixelFormat::Rgba8,
+        format: PixelFormat::<()>::Rgba8,
     };
     let rgba_result = ostromoukhov_in_place(&mut rgba_buffer, QuantizeMode::GrayBits(1));
     assert!(matches!(
         rgba_result,
         Err(Error::UnsupportedFormat(
-            "variable diffusion algorithms support Gray8 only"
+            "variable diffusion algorithms support grayscale formats only"
         ))
     ));
 }
@@ -369,13 +372,13 @@ fn zhou_fang_rejects_non_gray_formats() {
         width: 4,
         height: 4,
         stride: 12,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
     let rgb_result = zhou_fang_in_place(&mut rgb_buffer, QuantizeMode::GrayBits(1));
     assert!(matches!(
         rgb_result,
         Err(Error::UnsupportedFormat(
-            "variable diffusion algorithms support Gray8 only"
+            "variable diffusion algorithms support grayscale formats only"
         ))
     ));
 
@@ -385,13 +388,13 @@ fn zhou_fang_rejects_non_gray_formats() {
         width: 4,
         height: 4,
         stride: 16,
-        format: PixelFormat::Rgba8,
+        format: PixelFormat::<()>::Rgba8,
     };
     let rgba_result = zhou_fang_in_place(&mut rgba_buffer, QuantizeMode::GrayBits(1));
     assert!(matches!(
         rgba_result,
         Err(Error::UnsupportedFormat(
-            "variable diffusion algorithms support Gray8 only"
+            "variable diffusion algorithms support grayscale formats only"
         ))
     ));
 }
@@ -404,14 +407,14 @@ fn gradient_based_error_diffusion_rejects_non_gray_formats() {
         width: 4,
         height: 4,
         stride: 12,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
     let rgb_result =
         gradient_based_error_diffusion_in_place(&mut rgb_buffer, QuantizeMode::GrayBits(1));
     assert!(matches!(
         rgb_result,
         Err(Error::UnsupportedFormat(
-            "variable diffusion algorithms support Gray8 only"
+            "variable diffusion algorithms support grayscale formats only"
         ))
     ));
 
@@ -421,14 +424,14 @@ fn gradient_based_error_diffusion_rejects_non_gray_formats() {
         width: 4,
         height: 4,
         stride: 16,
-        format: PixelFormat::Rgba8,
+        format: PixelFormat::<()>::Rgba8,
     };
     let rgba_result =
         gradient_based_error_diffusion_in_place(&mut rgba_buffer, QuantizeMode::GrayBits(1));
     assert!(matches!(
         rgba_result,
         Err(Error::UnsupportedFormat(
-            "variable diffusion algorithms support Gray8 only"
+            "variable diffusion algorithms support grayscale formats only"
         ))
     ));
 }
@@ -441,11 +444,11 @@ fn diffusion_engine_rgb_palette_output_is_palette_member() {
         148, 204, 108, 164, 220, 124, 180, 236,
     ];
     let palette = Palette::new(vec![
-        [0, 0, 0],
-        [255, 255, 255],
-        [255, 0, 0],
-        [0, 255, 0],
-        [0, 0, 255],
+        [0_u8, 0, 0],
+        [255_u8, 255, 255],
+        [255_u8, 0, 0],
+        [0_u8, 255, 0],
+        [0_u8, 0, 255],
     ])
     .expect("palette should be valid");
     let mut buffer = Buffer {
@@ -453,7 +456,7 @@ fn diffusion_engine_rgb_palette_output_is_palette_member() {
         width: 4,
         height: 4,
         stride: 12,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
 
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::Palette(&palette))
@@ -476,7 +479,7 @@ fn diffusion_engine_preserves_alpha() {
         width: 6,
         height: 5,
         stride: 24,
-        format: PixelFormat::Rgba8,
+        format: PixelFormat::<()>::Rgba8,
     };
 
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::RgbBits(2))
@@ -494,7 +497,7 @@ fn diffusion_engine_does_not_panic_on_1x1() {
         width: 1,
         height: 1,
         stride: 1,
-        format: PixelFormat::Gray8,
+        format: PixelFormat::<()>::Gray8,
     };
 
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
@@ -516,14 +519,14 @@ fn diffusion_engine_is_deterministic() {
         width: 8,
         height: 6,
         stride: 24,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
     let mut buffer_b = Buffer {
         data: &mut b,
         width: 8,
         height: 6,
         stride: 24,
-        format: PixelFormat::Rgb8,
+        format: PixelFormat::<()>::Rgb8,
     };
 
     floyd_steinberg_in_place(&mut buffer_a, QuantizeMode::RgbBits(3))
@@ -556,4 +559,121 @@ fn fixture_builders_are_deterministic() {
     assert_eq!(fnv1a64(&checker), fnv1a64(&checker_8x8()));
     assert_eq!(fnv1a64(&gradient), fnv1a64(&rgb_gradient_8x8()));
     assert_eq!(fnv1a64(&cube), fnv1a64(&rgb_cube_strip()));
+}
+
+#[test]
+fn diffusion_u16_every_wrapper_smoke_gray() {
+    let wrappers: [DiffusionWrapperU16; 16] = [
+        floyd_steinberg_in_place,
+        false_floyd_steinberg_in_place,
+        jarvis_judice_ninke_in_place,
+        stucki_in_place,
+        burkes_in_place,
+        sierra_in_place,
+        two_row_sierra_in_place,
+        sierra_lite_in_place,
+        stevenson_arce_in_place,
+        atkinson_in_place,
+        fan_in_place,
+        shiau_fan_in_place,
+        shiau_fan_2_in_place,
+        ostromoukhov_in_place,
+        zhou_fang_in_place,
+        gradient_based_error_diffusion_in_place,
+    ];
+
+    for wrapper in wrappers {
+        let mut data: Vec<u16> = (0_u32..256)
+            .map(|value| ((value * 257) % 65_536) as u16)
+            .collect();
+        let mut buffer = Buffer {
+            data: &mut data,
+            width: 16,
+            height: 16,
+            stride: 16,
+            format: PixelFormat::<()>::Gray16,
+        };
+
+        wrapper(&mut buffer, QuantizeMode::GrayLevels(2)).expect("u16 wrapper should succeed");
+        assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+    }
+}
+
+#[test]
+fn diffusion_f32_every_wrapper_smoke_gray() {
+    let classic_extended_wrappers: [DiffusionWrapperF32; 13] = [
+        floyd_steinberg_in_place,
+        false_floyd_steinberg_in_place,
+        jarvis_judice_ninke_in_place,
+        stucki_in_place,
+        burkes_in_place,
+        sierra_in_place,
+        two_row_sierra_in_place,
+        sierra_lite_in_place,
+        stevenson_arce_in_place,
+        atkinson_in_place,
+        fan_in_place,
+        shiau_fan_in_place,
+        shiau_fan_2_in_place,
+    ];
+
+    for wrapper in classic_extended_wrappers {
+        let mut data: Vec<f32> = (0_u32..(16 * 16 * 3))
+            .map(|value| (value % 256) as f32 / 255.0)
+            .collect();
+        let mut buffer = Buffer {
+            data: &mut data,
+            width: 16,
+            height: 16,
+            stride: 48,
+            format: PixelFormat::<()>::Rgb32F,
+        };
+
+        wrapper(&mut buffer, QuantizeMode::GrayLevels(2)).expect("f32 wrapper should succeed");
+        assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
+    }
+
+    let variable_wrappers: [DiffusionWrapperF32; 3] = [
+        ostromoukhov_in_place,
+        zhou_fang_in_place,
+        gradient_based_error_diffusion_in_place,
+    ];
+
+    for wrapper in variable_wrappers {
+        let mut data: Vec<f32> = (0_u32..(16 * 16 * 3))
+            .map(|value| (value % 256) as f32 / 255.0)
+            .collect();
+        let mut buffer = Buffer {
+            data: &mut data,
+            width: 16,
+            height: 16,
+            stride: 48,
+            format: PixelFormat::<()>::Rgb32F,
+        };
+
+        let result = wrapper(&mut buffer, QuantizeMode::GrayLevels(2));
+        assert!(matches!(
+            result,
+            Err(Error::UnsupportedFormat(
+                "variable diffusion algorithms support grayscale formats only"
+            ))
+        ));
+    }
+}
+
+#[test]
+fn ostromoukhov_coeff_index_range_test() {
+    for luma in 0_u16..=255 {
+        let index = usize::from(luma as u8);
+        assert!(index < dithr::data::OSTROMOUKHOV_COEFFS.len());
+    }
+}
+
+#[test]
+fn zhou_fang_coeff_index_range_test() {
+    let len = dithr::data::ZHOU_FANG_MODULATION.len();
+    for luma in 0_u16..=255 {
+        let index = (usize::from(luma as u8) * len) / 256;
+        assert!(index < len);
+    }
 }

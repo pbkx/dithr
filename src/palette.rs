@@ -1,9 +1,15 @@
-use crate::math::color::rgb_distance_sq;
+use crate::{core::Sample, math::color::rgb_distance_sq_unit};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Palette {
-    colors: Vec<[u8; 3]>,
+#[derive(Debug, Clone, PartialEq)]
+pub struct Palette<S: Sample = u8> {
+    colors: Vec<[S; 3]>,
 }
+
+impl<S: Sample + Eq> Eq for Palette<S> {}
+
+pub type Palette8 = Palette<u8>;
+pub type Palette16 = Palette<u16>;
+pub type Palette32F = Palette<f32>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PaletteError {
@@ -27,14 +33,14 @@ pub struct IndexedImage {
     pub indices: Vec<u8>,
     pub width: usize,
     pub height: usize,
-    pub palette: Palette,
+    pub palette: Palette8,
 }
 
-impl Palette {
+impl<S: Sample> Palette<S> {
     pub const MIN_LEN: usize = 1;
     pub const MAX_LEN: usize = 256;
 
-    pub fn new(colors: Vec<[u8; 3]>) -> Result<Self, PaletteError> {
+    pub fn new(colors: Vec<[S; 3]>) -> Result<Self, PaletteError> {
         if colors.is_empty() {
             return Err(PaletteError::Empty);
         }
@@ -46,7 +52,7 @@ impl Palette {
         Ok(Self { colors })
     }
 
-    pub(crate) fn from_colors_trusted(colors: Vec<[u8; 3]>) -> Self {
+    pub(crate) fn from_colors_trusted(colors: Vec<[S; 3]>) -> Self {
         Self { colors }
     }
 
@@ -61,22 +67,22 @@ impl Palette {
     }
 
     #[must_use]
-    pub fn as_slice(&self) -> &[[u8; 3]] {
+    pub fn as_slice(&self) -> &[[S; 3]] {
         &self.colors
     }
 
     #[must_use]
-    pub fn get(&self, idx: usize) -> Option<[u8; 3]> {
+    pub fn get(&self, idx: usize) -> Option<[S; 3]> {
         self.colors.get(idx).copied()
     }
 
     #[must_use]
-    pub fn nearest_rgb_index(&self, rgb: [u8; 3]) -> usize {
+    pub fn nearest_rgb_index(&self, rgb: [S; 3]) -> usize {
         let mut best_idx = 0_usize;
-        let mut best_dist = rgb_distance_sq(rgb, self.colors[0]);
+        let mut best_dist = rgb_distance_sq_unit(rgb, self.colors[0]);
 
         for (idx, &candidate) in self.colors.iter().enumerate().skip(1) {
-            let dist = rgb_distance_sq(rgb, candidate);
+            let dist = rgb_distance_sq_unit(rgb, candidate);
             if dist < best_dist {
                 best_dist = dist;
                 best_idx = idx;
@@ -87,18 +93,20 @@ impl Palette {
     }
 
     #[must_use]
-    pub fn nearest_rgb_color(&self, rgb: [u8; 3]) -> [u8; 3] {
+    pub fn nearest_rgb_color(&self, rgb: [S; 3]) -> [S; 3] {
         self.colors[self.nearest_rgb_index(rgb)]
     }
+}
 
+impl<S: Sample + PartialEq> Palette<S> {
     #[must_use]
-    pub fn contains(&self, rgb: [u8; 3]) -> bool {
+    pub fn contains(&self, rgb: [S; 3]) -> bool {
         self.colors.contains(&rgb)
     }
 
     #[deprecated(since = "0.1.0", note = "use nearest_rgb_index instead")]
     #[must_use]
-    pub fn nearest_rgb(&self, rgb: [u8; 3]) -> usize {
+    pub fn nearest_rgb(&self, rgb: [S; 3]) -> usize {
         self.nearest_rgb_index(rgb)
     }
 }

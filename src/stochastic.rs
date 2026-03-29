@@ -27,7 +27,7 @@ pub fn threshold_binary_in_place(
                 PixelFormat::Gray8 => {
                     let light = row[offset] > threshold;
                     let sample = if light { [255_u8] } else { [0_u8] };
-                    let quantized = quantize_pixel(PixelFormat::Gray8, &sample, mode)?;
+                    let quantized = quantize_pixel::<u8, crate::core::Gray>(&sample, mode)?;
                     row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
                 }
                 PixelFormat::Rgb8 => {
@@ -38,7 +38,7 @@ pub fn threshold_binary_in_place(
                     } else {
                         [0_u8, 0_u8, 0_u8]
                     };
-                    let quantized = quantize_pixel(PixelFormat::Rgb8, &sample, mode)?;
+                    let quantized = quantize_pixel::<u8, crate::core::Rgb>(&sample, mode)?;
                     row[offset] = quantized[0];
                     row[offset + 1] = quantized[1];
                     row[offset + 2] = quantized[2];
@@ -52,7 +52,7 @@ pub fn threshold_binary_in_place(
                     } else {
                         [0_u8, 0_u8, 0_u8, alpha]
                     };
-                    let quantized = quantize_pixel(PixelFormat::Rgba8, &sample, mode)?;
+                    let quantized = quantize_pixel::<u8, crate::core::Rgba>(&sample, mode)?;
                     row[offset] = quantized[0];
                     row[offset + 1] = quantized[1];
                     row[offset + 2] = quantized[2];
@@ -95,7 +95,7 @@ pub fn random_binary_in_place(
                 PixelFormat::Gray8 => {
                     let light = row[offset] > threshold;
                     let sample = if light { [255_u8] } else { [0_u8] };
-                    let quantized = quantize_pixel(PixelFormat::Gray8, &sample, mode)?;
+                    let quantized = quantize_pixel::<u8, crate::core::Gray>(&sample, mode)?;
                     row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
                 }
                 PixelFormat::Rgb8 => {
@@ -106,7 +106,7 @@ pub fn random_binary_in_place(
                     } else {
                         [0_u8, 0_u8, 0_u8]
                     };
-                    let quantized = quantize_pixel(PixelFormat::Rgb8, &sample, mode)?;
+                    let quantized = quantize_pixel::<u8, crate::core::Rgb>(&sample, mode)?;
                     row[offset] = quantized[0];
                     row[offset + 1] = quantized[1];
                     row[offset + 2] = quantized[2];
@@ -120,7 +120,7 @@ pub fn random_binary_in_place(
                     } else {
                         [0_u8, 0_u8, 0_u8, alpha]
                     };
-                    let quantized = quantize_pixel(PixelFormat::Rgba8, &sample, mode)?;
+                    let quantized = quantize_pixel::<u8, crate::core::Rgba>(&sample, mode)?;
                     row[offset] = quantized[0];
                     row[offset + 1] = quantized[1];
                     row[offset + 2] = quantized[2];
@@ -163,7 +163,7 @@ pub fn threshold_binary_in_place_par(
                     PixelFormat::Gray8 => {
                         let light = row[offset] > threshold;
                         let sample = if light { [255_u8] } else { [0_u8] };
-                        let quantized = quantize_pixel(PixelFormat::Gray8, &sample, mode)?;
+                        let quantized = quantize_pixel::<u8, crate::core::Gray>(&sample, mode)?;
                         row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
                     }
                     PixelFormat::Rgb8 => {
@@ -174,7 +174,7 @@ pub fn threshold_binary_in_place_par(
                         } else {
                             [0_u8, 0_u8, 0_u8]
                         };
-                        let quantized = quantize_pixel(PixelFormat::Rgb8, &sample, mode)?;
+                        let quantized = quantize_pixel::<u8, crate::core::Rgb>(&sample, mode)?;
                         row[offset] = quantized[0];
                         row[offset + 1] = quantized[1];
                         row[offset + 2] = quantized[2];
@@ -188,7 +188,7 @@ pub fn threshold_binary_in_place_par(
                         } else {
                             [0_u8, 0_u8, 0_u8, alpha]
                         };
-                        let quantized = quantize_pixel(PixelFormat::Rgba8, &sample, mode)?;
+                        let quantized = quantize_pixel::<u8, crate::core::Rgba>(&sample, mode)?;
                         row[offset] = quantized[0];
                         row[offset + 1] = quantized[1];
                         row[offset + 2] = quantized[2];
@@ -244,7 +244,7 @@ pub fn random_binary_in_place_par(
                     PixelFormat::Gray8 => {
                         let light = row[offset] > threshold;
                         let sample = if light { [255_u8] } else { [0_u8] };
-                        let quantized = quantize_pixel(PixelFormat::Gray8, &sample, mode)?;
+                        let quantized = quantize_pixel::<u8, crate::core::Gray>(&sample, mode)?;
                         row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
                     }
                     PixelFormat::Rgb8 => {
@@ -255,7 +255,7 @@ pub fn random_binary_in_place_par(
                         } else {
                             [0_u8, 0_u8, 0_u8]
                         };
-                        let quantized = quantize_pixel(PixelFormat::Rgb8, &sample, mode)?;
+                        let quantized = quantize_pixel::<u8, crate::core::Rgb>(&sample, mode)?;
                         row[offset] = quantized[0];
                         row[offset + 1] = quantized[1];
                         row[offset + 2] = quantized[2];
@@ -269,7 +269,7 @@ pub fn random_binary_in_place_par(
                         } else {
                             [0_u8, 0_u8, 0_u8, alpha]
                         };
-                        let quantized = quantize_pixel(PixelFormat::Rgba8, &sample, mode)?;
+                        let quantized = quantize_pixel::<u8, crate::core::Rgba>(&sample, mode)?;
                         row[offset] = quantized[0];
                         row[offset + 1] = quantized[1];
                         row[offset + 2] = quantized[2];

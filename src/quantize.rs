@@ -1,59 +1,119 @@
-use crate::{math::color::luma_u8, Error, Palette, PixelFormat, Result};
+use crate::{
+    core::{alpha_index, read_unit_pixel, PixelLayout, Sample},
+    math::color::luma_unit,
+    Error, Palette, Result,
+};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum QuantizeMode<'a> {
-    GrayBits(u8),
-    RgbBits(u8),
-    Palette(&'a Palette),
-    SingleColor { fg: [u8; 3], bits: u8 },
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum QuantizeMode<'a, S: Sample = u8> {
+    GrayLevels(u16),
+    RgbLevels(u16),
+    Palette(&'a Palette<S>),
+    SingleColor { fg: [S; 3], levels: u16 },
 }
 
-#[inline]
-pub fn quantize_gray_u8(value: u8, bits: u8) -> Result<u8> {
-    let bits = validate_bits(bits)?;
-    let levels = (1_u16 << bits) - 1;
-    let q = ((u32::from(value) * u32::from(levels)) + 127) / 255;
+impl<'a> QuantizeMode<'a, u8> {
+    #[allow(non_snake_case)]
+    #[must_use]
+    pub const fn GrayBits(bits: u8) -> Self {
+        Self::GrayLevels(bits_to_levels(bits))
+    }
 
-    Ok((((q * 255) + (u32::from(levels) / 2)) / u32::from(levels)) as u8)
+    #[allow(non_snake_case)]
+    #[must_use]
+    pub const fn RgbBits(bits: u8) -> Self {
+        Self::RgbLevels(bits_to_levels(bits))
+    }
 }
 
-#[inline]
-pub fn quantize_rgb_u8(rgb: [u8; 3], bits: u8) -> Result<[u8; 3]> {
+pub fn quantize_gray<S: Sample>(value: S, levels: u16) -> Result<S> {
+    validate_levels(levels)?;
+
+    let steps = f32::from(levels - 1);
+    let unit = value.to_unit_f32().clamp(0.0, 1.0);
+    let index = (unit * steps).round();
+    let quantized = (index / steps).clamp(0.0, 1.0);
+
+    Ok(S::from_unit_f32(quantized))
+}
+
+pub fn quantize_rgb<S: Sample>(rgb: [S; 3], levels: u16) -> Result<[S; 3]> {
     Ok([
-        quantize_gray_u8(rgb[0], bits)?,
-        quantize_gray_u8(rgb[1], bits)?,
-        quantize_gray_u8(rgb[2], bits)?,
+        quantize_gray(rgb[0], levels)?,
+        quantize_gray(rgb[1], levels)?,
+        quantize_gray(rgb[2], levels)?,
     ])
 }
 
-pub fn quantize_pixel(
-    format: PixelFormat,
-    pixel: &[u8],
-    mode: QuantizeMode<'_>,
-) -> Result<[u8; 4]> {
-    let (rgb, alpha) = pixel_rgb_alpha(format, pixel)?;
+pub fn quantize_pixel<S: Sample, L: PixelLayout>(
+    pixel: &[S],
+    mode: QuantizeMode<'_, S>,
+) -> Result<[S; 4]> {
+    if pixel.len() != L::CHANNELS {
+        return Err(Error::InvalidArgument(
+            "pixel slice length does not match layout",
+        ));
+    }
+
+    let rgba = read_unit_pixel::<S, L>(pixel);
+    let rgb = [rgba[0], rgba[1], rgba[2]];
 
     let out = match mode {
-        QuantizeMode::GrayBits(bits) => {
-            let g = quantize_gray_u8(luma_u8(rgb), bits)?;
-            [g, g, g, alpha]
+        QuantizeMode::GrayLevels(levels) => {
+            let g = quantize_gray(
+                S::from_unit_f32(luma_unit([
+                    S::from_unit_f32(rgb[0]),
+                    S::from_unit_f32(rgb[1]),
+                    S::from_unit_f32(rgb[2]),
+                ])),
+                levels,
+            )?
+            .to_unit_f32();
+            [
+                S::from_unit_f32(g),
+                S::from_unit_f32(g),
+                S::from_unit_f32(g),
+                S::from_unit_f32(rgba[3]),
+            ]
         }
-        QuantizeMode::RgbBits(bits) => {
-            let q = quantize_rgb_u8(rgb, bits)?;
-            [q[0], q[1], q[2], alpha]
+        QuantizeMode::RgbLevels(levels) => {
+            let q = quantize_rgb(
+                [
+                    S::from_unit_f32(rgb[0]),
+                    S::from_unit_f32(rgb[1]),
+                    S::from_unit_f32(rgb[2]),
+                ],
+                levels,
+            )?;
+            [q[0], q[1], q[2], S::from_unit_f32(rgba[3])]
         }
         QuantizeMode::Palette(palette) => {
-            let nearest = palette.nearest_rgb_index(rgb);
+            let nearest = palette.nearest_rgb_index([
+                S::from_unit_f32(rgb[0]),
+                S::from_unit_f32(rgb[1]),
+                S::from_unit_f32(rgb[2]),
+            ]);
             let q = palette.as_slice()[nearest];
-            [q[0], q[1], q[2], alpha]
+            [q[0], q[1], q[2], S::from_unit_f32(rgba[3])]
         }
-        QuantizeMode::SingleColor { fg, bits } => {
-            let g = quantize_gray_u8(luma_u8(rgb), bits)?;
+        QuantizeMode::SingleColor { fg, levels } => {
+            let g = quantize_gray(
+                S::from_unit_f32(luma_unit([
+                    S::from_unit_f32(rgb[0]),
+                    S::from_unit_f32(rgb[1]),
+                    S::from_unit_f32(rgb[2]),
+                ])),
+                levels,
+            )?
+            .to_unit_f32();
+            let fg_r = fg[0].to_unit_f32();
+            let fg_g = fg[1].to_unit_f32();
+            let fg_b = fg[2].to_unit_f32();
             [
-                scale_channel_by_gray(fg[0], g),
-                scale_channel_by_gray(fg[1], g),
-                scale_channel_by_gray(fg[2], g),
-                alpha,
+                S::from_unit_f32(fg_r * g),
+                S::from_unit_f32(fg_g * g),
+                S::from_unit_f32(fg_b * g),
+                S::from_unit_f32(rgba[3]),
             ]
         }
     };
@@ -61,65 +121,68 @@ pub fn quantize_pixel(
     Ok(out)
 }
 
-#[inline]
-pub fn quantize_error(original: &[u8], quantized: &[u8]) -> Result<[i16; 4]> {
-    let len = original.len();
-    if len != quantized.len() {
+pub fn quantize_error<S: Sample, L: PixelLayout>(
+    original: &[S],
+    quantized: &[S],
+) -> Result<[f32; 4]> {
+    if original.len() != quantized.len() {
         return Err(Error::InvalidArgument(
             "original and quantized pixel lengths must match",
         ));
     }
-    if len == 0 || len > 4 {
-        return Err(Error::InvalidArgument("pixel length must be in 1..=4"));
+    if original.len() != L::CHANNELS {
+        return Err(Error::InvalidArgument(
+            "pixel slice length does not match layout",
+        ));
     }
 
-    let mut out = [0_i16; 4];
-    for idx in 0..len {
-        out[idx] = i16::from(original[idx]) - i16::from(quantized[idx]);
+    let mut out = [0.0_f32; 4];
+    for (idx, (a, b)) in original.iter().zip(quantized.iter()).enumerate() {
+        out[idx] = a.to_unit_f32() - b.to_unit_f32();
+    }
+    if alpha_index::<L>().is_none() {
+        out[3] = 0.0;
     }
 
     Ok(out)
 }
 
 #[inline]
-fn validate_bits(bits: u8) -> Result<u8> {
-    if (1..=8).contains(&bits) {
-        Ok(bits)
-    } else {
-        Err(Error::InvalidArgument("quantization bits must be in 1..=8"))
-    }
+pub fn quantize_gray_u8(value: u8, bits: u8) -> Result<u8> {
+    let levels = levels_from_bits_u8(bits)?;
+    quantize_gray(value, levels)
 }
 
-#[must_use]
-fn expected_pixel_len(format: PixelFormat) -> usize {
-    format.bytes_per_pixel()
-}
-
-fn pixel_rgb_alpha(format: PixelFormat, pixel: &[u8]) -> Result<([u8; 3], u8)> {
-    let expected = expected_pixel_len(format);
-    if pixel.len() != expected {
-        return Err(Error::InvalidArgument(
-            "pixel slice length does not match format",
-        ));
-    }
-
-    match format {
-        PixelFormat::Gray8 => {
-            let g = pixel[0];
-            Ok(([g, g, g], 255))
-        }
-        PixelFormat::Rgb8 => Ok(([pixel[0], pixel[1], pixel[2]], 255)),
-        PixelFormat::Rgba8 => Ok(([pixel[0], pixel[1], pixel[2]], pixel[3])),
-        _ => Err(Error::UnsupportedFormat(
-            "quantize helpers support Gray8, Rgb8, and Rgba8 pixel formats only",
-        )),
-    }
-}
-
-#[must_use]
 #[inline]
-fn scale_channel_by_gray(channel: u8, gray: u8) -> u8 {
-    let scaled = (u32::from(channel) * u32::from(gray)) + 127;
+pub fn quantize_rgb_u8(rgb: [u8; 3], bits: u8) -> Result<[u8; 3]> {
+    let levels = levels_from_bits_u8(bits)?;
+    quantize_rgb(rgb, levels)
+}
 
-    (scaled / 255) as u8
+fn validate_levels(levels: u16) -> Result<()> {
+    if levels >= 2 {
+        Ok(())
+    } else {
+        Err(Error::InvalidArgument(
+            "quantization levels must be in 2..=65535",
+        ))
+    }
+}
+
+fn levels_from_bits_u8(bits: u8) -> Result<u16> {
+    if !(1..=8).contains(&bits) {
+        return Err(Error::InvalidArgument("quantization bits must be in 1..=8"));
+    }
+
+    Ok(1_u16 << bits)
+}
+
+const fn bits_to_levels(bits: u8) -> u16 {
+    if bits == 0 {
+        0
+    } else if bits >= 16 {
+        u16::MAX
+    } else {
+        1_u16 << bits
+    }
 }

@@ -48,9 +48,10 @@ pub use ordered::{
     bayer_8x8_in_place_par, cluster_dot_4x4_in_place_par, cluster_dot_8x8_in_place_par,
     custom_ordered_in_place_par,
 };
-pub use palette::{IndexedImage, Palette, PaletteError};
+pub use palette::{IndexedImage, Palette, Palette16, Palette32F, Palette8, PaletteError};
 pub use quantize::{
-    quantize_error, quantize_gray_u8, quantize_pixel, quantize_rgb_u8, QuantizeMode,
+    quantize_error, quantize_gray, quantize_gray_u8, quantize_pixel, quantize_rgb, quantize_rgb_u8,
+    QuantizeMode,
 };
 pub use riemersma::riemersma_in_place;
 pub use stochastic::{

@@ -262,7 +262,8 @@ fn pixel_format_metadata_matches_expected() {
 
 #[test]
 fn palette_accepts_single_color() {
-    let palette = Palette::new(vec![[10, 20, 30]]).expect("single color palette should be valid");
+    let palette =
+        Palette::new(vec![[10_u8, 20, 30]]).expect("single color palette should be valid");
 
     assert_eq!(palette.len(), 1);
     assert!(!palette.is_empty());
@@ -280,19 +281,19 @@ fn palette_accepts_256_colors() {
 
 #[test]
 fn palette_rejects_empty() {
-    assert_eq!(Palette::new(vec![]), Err(PaletteError::Empty));
+    assert_eq!(Palette::<u8>::new(vec![]), Err(PaletteError::Empty));
 }
 
 #[test]
 fn palette_rejects_257_colors() {
-    let colors = vec![[0, 0, 0]; 257];
+    let colors = vec![[0_u8, 0, 0]; 257];
 
     assert_eq!(Palette::new(colors), Err(PaletteError::TooLarge));
 }
 
 #[test]
 fn palette_nearest_rgb_index_returns_exact_index_for_member() {
-    let palette = Palette::new(vec![[0, 0, 0], [10, 20, 30], [255, 255, 255]])
+    let palette = Palette::new(vec![[0_u8, 0, 0], [10, 20, 30], [255, 255, 255]])
         .expect("palette should be valid");
 
     assert_eq!(palette.nearest_rgb_index([10, 20, 30]), 1);
@@ -300,7 +301,7 @@ fn palette_nearest_rgb_index_returns_exact_index_for_member() {
 
 #[test]
 fn palette_nearest_rgb_color_returns_palette_member() {
-    let palette = Palette::new(vec![[0, 0, 0], [10, 20, 30], [255, 255, 255]])
+    let palette = Palette::new(vec![[0_u8, 0, 0], [10, 20, 30], [255, 255, 255]])
         .expect("palette should be valid");
 
     let nearest = palette.nearest_rgb_color([11, 22, 29]);
@@ -309,7 +310,7 @@ fn palette_nearest_rgb_color_returns_palette_member() {
 
 #[test]
 fn palette_contains_true_for_member() {
-    let palette = Palette::new(vec![[0, 0, 0], [10, 20, 30], [255, 255, 255]])
+    let palette = Palette::new(vec![[0_u8, 0, 0], [10, 20, 30], [255, 255, 255]])
         .expect("palette should be valid");
 
     assert!(palette.contains([10, 20, 30]));
@@ -317,7 +318,8 @@ fn palette_contains_true_for_member() {
 
 #[test]
 fn indexed_image_stores_dimensions_and_palette() {
-    let palette = Palette::new(vec![[0, 0, 0], [255, 255, 255]]).expect("palette should be valid");
+    let palette =
+        Palette::new(vec![[0_u8, 0, 0], [255, 255, 255]]).expect("palette should be valid");
     let image = IndexedImage {
         indices: vec![0, 1, 1, 0],
         width: 2,
@@ -385,15 +387,66 @@ fn quantize_rgb_rejects_invalid_bits() {
 }
 
 #[test]
+fn quantize_gray_u16_binary_only() {
+    for value in [0_u16, 1, 12_345, 32_767, 65_534, 65_535] {
+        let quantized = dithr::quantize_gray(value, 2).expect("valid levels");
+        assert!(quantized == 0 || quantized == 65_535);
+    }
+}
+
+#[test]
+fn quantize_rgb_u16_binary_only() {
+    let quantized = dithr::quantize_rgb([1_u16, 32_767, 65_535], 2).expect("valid levels");
+    for channel in quantized {
+        assert!(channel == 0 || channel == 65_535);
+    }
+}
+
+#[test]
+fn quantize_gray_f32_identity_high_levels() {
+    let values = [0.0_f32, 0.1, 0.5, 0.9, 1.0];
+    for value in values {
+        let quantized = dithr::quantize_gray(value, 65_535).expect("valid levels");
+        assert!((quantized - value).abs() < 2e-5);
+    }
+}
+
+#[test]
+fn palette_u16_exact_member_roundtrip() {
+    let palette = dithr::Palette::<u16>::new(vec![
+        [0, 0, 0],
+        [10_000, 20_000, 30_000],
+        [65_535, 65_535, 65_535],
+    ])
+    .expect("palette should be valid");
+    assert_eq!(palette.nearest_rgb_index([10_000, 20_000, 30_000]), 1);
+}
+
+#[test]
+fn palette_f32_exact_member_roundtrip() {
+    let palette =
+        dithr::Palette::<f32>::new(vec![[0.0, 0.0, 0.0], [0.25, 0.5, 0.75], [1.0, 1.0, 1.0]])
+            .expect("palette should be valid");
+    assert_eq!(palette.nearest_rgb_index([0.25, 0.5, 0.75]), 1);
+}
+
+#[test]
+fn quantize_error_returns_unit_space_difference() {
+    let error = quantize_error::<u16, dithr::core::Rgb>(&[0, 32_768, 65_535], &[65_535, 32_768, 0])
+        .expect("quantize error should succeed");
+    assert!((error[0] + 1.0).abs() < 1e-6);
+    assert!((error[1] - 0.0).abs() < 1e-6);
+    assert!((error[2] - 1.0).abs() < 1e-6);
+    assert!((error[3] - 0.0).abs() < 1e-6);
+}
+
+#[test]
 fn quantize_palette_output_is_palette_member() {
     let palette =
         Palette::new(vec![[0, 0, 0], [120, 120, 120], [255, 255, 255]]).expect("valid palette");
-    let quantized = quantize_pixel(
-        PixelFormat::Rgb8,
-        &[100, 110, 120],
-        QuantizeMode::Palette(&palette),
-    )
-    .expect("palette quantization should succeed");
+    let quantized =
+        quantize_pixel::<u8, dithr::core::Rgb>(&[100, 110, 120], QuantizeMode::Palette(&palette))
+            .expect("palette quantization should succeed");
     let rgb = [quantized[0], quantized[1], quantized[2]];
 
     assert!(palette.as_slice().contains(&rgb));
@@ -402,11 +455,11 @@ fn quantize_palette_output_is_palette_member() {
 #[test]
 fn quantize_single_color_preserves_intermediate_levels() {
     let fg = [12, 180, 90];
-    let mode = QuantizeMode::SingleColor { fg, bits: 3 };
+    let mode = QuantizeMode::SingleColor { fg, levels: 8 };
     let mut saw_mid = false;
 
     for value in 0_u16..=255 {
-        let quantized = quantize_pixel(PixelFormat::Gray8, &[value as u8], mode);
+        let quantized = quantize_pixel::<u8, dithr::core::Gray>(&[value as u8], mode);
         let quantized = quantized.expect("single-color quantization should succeed");
         let rgb = [quantized[0], quantized[1], quantized[2]];
         assert!(rgb[0] <= fg[0]);
@@ -419,12 +472,12 @@ fn quantize_single_color_preserves_intermediate_levels() {
     }
 
     assert_eq!(
-        quantize_pixel(PixelFormat::Gray8, &[0], mode)
+        quantize_pixel::<u8, dithr::core::Gray>(&[0], mode)
             .expect("single-color quantization should succeed"),
         [0, 0, 0, 255]
     );
     assert_eq!(
-        quantize_pixel(PixelFormat::Gray8, &[255], mode)
+        quantize_pixel::<u8, dithr::core::Gray>(&[255], mode)
             .expect("single-color quantization should succeed"),
         [fg[0], fg[1], fg[2], 255]
     );
@@ -433,26 +486,29 @@ fn quantize_single_color_preserves_intermediate_levels() {
 
 #[test]
 fn quantize_error_sign_and_magnitude_correct() {
-    let error = quantize_error(&[10, 200, 50, 255], &[20, 180, 60, 200])
+    let error = quantize_error::<u8, dithr::core::Rgba>(&[10, 200, 50, 255], &[20, 180, 60, 200])
         .expect("quantize error should succeed");
 
-    assert_eq!(error, [-10, 20, -10, 55]);
+    assert!((error[0] + 10.0 / 255.0).abs() < 1e-6);
+    assert!((error[1] - 20.0 / 255.0).abs() < 1e-6);
+    assert!((error[2] + 10.0 / 255.0).abs() < 1e-6);
+    assert!((error[3] - 55.0 / 255.0).abs() < 1e-6);
 }
 
 #[test]
 fn quantize_pixel_rejects_short_slice_for_format() {
-    let result = quantize_pixel(PixelFormat::Rgb8, &[10, 20], QuantizeMode::RgbBits(2));
+    let result = quantize_pixel::<u8, dithr::core::Rgb>(&[10, 20], QuantizeMode::RgbBits(2));
     assert_eq!(
         result,
         Err(Error::InvalidArgument(
-            "pixel slice length does not match format"
+            "pixel slice length does not match layout"
         ))
     );
 }
 
 #[test]
 fn quantize_error_rejects_mismatched_lengths() {
-    let result = quantize_error(&[10, 20, 30], &[10, 20]);
+    let result = quantize_error::<u8, dithr::core::Rgb>(&[10, 20, 30], &[10, 20]);
     assert_eq!(
         result,
         Err(Error::InvalidArgument(
@@ -463,10 +519,12 @@ fn quantize_error_rejects_mismatched_lengths() {
 
 #[test]
 fn quantize_error_rejects_empty_slice() {
-    let result = quantize_error(&[], &[]);
+    let result = quantize_error::<u8, dithr::core::Gray>(&[], &[]);
     assert_eq!(
         result,
-        Err(Error::InvalidArgument("pixel length must be in 1..=4"))
+        Err(Error::InvalidArgument(
+            "pixel slice length does not match layout"
+        ))
     );
 }
 

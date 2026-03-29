@@ -67,7 +67,7 @@ fn diffuse_gradient_gray(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Res
             let idx = y * width + x;
             let original = *value;
             let adjusted = clamp_u8(i32::from(original) + errors[idx]);
-            let quantized = quantize_pixel(PixelFormat::Gray8, &[adjusted], mode)?;
+            let quantized = quantize_pixel::<u8, crate::core::Gray>(&[adjusted], mode)?;
             let quantized_gray = luma_u8([quantized[0], quantized[1], quantized[2]]);
             *value = quantized_gray;
 
@@ -147,7 +147,7 @@ fn diffuse_variable_gray(
                 } else {
                     adjusted
                 };
-                let quantized = quantize_pixel(PixelFormat::Gray8, &[thresholded], mode)?;
+                let quantized = quantize_pixel::<u8, crate::core::Gray>(&[thresholded], mode)?;
                 let quantized_gray = luma_u8([quantized[0], quantized[1], quantized[2]]);
                 row[x] = quantized_gray;
 
@@ -199,7 +199,7 @@ fn diffuse_variable_gray(
                 } else {
                     adjusted
                 };
-                let quantized = quantize_pixel(PixelFormat::Gray8, &[thresholded], mode)?;
+                let quantized = quantize_pixel::<u8, crate::core::Gray>(&[thresholded], mode)?;
                 let quantized_gray = luma_u8([quantized[0], quantized[1], quantized[2]]);
                 row[x] = quantized_gray;
 

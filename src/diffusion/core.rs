@@ -88,7 +88,7 @@ pub(crate) fn diffuse_gray_row_major(
             for tap in kernel.taps {
                 let nx = x as isize + isize::from(tap.dx);
                 let ny = y as isize + isize::from(tap.dy);
-                let distributed = mul_div_i32(err, i32::from(tap.weight_num), denominator);
+                let distributed = mul_div_i32(err, i32::from(tap.weight_num), denominator)?;
                 add_error_to_pixel(
                     &mut errors,
                     width,
@@ -162,9 +162,9 @@ pub(crate) fn diffuse_rgb_row_major(
                 let nx = x as isize + isize::from(tap.dx);
                 let ny = y as isize + isize::from(tap.dy);
                 let distributed = [
-                    mul_div_i32(err[0], i32::from(tap.weight_num), denominator),
-                    mul_div_i32(err[1], i32::from(tap.weight_num), denominator),
-                    mul_div_i32(err[2], i32::from(tap.weight_num), denominator),
+                    mul_div_i32(err[0], i32::from(tap.weight_num), denominator)?,
+                    mul_div_i32(err[1], i32::from(tap.weight_num), denominator)?,
+                    mul_div_i32(err[2], i32::from(tap.weight_num), denominator)?,
                 ];
                 add_error_to_pixel(
                     &mut errors,

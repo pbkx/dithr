@@ -75,10 +75,10 @@ fn diffuse_gradient_gray(buffer: &mut Buffer<'_>, mode: QuantizeMode<'_>) -> Res
             let scale_num = 8 + ((255 - i32::from(gradient)) * 8) / 255;
             let err = i32::from(adjusted) - i32::from(quantized_gray);
 
-            let right = mul_div_i32(err, 7 * scale_num, 16 * 16);
-            let down_left = mul_div_i32(err, 3 * scale_num, 16 * 16);
-            let down = mul_div_i32(err, 5 * scale_num, 16 * 16);
-            let down_right = mul_div_i32(err, scale_num, 16 * 16);
+            let right = mul_div_i32(err, 7 * scale_num, 16 * 16)?;
+            let down_left = mul_div_i32(err, 3 * scale_num, 16 * 16)?;
+            let down = mul_div_i32(err, 5 * scale_num, 16 * 16)?;
+            let down_right = mul_div_i32(err, scale_num, 16 * 16)?;
 
             add_error_to_pixel(
                 &mut errors,
@@ -154,9 +154,9 @@ fn diffuse_variable_gray(
                 let err = i32::from(adjusted) - i32::from(quantized_gray);
                 let coeff = coefficient_for_luma(adjusted);
                 let den = i32::from(coeff.3);
-                let forward = mul_div_i32(err, i32::from(coeff.0), den);
-                let down_diag = mul_div_i32(err, i32::from(coeff.1), den);
-                let down = mul_div_i32(err, i32::from(coeff.2), den);
+                let forward = mul_div_i32(err, i32::from(coeff.0), den)?;
+                let down_diag = mul_div_i32(err, i32::from(coeff.1), den)?;
+                let down = mul_div_i32(err, i32::from(coeff.2), den)?;
                 let xi = x as isize;
                 let yi = y as isize;
 
@@ -206,9 +206,9 @@ fn diffuse_variable_gray(
                 let err = i32::from(adjusted) - i32::from(quantized_gray);
                 let coeff = coefficient_for_luma(adjusted);
                 let den = i32::from(coeff.3);
-                let forward = mul_div_i32(err, i32::from(coeff.0), den);
-                let down_diag = mul_div_i32(err, i32::from(coeff.1), den);
-                let down = mul_div_i32(err, i32::from(coeff.2), den);
+                let forward = mul_div_i32(err, i32::from(coeff.0), den)?;
+                let down_diag = mul_div_i32(err, i32::from(coeff.1), den)?;
+                let down = mul_div_i32(err, i32::from(coeff.2), den)?;
                 let xi = x as isize;
                 let yi = y as isize;
 

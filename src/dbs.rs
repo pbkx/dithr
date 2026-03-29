@@ -155,7 +155,7 @@ pub fn lattice_boltzmann_in_place(buffer: &mut Buffer<'_>, max_steps: usize) -> 
     for y in 0..height {
         let row = buffer.try_row(y)?;
         for &value in row.iter().take(width) {
-            target.push(mul_div_i32(i32::from(value), LBM_SCALE, 255));
+            target.push(mul_div_i32(i32::from(value), LBM_SCALE, 255)?);
         }
     }
 
@@ -165,20 +165,21 @@ pub fn lattice_boltzmann_in_place(buffer: &mut Buffer<'_>, max_steps: usize) -> 
 
     for i in 0..pixel_count {
         for d in 0..9 {
-            distributions[i][d] = mul_div_i32(target[i], LBM_WEIGHTS[d], LBM_SCALE);
+            distributions[i][d] = mul_div_i32(target[i], LBM_WEIGHTS[d], LBM_SCALE)?;
         }
     }
 
     for _ in 0..max_steps {
         for idx in 0..pixel_count {
             let rho = distributions[idx].iter().sum::<i32>();
-            let rho_for_eq = rho + mul_div_i32(target[idx] - rho, LBM_FORCING_NUM, LBM_FORCING_DEN);
+            let rho_for_eq =
+                rho + mul_div_i32(target[idx] - rho, LBM_FORCING_NUM, LBM_FORCING_DEN)?;
 
             for d in 0..9 {
-                let feq = mul_div_i32(rho_for_eq, LBM_WEIGHTS[d], LBM_SCALE);
+                let feq = mul_div_i32(rho_for_eq, LBM_WEIGHTS[d], LBM_SCALE)?;
                 let delta = feq - distributions[idx][d];
                 post_collision[idx][d] =
-                    distributions[idx][d] + mul_div_i32(delta, LBM_OMEGA_NUM, LBM_OMEGA_DEN);
+                    distributions[idx][d] + mul_div_i32(delta, LBM_OMEGA_NUM, LBM_OMEGA_DEN)?;
             }
         }
 

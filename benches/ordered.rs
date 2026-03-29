@@ -3,8 +3,9 @@ mod common;
 #[cfg(feature = "rayon")]
 use common::assert_gray_seq_par_equal;
 use common::{
-    bench_gray_case, bench_rgb_case, gray_ramp, mode_gray_1, mode_palette_cga, mode_palette_gray4,
-    rgb_gradient, set_gray_throughput, set_rgb_throughput, touch_common, CUSTOM_2X2_MAP,
+    bench_gray_case, bench_gray_case_u16, bench_rgb_case, gray_ramp, gray_ramp_u16, mode_gray_1,
+    mode_gray_levels2_u16, mode_palette_cga, mode_palette_gray4, rgb_gradient, set_gray_throughput,
+    set_rgb_throughput, touch_common, CUSTOM_2X2_MAP,
 };
 use criterion::{criterion_group, criterion_main, Criterion};
 use dithr::{
@@ -84,6 +85,23 @@ fn bench_ordered(c: &mut Criterion) {
         width,
         height,
         |buffer| custom_ordered_in_place(buffer, mode_gray_1(), &CUSTOM_2X2_MAP, 2, 2, 64),
+    );
+    group.finish();
+
+    let width = 512;
+    let height = 512;
+    let fixture_u16 = gray_ramp_u16(width, height);
+
+    let mut group = c.benchmark_group("ordered_gray_u16_512");
+    group.sample_size(16);
+    set_gray_throughput(&mut group, width, height);
+    bench_gray_case_u16(
+        &mut group,
+        "bayer_8x8_gray_u16_levels2_512",
+        &fixture_u16,
+        width,
+        height,
+        |buffer| bayer_8x8_in_place(buffer, mode_gray_levels2_u16()),
     );
     group.finish();
 

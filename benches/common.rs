@@ -2,8 +2,8 @@ use std::sync::OnceLock;
 
 use criterion::{black_box, measurement::WallTime, BatchSize, BenchmarkGroup, Throughput};
 use dithr::{
-    cga_palette, grayscale_16, grayscale_2, grayscale_4, Buffer, Palette, PixelFormat,
-    QuantizeMode, Result as DithrResult,
+    cga_palette, grayscale_16, grayscale_2, grayscale_4, Buffer, GrayBuffer16, Palette,
+    PixelFormat, QuantizeMode, Result as DithrResult,
 };
 
 pub const CUSTOM_2X2_MAP: [u8; 4] = [0, 2, 3, 1];
@@ -70,14 +70,17 @@ pub fn coverage_count() -> usize {
 
 pub fn touch_common() {
     let _ = gray_ramp(2, 2);
+    let _ = gray_ramp_u16(2, 2);
     let _ = gray_checker(2, 2, 1);
     let _ = gray_noise(2, 2, 1);
     let _ = rgb_gradient(2, 2);
     let _ = rgb_noise(2, 2, 1);
 
     let mut gray = vec![0_u8; 4];
+    let mut gray16 = vec![0_u16; 4];
     let mut rgb = vec![0_u8; 12];
     let _ = gray_buffer(&mut gray, 2, 2);
+    let _ = gray_buffer_u16(&mut gray16, 2, 2);
     let _ = rgb_buffer(&mut rgb, 2, 2);
 
     let _ = palette_bw();
@@ -185,6 +188,20 @@ pub fn gray_ramp(width: usize, height: usize) -> Vec<u8> {
         .collect()
 }
 
+pub fn gray_ramp_u16(width: usize, height: usize) -> Vec<u16> {
+    let len = width.saturating_mul(height);
+    if len == 0 {
+        return Vec::new();
+    }
+    if len == 1 {
+        return vec![0];
+    }
+
+    (0..len)
+        .map(|index| ((index * 65_535) / (len - 1)) as u16)
+        .collect()
+}
+
 pub fn gray_checker(width: usize, height: usize, block: usize) -> Vec<u8> {
     let block = block.max(1);
     let mut out = vec![0_u8; width.saturating_mul(height)];
@@ -248,6 +265,16 @@ pub fn gray_buffer<'a>(data: &'a mut [u8], width: usize, height: usize) -> Buffe
     }
 }
 
+pub fn gray_buffer_u16<'a>(data: &'a mut [u16], width: usize, height: usize) -> GrayBuffer16<'a> {
+    Buffer {
+        data,
+        width,
+        height,
+        stride: width,
+        format: PixelFormat::Gray16,
+    }
+}
+
 pub fn rgb_buffer<'a>(data: &'a mut [u8], width: usize, height: usize) -> Buffer<'a> {
     Buffer {
         data,
@@ -282,6 +309,11 @@ pub fn mode_gray_2() -> QuantizeMode<'static> {
     QuantizeMode::GrayBits(2)
 }
 
+#[allow(dead_code)]
+pub fn mode_gray_levels2_u16() -> QuantizeMode<'static, u16> {
+    QuantizeMode::GrayLevels(2)
+}
+
 pub fn mode_rgb_bits3() -> QuantizeMode<'static> {
     QuantizeMode::RgbBits(3)
 }
@@ -311,6 +343,30 @@ fn palette_gray4_ref() -> &'static Palette {
 fn palette_cga_ref() -> &'static Palette {
     static PALETTE: OnceLock<Palette> = OnceLock::new();
     PALETTE.get_or_init(palette_cga)
+}
+
+#[allow(dead_code)]
+pub fn bench_gray_case_u16<F>(
+    group: &mut BenchmarkGroup<'_, WallTime>,
+    name: &str,
+    fixture: &[u16],
+    width: usize,
+    height: usize,
+    mut run: F,
+) where
+    F: FnMut(&mut GrayBuffer16<'_>) -> DithrResult<()>,
+{
+    group.bench_function(name, |b| {
+        b.iter_batched(
+            || fixture.to_vec(),
+            |mut data| {
+                let mut buffer = gray_buffer_u16(&mut data, width, height);
+                run(&mut buffer).expect("benchmark case failed");
+                black_box(data);
+            },
+            BatchSize::SmallInput,
+        );
+    });
 }
 
 struct XorShift64 {

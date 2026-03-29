@@ -1,7 +1,8 @@
 mod common;
 
 use common::{
-    checker_8x8, fnv1a64, gray_ramp_16x16, gray_ramp_8x8, rgb_cube_strip, rgb_gradient_8x8,
+    checker_8x8, fnv1a64, gray_ramp_16x16, gray_ramp_16x16_u8, gray_ramp_8x8, gray_ramp_8x8_u16,
+    rgb_cube_strip, rgb_gradient_8x8, rgb_gradient_8x8_f32, rgb_gradient_8x8_u16,
 };
 use dithr::{
     bayer_8x8_rgb16_in_place, cga_palette, floyd_steinberg_in_place, gray_u16, gray_u8,
@@ -713,18 +714,30 @@ fn random_binary_parallel_matches_sequential_fixed_seed() {
 fn fixture_builders_are_deterministic() {
     let gray8 = gray_ramp_8x8();
     let gray16 = gray_ramp_16x16();
+    let gray8_u16 = gray_ramp_8x8_u16();
     let checker = checker_8x8();
     let gradient = rgb_gradient_8x8();
+    let gradient_u16 = rgb_gradient_8x8_u16();
+    let gradient_f32 = rgb_gradient_8x8_f32();
     let cube = rgb_cube_strip();
 
     assert_eq!(gray8.len(), 64);
     assert_eq!(gray16.len(), 256);
+    assert_eq!(gray16, gray_ramp_16x16_u8());
+    assert_eq!(gray8_u16.len(), 64);
     assert_eq!(checker.len(), 64);
     assert_eq!(gradient.len(), 8 * 8 * 3);
+    assert_eq!(gradient_u16.len(), 8 * 8 * 3);
+    assert_eq!(gradient_f32.len(), 8 * 8 * 3);
     assert_eq!(cube.len(), 27 * 3);
 
     assert_eq!(checker.iter().filter(|&&value| value == 0).count(), 32);
     assert_eq!(checker.iter().filter(|&&value| value == 255).count(), 32);
+    assert_eq!(gray8_u16.first().copied(), Some(0));
+    assert_eq!(gray8_u16.last().copied(), Some(65_535));
+    assert_eq!(gradient_u16.iter().copied().min(), Some(0));
+    assert_eq!(gradient_u16.iter().copied().max(), Some(65_535));
+    assert!(gradient_f32.iter().all(|&v| (0.0..=1.0).contains(&v)));
 
     assert_eq!(fnv1a64(&gray8), fnv1a64(&gray_ramp_8x8()));
     assert_eq!(fnv1a64(&gray16), fnv1a64(&gray_ramp_16x16()));

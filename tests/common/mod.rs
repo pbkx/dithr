@@ -1,9 +1,17 @@
-pub fn gray_ramp_8x8() -> Vec<u8> {
+#![allow(dead_code)]
+
+pub fn gray_ramp_8x8_u8() -> Vec<u8> {
     (0_u16..64).map(|value| (value * 4) as u8).collect()
 }
 
-pub fn gray_ramp_16x16() -> Vec<u8> {
+pub fn gray_ramp_16x16_u8() -> Vec<u8> {
     (0_u16..256).map(|value| value as u8).collect()
+}
+
+pub fn gray_ramp_8x8_u16() -> Vec<u16> {
+    (0_u32..64)
+        .map(|value| ((value * 65_535) / 63) as u16)
+        .collect()
 }
 
 pub fn checker_8x8() -> Vec<u8> {
@@ -18,7 +26,7 @@ pub fn checker_8x8() -> Vec<u8> {
     out
 }
 
-pub fn rgb_gradient_8x8() -> Vec<u8> {
+pub fn rgb_gradient_8x8_u8() -> Vec<u8> {
     let mut out = Vec::with_capacity(8 * 8 * 3);
 
     for y in 0..8_u8 {
@@ -30,6 +38,46 @@ pub fn rgb_gradient_8x8() -> Vec<u8> {
     }
 
     out
+}
+
+pub fn rgb_gradient_8x8_u16() -> Vec<u16> {
+    let mut out = Vec::with_capacity(8 * 8 * 3);
+
+    for y in 0_u16..8 {
+        for x in 0_u16..8 {
+            out.push((u32::from(x) * 65_535 / 7) as u16);
+            out.push((u32::from(y) * 65_535 / 7) as u16);
+            out.push((u32::from(x ^ y) * 65_535 / 7) as u16);
+        }
+    }
+
+    out
+}
+
+pub fn rgb_gradient_8x8_f32() -> Vec<f32> {
+    let mut out = Vec::with_capacity(8 * 8 * 3);
+
+    for y in 0_u16..8 {
+        for x in 0_u16..8 {
+            out.push(f32::from(x) / 7.0);
+            out.push(f32::from(y) / 7.0);
+            out.push(f32::from(x ^ y) / 7.0);
+        }
+    }
+
+    out
+}
+
+pub fn gray_ramp_8x8() -> Vec<u8> {
+    gray_ramp_8x8_u8()
+}
+
+pub fn gray_ramp_16x16() -> Vec<u8> {
+    gray_ramp_16x16_u8()
+}
+
+pub fn rgb_gradient_8x8() -> Vec<u8> {
+    rgb_gradient_8x8_u8()
 }
 
 pub fn rgb_cube_strip() -> Vec<u8> {

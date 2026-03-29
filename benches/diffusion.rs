@@ -1,8 +1,9 @@
 mod common;
 
 use common::{
-    bench_gray_case, bench_rgb_case, gray_ramp, mode_gray_1, mode_palette_cga, rgb_gradient,
-    set_gray_throughput, set_rgb_throughput, touch_common,
+    bench_gray_case, bench_gray_case_u16, bench_rgb_case, gray_ramp, gray_ramp_u16, mode_gray_1,
+    mode_gray_levels2_u16, mode_palette_cga, rgb_gradient, set_gray_throughput, set_rgb_throughput,
+    touch_common,
 };
 use criterion::{criterion_group, criterion_main, Criterion};
 use dithr::{
@@ -219,6 +220,30 @@ fn bench_diffusion(c: &mut Criterion) {
         width,
         height,
         |buffer| shiau_fan_in_place(buffer, mode_palette_cga()),
+    );
+    group.finish();
+
+    let width = 256;
+    let height = 256;
+    let fixture_u16 = gray_ramp_u16(width, height);
+    let mut group = c.benchmark_group("diffusion_gray_u16_256");
+    group.sample_size(16);
+    set_gray_throughput(&mut group, width, height);
+    bench_gray_case_u16(
+        &mut group,
+        "floyd_steinberg_gray_u16_levels2_256",
+        &fixture_u16,
+        width,
+        height,
+        |buffer| floyd_steinberg_in_place(buffer, mode_gray_levels2_u16()),
+    );
+    bench_gray_case_u16(
+        &mut group,
+        "burkes_gray_u16_levels2_256",
+        &fixture_u16,
+        width,
+        height,
+        |buffer| burkes_in_place(buffer, mode_gray_levels2_u16()),
     );
     group.finish();
 }

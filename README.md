@@ -6,12 +6,11 @@ buffer-first rust dithering and halftoning library.
 
 core crate provides in-memory pixel transforms:
 
-- supports Gray8, Rgb8, and Rgba8 buffer formats
-- provides quantization via bit-depth, arbitrary palette, and single-color modes
-- includes ordered dithering, error diffusion, stochastic dithering, and advanced halftoning families
-- exposes both sequential and feature-gated parallel ordered/stochastic APIs
-- includes deterministic outputs validated by golden-hash regression tests
-- includes optional image adapters for zero-copy bridge into `image` crate buffers
+- generic core over sample/layout abstractions
+- concrete ergonomic APIs for `u8`, `u16`, and `f32`
+- deterministic ordered dithering, error diffusion, stochastic dithering, and advanced halftoning
+- optional `rayon` parallel paths for ordered and binary stochastic families
+- optional `image` adapters for zero-copy conversion from `DynamicImage` variants
 
 # install instructions
 
@@ -34,10 +33,8 @@ cargo test --all-features
 
 # usage
 
-```
-use dithr::{
-    bayer_8x8_in_place, Buffer, PixelFormat, QuantizeMode, Result,
-};
+```rust
+use dithr::{bayer_8x8_in_place, Buffer, PixelFormat, QuantizeMode, Result};
 
 fn main() -> Result<()> {
     let width = 16;
@@ -49,106 +46,50 @@ fn main() -> Result<()> {
 
     Ok(())
 }
+```
+
 core types:
-- Buffer
-- PixelFormat
-- Palette
-- IndexedImage
-- QuantizeMode
-- Error
-- Result
+
+- `Buffer`
+- `PixelFormat`
+- `Palette`
+- `IndexedImage`
+- `QuantizeMode`
+- `Error`
+- `Result`
 
 pixel formats:
-- Gray8
-- Rgb8
-- Rgba8
+
+- `Gray8`, `Rgb8`, `Rgba8`
+- `Gray16`, `Rgb16`, `Rgba16`
+- `Rgb32F`, `Rgba32F`
 
 quantize modes:
-- GrayBits(bits)
-- RgbBits(bits)
-- Palette(&Palette)
-- SingleColor { fg, bits }
 
-public quantization helpers:
-- quantize_gray_u8
-- quantize_rgb_u8
-- quantize_pixel
-- quantize_error
+- `GrayBits(bits)` / `GrayLevels(levels)`
+- `RgbBits(bits)` / `RgbLevels(levels)`
+- `Palette(&Palette<_>)`
+- `SingleColor { fg, levels }`
 
-buffer methods:
-- new
-- validate
-- required_len
-- try_width_bytes
-- try_row
-- try_row_mut
-- try_pixel_offset
-- row
-- row_mut
-- pixel_offset
-- width_bytes
+algorithm families:
 
-palette methods:
-- new
-- len
-- is_empty
-- as_slice
-- get
-- contains
-- nearest_rgb_index
-- nearest_rgb_color
+- stochastic: `threshold_binary_in_place`, `random_binary_in_place`
+- ordered: Bayer, cluster-dot, custom ordered, Yliluoma 1/2/3
+- classic diffusion: Floyd-Steinberg, JJN, Stucki, Burkes, Sierra variants, Stevenson-Arce, Atkinson
+- extended diffusion: Fan, Shiau-Fan, Shiau-Fan-2
+- variable diffusion: Ostromoukhov, Zhou-Fang, gradient-based diffusion
+- other families: Riemersma, Knuth dot diffusion, DBS, lattice-Boltzmann, electrostatic
 
-ordered dithering:
-- bayer_2x2_in_place
-- bayer_4x4_in_place
-- bayer_8x8_in_place
-- bayer_16x16_in_place
-- cluster_dot_4x4_in_place
-- cluster_dot_8x8_in_place
-- custom_ordered_in_place
-- yliluoma_1_in_place
-- yliluoma_2_in_place
-- yliluoma_3_in_place
+format support notes:
 
-classic error diffusion:
-- floyd_steinberg_in_place
-- false_floyd_steinberg_in_place
-- jarvis_judice_ninke_in_place
-- stucki_in_place
-- burkes_in_place
-- sierra_in_place
-- two_row_sierra_in_place
-- sierra_lite_in_place
-- stevenson_arce_in_place
-- atkinson_in_place
+- `ostromoukhov_in_place`, `zhou_fang_in_place`, and `gradient_based_error_diffusion_in_place` are grayscale-only
+- `direct_binary_search_in_place`, `lattice_boltzmann_in_place`, and `electrostatic_halftoning_in_place` are grayscale-first research-grade methods
 
-extended and variable diffusion:
-- fan_in_place
-- shiau_fan_in_place
-- shiau_fan_2_in_place
-- ostromoukhov_in_place
-- zhou_fang_in_place
-- gradient_based_error_diffusion_in_place
+optional image adapters:
 
-stochastic:
-- threshold_binary_in_place
-- random_binary_in_place
-- threshold_in_place
-- random_in_place
-
-other families:
-- riemersma_in_place
-- knuth_dot_diffusion_in_place
-- direct_binary_search_in_place
-- lattice_boltzmann_in_place
-- electrostatic_halftoning_in_place
-
-notes about format support:
-- direct_binary_search_in_place supports Gray8 only
-- lattice_boltzmann_in_place supports Gray8 only
-- electrostatic_halftoning_in_place supports Gray8 only
-- all functions are deterministic for same input and parameters
-```
+- `GrayImage`, `RgbImage`, `RgbaImage`
+- `ImageLuma16`, `ImageRgb16`, `ImageRgba16`
+- `ImageRgb32F`, `ImageRgba32F`
 
 # basic example usage
 
@@ -157,7 +98,7 @@ $ cargo run --example gray_buffer
 pixels=256 black=128 white=128
 
 $ cargo run --example rgb_buffer
-pixels=4096 palette_entries=16
+pixels=4096 binary_channels=true
 
 $ cargo run --example indexed_palette
 pixels=1024 palette_entries=4 used_indices=4
@@ -171,10 +112,10 @@ wrote output.png
 
 # more advanced usage
 
-```
+```rust
 use dithr::{
-    floyd_steinberg_in_place, random_binary_in_place, Buffer, Palette, PixelFormat,
-    QuantizeMode, Result,
+    floyd_steinberg_in_place, random_binary_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
+    Result,
 };
 
 fn main() -> Result<()> {
@@ -265,13 +206,13 @@ cargo test --workspace --all-targets --all-features
 
 test layout:
 
-- tests/basic.rs
-- tests/ordered.rs
-- tests/diffusion.rs
-- tests/advanced.rs
-- tests/golden.rs
+- `tests/basic.rs`
+- `tests/ordered.rs`
+- `tests/diffusion.rs`
+- `tests/advanced.rs`
+- `tests/golden.rs`
 
-golden tests use deterministic fixtures and fnv-1a hashes for regression locking.
+golden tests use deterministic fixtures and fnv-1a hashes for stable u8 regression locking.
 
 # references
 

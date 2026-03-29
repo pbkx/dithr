@@ -1,7 +1,8 @@
 mod common;
 
 use common::{
-    checker_8x8, fnv1a64, gray_ramp_16x16, gray_ramp_8x8, rgb_cube_strip, rgb_gradient_8x8,
+    checker_8x8, fnv1a64, gray_ramp_16x16, gray_ramp_8x8, gray_ramp_8x8_u16, rgb_cube_strip,
+    rgb_gradient_8x8, rgb_gradient_8x8_f32,
 };
 use dithr::{
     atkinson_in_place, bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place,
@@ -642,4 +643,53 @@ fn golden_electrostatic_halftoning_gray_ramp_8x8() {
         .expect("electrostatic halftoning should succeed");
 
     assert_eq!(fnv1a64(&data), 1_985_050_605_501_357_403_u64);
+}
+
+#[test]
+fn golden_bayer_8x8_gray_ramp_8x8_u16_binary_invariant() {
+    let mut data = gray_ramp_8x8_u16();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::<()>::Gray16,
+    };
+
+    bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayLevels(2)).expect("bayer 8x8 should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+}
+
+#[test]
+fn golden_floyd_steinberg_gray_ramp_8x8_u16_binary_invariant() {
+    let mut data = gray_ramp_8x8_u16();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 8,
+        format: PixelFormat::<()>::Gray16,
+    };
+
+    floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("floyd-steinberg should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+}
+
+#[test]
+fn golden_bayer_8x8_rgb_gradient_8x8_f32_binary_invariant() {
+    let mut data = rgb_gradient_8x8_f32();
+    let mut buffer = Buffer {
+        data: &mut data,
+        width: 8,
+        height: 8,
+        stride: 24,
+        format: PixelFormat::<()>::Rgb32F,
+    };
+
+    bayer_8x8_in_place(&mut buffer, QuantizeMode::RgbLevels(2)).expect("bayer 8x8 should succeed");
+
+    assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
 }

@@ -9,6 +9,7 @@ use dithr::{
     direct_binary_search_in_place, electrostatic_halftoning_in_place, knuth_dot_diffusion_in_place,
     lattice_boltzmann_in_place, riemersma_in_place,
 };
+use std::time::Duration;
 
 fn bench_advanced(c: &mut Criterion) {
     touch_common();
@@ -62,36 +63,49 @@ fn bench_advanced(c: &mut Criterion) {
     );
     group.finish();
 
-    let width = 128;
-    let height = 128;
+    let width = 64;
+    let height = 64;
     let fixture = gray_ramp(width, height);
-    let mut group = c.benchmark_group("advanced_gray_dbs_128");
+    let mut group = c.benchmark_group("advanced_gray_physical_64");
     group.sample_size(10);
+    group.warm_up_time(Duration::from_secs(1));
+    group.measurement_time(Duration::from_secs(3));
     set_gray_throughput(&mut group, width, height);
 
     bench_gray_case(
         &mut group,
-        "direct_binary_search_gray_128_iters8",
+        "lattice_boltzmann_gray_64_steps6",
         &fixture,
         width,
         height,
-        |buffer| direct_binary_search_in_place(buffer, 8),
+        |buffer| lattice_boltzmann_in_place(buffer, 6),
     );
     bench_gray_case(
         &mut group,
-        "lattice_boltzmann_gray_128_steps8",
+        "electrostatic_halftoning_gray_64_steps4",
         &fixture,
         width,
         height,
-        |buffer| lattice_boltzmann_in_place(buffer, 8),
+        |buffer| electrostatic_halftoning_in_place(buffer, 4),
     );
+    group.finish();
+
+    let width = 32;
+    let height = 32;
+    let fixture = gray_ramp(width, height);
+    let mut group = c.benchmark_group("advanced_gray_dbs_32");
+    group.sample_size(10);
+    group.warm_up_time(Duration::from_secs(1));
+    group.measurement_time(Duration::from_secs(3));
+    set_gray_throughput(&mut group, width, height);
+
     bench_gray_case(
         &mut group,
-        "electrostatic_halftoning_gray_128_steps8",
+        "direct_binary_search_gray_32_iters4",
         &fixture,
         width,
         height,
-        |buffer| electrostatic_halftoning_in_place(buffer, 8),
+        |buffer| direct_binary_search_in_place(buffer, 4),
     );
     group.finish();
 }

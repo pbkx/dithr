@@ -6,7 +6,7 @@ use common::{
 };
 use dithr::{
     direct_binary_search_in_place, electrostatic_halftoning_in_place, knuth_dot_diffusion_in_place,
-    lattice_boltzmann_in_place, riemersma_in_place, Buffer, PixelFormat, QuantizeMode,
+    lattice_boltzmann_in_place, riemersma_in_place, QuantizeMode,
 };
 
 #[test]
@@ -34,13 +34,7 @@ fn dot_diffusion_class_matrix_valid() {
 #[test]
 fn knuth_dot_diffusion_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     knuth_dot_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("knuth dot diffusion should succeed");
@@ -51,13 +45,7 @@ fn knuth_dot_diffusion_runs() {
 #[test]
 fn dbs_runs_small_fixture() {
     let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     direct_binary_search_in_place(&mut buffer, 4).expect("direct binary search should succeed");
 
@@ -71,27 +59,9 @@ fn dbs_objective_nonincreasing_over_iterations() {
     let mut data_1 = target.clone();
     let mut data_2 = target.clone();
 
-    let mut buffer_0 = Buffer {
-        data: &mut data_0,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
-    let mut buffer_1 = Buffer {
-        data: &mut data_1,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
-    let mut buffer_2 = Buffer {
-        data: &mut data_2,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer_0 = dithr::gray_u8(&mut data_0, 8, 8, 8).expect("valid buffer should construct");
+    let mut buffer_1 = dithr::gray_u8(&mut data_1, 8, 8, 8).expect("valid buffer should construct");
+    let mut buffer_2 = dithr::gray_u8(&mut data_2, 8, 8, 8).expect("valid buffer should construct");
 
     direct_binary_search_in_place(&mut buffer_0, 0).expect("direct binary search should succeed");
     direct_binary_search_in_place(&mut buffer_1, 1).expect("direct binary search should succeed");
@@ -110,13 +80,7 @@ fn dbs_u16_smoke() {
     let mut data: Vec<u16> = (0_u32..64)
         .map(|value| ((value * 1024) % 65_536) as u16)
         .collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray16,
-    };
+    let mut buffer = dithr::gray_u16(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     direct_binary_search_in_place(&mut buffer, 4).expect("direct binary search should succeed");
 
@@ -126,13 +90,7 @@ fn dbs_u16_smoke() {
 #[test]
 fn lattice_boltzmann_runs_small_fixture() {
     let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     lattice_boltzmann_in_place(&mut buffer, 6).expect("lattice-boltzmann should succeed");
 
@@ -142,13 +100,7 @@ fn lattice_boltzmann_runs_small_fixture() {
 #[test]
 fn lattice_boltzmann_binary_only_output() {
     let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     lattice_boltzmann_in_place(&mut buffer, 8).expect("lattice-boltzmann should succeed");
 
@@ -160,13 +112,7 @@ fn lattice_boltzmann_u16_smoke() {
     let mut data: Vec<u16> = (0_u32..64)
         .map(|value| ((value * 1024) % 65_536) as u16)
         .collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray16,
-    };
+    let mut buffer = dithr::gray_u16(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     lattice_boltzmann_in_place(&mut buffer, 8).expect("lattice-boltzmann should succeed");
 
@@ -176,13 +122,7 @@ fn lattice_boltzmann_u16_smoke() {
 #[test]
 fn electrostatic_halftoning_runs_small_fixture() {
     let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     electrostatic_halftoning_in_place(&mut buffer, 8)
         .expect("electrostatic halftoning should succeed");
@@ -193,13 +133,7 @@ fn electrostatic_halftoning_runs_small_fixture() {
 #[test]
 fn electrostatic_halftoning_binary_only_output() {
     let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     electrostatic_halftoning_in_place(&mut buffer, 10)
         .expect("electrostatic halftoning should succeed");
@@ -212,13 +146,7 @@ fn electrostatic_halftoning_u16_smoke() {
     let mut data: Vec<u16> = (0_u32..64)
         .map(|value| ((value * 1024) % 65_536) as u16)
         .collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray16,
-    };
+    let mut buffer = dithr::gray_u16(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     electrostatic_halftoning_in_place(&mut buffer, 10)
         .expect("electrostatic halftoning should succeed");
@@ -229,13 +157,7 @@ fn electrostatic_halftoning_u16_smoke() {
 #[test]
 fn riemersma_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     riemersma_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("riemersma should succeed");
 
@@ -245,13 +167,7 @@ fn riemersma_runs() {
 #[test]
 fn riemersma_binary_only_for_graybits1() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     riemersma_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("riemersma should succeed");
 
@@ -263,13 +179,7 @@ fn riemersma_u16_smoke() {
     let mut data: Vec<u16> = (0_u32..256)
         .map(|value| ((value * 257) % 65_536) as u16)
         .collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray16,
-    };
+    let mut buffer = dithr::gray_u16(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     riemersma_in_place(&mut buffer, QuantizeMode::GrayLevels(2)).expect("riemersma should succeed");
 
@@ -281,13 +191,7 @@ fn riemersma_f32_smoke() {
     let mut data: Vec<f32> = (0_u32..(16 * 16 * 3))
         .map(|value| (value % 256) as f32 / 255.0)
         .collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 48,
-        format: PixelFormat::<()>::Rgb32F,
-    };
+    let mut buffer = dithr::rgb_f32(&mut data, 16, 16, 48).expect("valid buffer should construct");
 
     riemersma_in_place(&mut buffer, QuantizeMode::GrayLevels(2)).expect("riemersma should succeed");
 
@@ -299,13 +203,7 @@ fn dot_diffusion_u16_smoke() {
     let mut data: Vec<u16> = (0_u32..256)
         .map(|value| ((value * 257) % 65_536) as u16)
         .collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray16,
-    };
+    let mut buffer = dithr::gray_u16(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     knuth_dot_diffusion_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
         .expect("knuth dot diffusion should succeed");
@@ -318,13 +216,7 @@ fn dot_diffusion_f32_smoke() {
     let mut data: Vec<f32> = (0_u32..(16 * 16 * 3))
         .map(|value| (value % 256) as f32 / 255.0)
         .collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 48,
-        format: PixelFormat::<()>::Rgb32F,
-    };
+    let mut buffer = dithr::rgb_f32(&mut data, 16, 16, 48).expect("valid buffer should construct");
 
     knuth_dot_diffusion_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
         .expect("knuth dot diffusion should succeed");

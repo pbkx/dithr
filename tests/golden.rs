@@ -14,7 +14,7 @@ use dithr::{
     random_binary_in_place, riemersma_in_place, shiau_fan_2_in_place, shiau_fan_in_place,
     sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place,
     threshold_binary_in_place, two_row_sierra_in_place, yliluoma_1_in_place, yliluoma_2_in_place,
-    yliluoma_3_in_place, zhou_fang_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
+    yliluoma_3_in_place, zhou_fang_in_place, Palette, QuantizeMode,
 };
 
 fn variable_gray_challenge_64x64() -> Vec<u8> {
@@ -41,13 +41,7 @@ fn golden_fixture_hashes() {
 #[test]
 fn golden_threshold_gray_ramp_8x8() {
     let mut data = gray_ramp_8x8();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     threshold_binary_in_place(&mut buffer, QuantizeMode::GrayBits(1), 127)
         .expect("threshold binary should succeed");
@@ -58,13 +52,7 @@ fn golden_threshold_gray_ramp_8x8() {
 #[test]
 fn golden_random_seed_1_gray_ramp_8x8() {
     let mut data = gray_ramp_8x8();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     random_binary_in_place(&mut buffer, QuantizeMode::GrayBits(1), 1, 64)
         .expect("random binary should succeed");
@@ -75,13 +63,7 @@ fn golden_random_seed_1_gray_ramp_8x8() {
 #[test]
 fn golden_bayer_2x2_gray_ramp_8x8() {
     let mut data = gray_ramp_8x8();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     bayer_2x2_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 2x2 should succeed");
 
@@ -91,13 +73,7 @@ fn golden_bayer_2x2_gray_ramp_8x8() {
 #[test]
 fn golden_bayer_4x4_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     bayer_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 4x4 should succeed");
 
@@ -107,13 +83,7 @@ fn golden_bayer_4x4_gray_ramp_16x16() {
 #[test]
 fn golden_bayer_8x8_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 8x8 should succeed");
 
@@ -123,13 +93,7 @@ fn golden_bayer_8x8_gray_ramp_16x16() {
 #[test]
 fn golden_bayer_16x16_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     bayer_16x16_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("bayer 16x16 should succeed");
@@ -140,13 +104,7 @@ fn golden_bayer_16x16_gray_ramp_16x16() {
 #[test]
 fn golden_cluster_dot_4x4_gray_ramp_8x8() {
     let mut data = gray_ramp_8x8();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     cluster_dot_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("cluster-dot 4x4 should succeed");
@@ -157,13 +115,7 @@ fn golden_cluster_dot_4x4_gray_ramp_8x8() {
 #[test]
 fn golden_cluster_dot_8x8_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     cluster_dot_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("cluster-dot 8x8 should succeed");
@@ -174,13 +126,7 @@ fn golden_cluster_dot_8x8_gray_ramp_16x16() {
 #[test]
 fn golden_custom_ordered_2x2_gray_ramp_8x8() {
     let mut data = gray_ramp_8x8();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
     let map = [0_u8, 2, 3, 1];
 
     custom_ordered_in_place(&mut buffer, QuantizeMode::GrayBits(1), &map, 2, 2, 64)
@@ -203,13 +149,7 @@ fn golden_yliluoma_1_rgb_gradient_8x8() {
         [255, 0, 255],
     ])
     .expect("palette should be valid");
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 24,
-        format: PixelFormat::<()>::Rgb8,
-    };
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
 
     yliluoma_1_in_place(&mut buffer, &palette).expect("yliluoma 1 should succeed");
 
@@ -230,13 +170,7 @@ fn golden_yliluoma_2_rgb_gradient_8x8() {
         [255, 0, 255],
     ])
     .expect("palette should be valid");
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 24,
-        format: PixelFormat::<()>::Rgb8,
-    };
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
 
     yliluoma_2_in_place(&mut buffer, &palette).expect("yliluoma 2 should succeed");
 
@@ -257,13 +191,7 @@ fn golden_yliluoma_3_rgb_gradient_8x8() {
         [255, 0, 255],
     ])
     .expect("palette should be valid");
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 24,
-        format: PixelFormat::<()>::Rgb8,
-    };
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
 
     yliluoma_3_in_place(&mut buffer, &palette).expect("yliluoma 3 should succeed");
 
@@ -273,13 +201,7 @@ fn golden_yliluoma_3_rgb_gradient_8x8() {
 #[test]
 fn golden_floyd_steinberg_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("floyd-steinberg should succeed");
@@ -290,13 +212,7 @@ fn golden_floyd_steinberg_gray_ramp_16x16() {
 #[test]
 fn golden_false_floyd_steinberg_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     false_floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("false floyd-steinberg should succeed");
@@ -307,13 +223,7 @@ fn golden_false_floyd_steinberg_gray_ramp_16x16() {
 #[test]
 fn golden_jarvis_judice_ninke_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     jarvis_judice_ninke_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("jarvis-judice-ninke should succeed");
@@ -324,13 +234,7 @@ fn golden_jarvis_judice_ninke_gray_ramp_16x16() {
 #[test]
 fn golden_stucki_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     stucki_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("stucki should succeed");
 
@@ -340,13 +244,7 @@ fn golden_stucki_gray_ramp_16x16() {
 #[test]
 fn golden_burkes_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     burkes_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("burkes should succeed");
 
@@ -356,13 +254,7 @@ fn golden_burkes_gray_ramp_16x16() {
 #[test]
 fn golden_sierra_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("sierra should succeed");
 
@@ -372,13 +264,7 @@ fn golden_sierra_gray_ramp_16x16() {
 #[test]
 fn golden_two_row_sierra_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     two_row_sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("two-row sierra should succeed");
@@ -389,13 +275,7 @@ fn golden_two_row_sierra_gray_ramp_16x16() {
 #[test]
 fn golden_sierra_lite_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     sierra_lite_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("sierra lite should succeed");
@@ -406,13 +286,7 @@ fn golden_sierra_lite_gray_ramp_16x16() {
 #[test]
 fn golden_stevenson_arce_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     stevenson_arce_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("stevenson-arce should succeed");
@@ -423,13 +297,7 @@ fn golden_stevenson_arce_gray_ramp_16x16() {
 #[test]
 fn golden_atkinson_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     atkinson_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("atkinson should succeed");
 
@@ -439,13 +307,7 @@ fn golden_atkinson_gray_ramp_16x16() {
 #[test]
 fn golden_fan_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     fan_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("fan should succeed");
 
@@ -455,13 +317,7 @@ fn golden_fan_gray_ramp_16x16() {
 #[test]
 fn golden_shiau_fan_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     shiau_fan_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("shiau-fan should succeed");
 
@@ -471,13 +327,7 @@ fn golden_shiau_fan_gray_ramp_16x16() {
 #[test]
 fn golden_shiau_fan_2_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     shiau_fan_2_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("shiau-fan-2 should succeed");
@@ -488,13 +338,7 @@ fn golden_shiau_fan_2_gray_ramp_16x16() {
 #[test]
 fn golden_ostromoukhov_gray_challenge_64x64() {
     let mut data = variable_gray_challenge_64x64();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 64,
-        height: 64,
-        stride: 64,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 64, 64, 64).expect("valid buffer should construct");
 
     ostromoukhov_in_place(&mut buffer, QuantizeMode::GrayBits(2))
         .expect("ostromoukhov should succeed");
@@ -505,13 +349,7 @@ fn golden_ostromoukhov_gray_challenge_64x64() {
 #[test]
 fn golden_zhou_fang_gray_challenge_64x64() {
     let mut data = variable_gray_challenge_64x64();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 64,
-        height: 64,
-        stride: 64,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 64, 64, 64).expect("valid buffer should construct");
 
     zhou_fang_in_place(&mut buffer, QuantizeMode::GrayBits(2)).expect("zhou-fang should succeed");
 
@@ -523,20 +361,10 @@ fn golden_variable_diffusion_distinguishes_ostromoukhov_and_zhou_fang() {
     let mut ostromoukhov_data = variable_gray_challenge_64x64();
     let mut zhou_fang_data = ostromoukhov_data.clone();
 
-    let mut ostromoukhov_buffer = Buffer {
-        data: &mut ostromoukhov_data,
-        width: 64,
-        height: 64,
-        stride: 64,
-        format: PixelFormat::<()>::Gray8,
-    };
-    let mut zhou_fang_buffer = Buffer {
-        data: &mut zhou_fang_data,
-        width: 64,
-        height: 64,
-        stride: 64,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut ostromoukhov_buffer =
+        dithr::gray_u8(&mut ostromoukhov_data, 64, 64, 64).expect("valid buffer should construct");
+    let mut zhou_fang_buffer =
+        dithr::gray_u8(&mut zhou_fang_data, 64, 64, 64).expect("valid buffer should construct");
 
     ostromoukhov_in_place(&mut ostromoukhov_buffer, QuantizeMode::GrayBits(2))
         .expect("ostromoukhov should succeed");
@@ -549,13 +377,7 @@ fn golden_variable_diffusion_distinguishes_ostromoukhov_and_zhou_fang() {
 #[test]
 fn golden_gradient_based_error_diffusion_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     gradient_based_error_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("gradient-based diffusion should succeed");
@@ -566,13 +388,7 @@ fn golden_gradient_based_error_diffusion_gray_ramp_16x16() {
 #[test]
 fn golden_riemersma_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     riemersma_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("riemersma should succeed");
 
@@ -582,13 +398,7 @@ fn golden_riemersma_gray_ramp_16x16() {
 #[test]
 fn golden_knuth_dot_diffusion_gray_ramp_16x16() {
     let mut data = gray_ramp_16x16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     knuth_dot_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("knuth dot diffusion should succeed");
@@ -599,13 +409,7 @@ fn golden_knuth_dot_diffusion_gray_ramp_16x16() {
 #[test]
 fn golden_dbs_gray_ramp_8x8() {
     let mut data = gray_ramp_8x8();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     direct_binary_search_in_place(&mut buffer, 4).expect("direct binary search should succeed");
 
@@ -615,13 +419,7 @@ fn golden_dbs_gray_ramp_8x8() {
 #[test]
 fn golden_lattice_boltzmann_gray_ramp_8x8() {
     let mut data = gray_ramp_8x8();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     lattice_boltzmann_in_place(&mut buffer, 8).expect("lattice-boltzmann should succeed");
 
@@ -631,13 +429,7 @@ fn golden_lattice_boltzmann_gray_ramp_8x8() {
 #[test]
 fn golden_electrostatic_halftoning_gray_ramp_8x8() {
     let mut data = gray_ramp_8x8();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     electrostatic_halftoning_in_place(&mut buffer, 10)
         .expect("electrostatic halftoning should succeed");
@@ -648,13 +440,7 @@ fn golden_electrostatic_halftoning_gray_ramp_8x8() {
 #[test]
 fn golden_bayer_8x8_gray_ramp_8x8_u16_binary_invariant() {
     let mut data = gray_ramp_8x8_u16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray16,
-    };
+    let mut buffer = dithr::gray_u16(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayLevels(2)).expect("bayer 8x8 should succeed");
 
@@ -664,13 +450,7 @@ fn golden_bayer_8x8_gray_ramp_8x8_u16_binary_invariant() {
 #[test]
 fn golden_floyd_steinberg_gray_ramp_8x8_u16_binary_invariant() {
     let mut data = gray_ramp_8x8_u16();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray16,
-    };
+    let mut buffer = dithr::gray_u16(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
         .expect("floyd-steinberg should succeed");
@@ -681,13 +461,7 @@ fn golden_floyd_steinberg_gray_ramp_8x8_u16_binary_invariant() {
 #[test]
 fn golden_bayer_8x8_rgb_gradient_8x8_f32_binary_invariant() {
     let mut data = rgb_gradient_8x8_f32();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 24,
-        format: PixelFormat::<()>::Rgb32F,
-    };
+    let mut buffer = dithr::rgb_f32(&mut data, 8, 8, 24).expect("valid buffer should construct");
 
     bayer_8x8_in_place(&mut buffer, QuantizeMode::RgbLevels(2)).expect("bayer 8x8 should succeed");
 

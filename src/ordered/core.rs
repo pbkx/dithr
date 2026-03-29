@@ -1,6 +1,6 @@
 use crate::{
     core::{PixelLayout, Sample},
-    quantize_pixel, Buffer, BufferError, Error, PixelFormat, QuantizeMode, Result,
+    quantize_pixel, Buffer, BufferError, Error, QuantizeMode, Result,
 };
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
@@ -20,8 +20,7 @@ pub(crate) fn ordered_dither_in_place<S: Sample, L: PixelLayout>(
     let map_max = map.iter().copied().max().unwrap_or_default();
     let width = buffer.width;
     let height = buffer.height;
-    let format = buffer.format;
-    let channels = format.channels();
+    let channels = L::CHANNELS;
 
     for y in 0..height {
         let row = buffer.try_row_mut(y)?;
@@ -31,42 +30,37 @@ pub(crate) fn ordered_dither_in_place<S: Sample, L: PixelLayout>(
             let bias = threshold_bias_unit(threshold, map_min, map_max, strength);
             let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
 
-            match format {
-                PixelFormat::Gray8 | PixelFormat::Gray16 => {
-                    let value = apply_bias_unit(row[offset], bias);
-                    let quantized = quantize_pixel::<S, crate::core::Gray>(&[value], mode)?;
-                    row[offset] = quantized[0];
-                }
-                PixelFormat::Rgb8 | PixelFormat::Rgb16 | PixelFormat::Rgb32F => {
-                    let adjusted = [
-                        apply_bias_unit(row[offset], bias),
-                        apply_bias_unit(row[offset + 1], bias),
-                        apply_bias_unit(row[offset + 2], bias),
-                    ];
-                    let quantized = quantize_pixel::<S, crate::core::Rgb>(&adjusted, mode)?;
-                    row[offset] = quantized[0];
-                    row[offset + 1] = quantized[1];
-                    row[offset + 2] = quantized[2];
-                }
-                PixelFormat::Rgba8 | PixelFormat::Rgba16 | PixelFormat::Rgba32F => {
-                    let alpha = row[offset + 3];
-                    let adjusted = [
-                        apply_bias_unit(row[offset], bias),
-                        apply_bias_unit(row[offset + 1], bias),
-                        apply_bias_unit(row[offset + 2], bias),
-                        alpha,
-                    ];
-                    let quantized = quantize_pixel::<S, crate::core::Rgba>(&adjusted, mode)?;
-                    row[offset] = quantized[0];
-                    row[offset + 1] = quantized[1];
-                    row[offset + 2] = quantized[2];
-                    row[offset + 3] = alpha;
-                }
-                _ => {
-                    return Err(Error::UnsupportedFormat(
-                        "ordered dithering supports Gray, Rgb, and Rgba formats only",
-                    ));
-                }
+            if L::CHANNELS == 1 && !L::HAS_ALPHA {
+                let value = apply_bias_unit(row[offset], bias);
+                let quantized = quantize_pixel::<S, crate::core::Gray>(&[value], mode)?;
+                row[offset] = quantized[0];
+            } else if L::CHANNELS == 3 && !L::HAS_ALPHA {
+                let adjusted = [
+                    apply_bias_unit(row[offset], bias),
+                    apply_bias_unit(row[offset + 1], bias),
+                    apply_bias_unit(row[offset + 2], bias),
+                ];
+                let quantized = quantize_pixel::<S, crate::core::Rgb>(&adjusted, mode)?;
+                row[offset] = quantized[0];
+                row[offset + 1] = quantized[1];
+                row[offset + 2] = quantized[2];
+            } else if L::CHANNELS == 4 && L::HAS_ALPHA {
+                let alpha = row[offset + 3];
+                let adjusted = [
+                    apply_bias_unit(row[offset], bias),
+                    apply_bias_unit(row[offset + 1], bias),
+                    apply_bias_unit(row[offset + 2], bias),
+                    alpha,
+                ];
+                let quantized = quantize_pixel::<S, crate::core::Rgba>(&adjusted, mode)?;
+                row[offset] = quantized[0];
+                row[offset + 1] = quantized[1];
+                row[offset + 2] = quantized[2];
+                row[offset + 3] = alpha;
+            } else {
+                return Err(Error::UnsupportedFormat(
+                    "ordered dithering supports Gray, Rgb, and Rgba formats only",
+                ));
             }
         }
     }
@@ -90,8 +84,7 @@ pub(crate) fn ordered_dither_in_place_par<S: Sample, L: PixelLayout>(
     let map_max = map.iter().copied().max().unwrap_or_default();
     let width = buffer.width;
     let height = buffer.height;
-    let format = buffer.format;
-    let channels = format.channels();
+    let channels = L::CHANNELS;
     let stride = buffer.stride;
 
     buffer
@@ -105,42 +98,37 @@ pub(crate) fn ordered_dither_in_place_par<S: Sample, L: PixelLayout>(
                 let bias = threshold_bias_unit(threshold, map_min, map_max, strength);
                 let offset = x * channels;
 
-                match format {
-                    PixelFormat::Gray8 | PixelFormat::Gray16 => {
-                        let value = apply_bias_unit(row[offset], bias);
-                        let quantized = quantize_pixel::<S, crate::core::Gray>(&[value], mode)?;
-                        row[offset] = quantized[0];
-                    }
-                    PixelFormat::Rgb8 | PixelFormat::Rgb16 | PixelFormat::Rgb32F => {
-                        let adjusted = [
-                            apply_bias_unit(row[offset], bias),
-                            apply_bias_unit(row[offset + 1], bias),
-                            apply_bias_unit(row[offset + 2], bias),
-                        ];
-                        let quantized = quantize_pixel::<S, crate::core::Rgb>(&adjusted, mode)?;
-                        row[offset] = quantized[0];
-                        row[offset + 1] = quantized[1];
-                        row[offset + 2] = quantized[2];
-                    }
-                    PixelFormat::Rgba8 | PixelFormat::Rgba16 | PixelFormat::Rgba32F => {
-                        let alpha = row[offset + 3];
-                        let adjusted = [
-                            apply_bias_unit(row[offset], bias),
-                            apply_bias_unit(row[offset + 1], bias),
-                            apply_bias_unit(row[offset + 2], bias),
-                            alpha,
-                        ];
-                        let quantized = quantize_pixel::<S, crate::core::Rgba>(&adjusted, mode)?;
-                        row[offset] = quantized[0];
-                        row[offset + 1] = quantized[1];
-                        row[offset + 2] = quantized[2];
-                        row[offset + 3] = alpha;
-                    }
-                    _ => {
-                        return Err(Error::UnsupportedFormat(
-                            "ordered dithering supports Gray, Rgb, and Rgba formats only",
-                        ));
-                    }
+                if L::CHANNELS == 1 && !L::HAS_ALPHA {
+                    let value = apply_bias_unit(row[offset], bias);
+                    let quantized = quantize_pixel::<S, crate::core::Gray>(&[value], mode)?;
+                    row[offset] = quantized[0];
+                } else if L::CHANNELS == 3 && !L::HAS_ALPHA {
+                    let adjusted = [
+                        apply_bias_unit(row[offset], bias),
+                        apply_bias_unit(row[offset + 1], bias),
+                        apply_bias_unit(row[offset + 2], bias),
+                    ];
+                    let quantized = quantize_pixel::<S, crate::core::Rgb>(&adjusted, mode)?;
+                    row[offset] = quantized[0];
+                    row[offset + 1] = quantized[1];
+                    row[offset + 2] = quantized[2];
+                } else if L::CHANNELS == 4 && L::HAS_ALPHA {
+                    let alpha = row[offset + 3];
+                    let adjusted = [
+                        apply_bias_unit(row[offset], bias),
+                        apply_bias_unit(row[offset + 1], bias),
+                        apply_bias_unit(row[offset + 2], bias),
+                        alpha,
+                    ];
+                    let quantized = quantize_pixel::<S, crate::core::Rgba>(&adjusted, mode)?;
+                    row[offset] = quantized[0];
+                    row[offset + 1] = quantized[1];
+                    row[offset + 2] = quantized[2];
+                    row[offset + 3] = alpha;
+                } else {
+                    return Err(Error::UnsupportedFormat(
+                        "ordered dithering supports Gray, Rgb, and Rgba formats only",
+                    ));
                 }
             }
             Ok(())

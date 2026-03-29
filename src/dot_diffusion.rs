@@ -1,7 +1,7 @@
 use crate::{
     core::{PixelLayout, Sample},
     math::fixed::mul_div_i32,
-    quantize_pixel, Buffer, Error, PixelFormat, QuantizeMode, Result,
+    quantize_pixel, Buffer, Error, QuantizeMode, Result,
 };
 use std::mem::size_of;
 
@@ -24,17 +24,14 @@ pub fn knuth_dot_diffusion_in_place<S: Sample, L: PixelLayout>(
     mode: QuantizeMode<'_, S>,
 ) -> Result<()> {
     buffer.validate()?;
-    match buffer.format {
-        PixelFormat::Gray8 | PixelFormat::Gray16 => dot_diffuse_gray(buffer, mode),
-        PixelFormat::Rgb8
-        | PixelFormat::Rgba8
-        | PixelFormat::Rgb16
-        | PixelFormat::Rgba16
-        | PixelFormat::Rgb32F
-        | PixelFormat::Rgba32F => dot_diffuse_rgb(buffer, mode),
-        _ => Err(Error::UnsupportedFormat(
+    if L::CHANNELS == 1 && !L::HAS_ALPHA {
+        dot_diffuse_gray(buffer, mode)
+    } else if (L::CHANNELS == 3 && !L::HAS_ALPHA) || (L::CHANNELS == 4 && L::HAS_ALPHA) {
+        dot_diffuse_rgb(buffer, mode)
+    } else {
+        Err(Error::UnsupportedFormat(
             "knuth dot diffusion supports Gray, Rgb, and Rgba formats only",
-        )),
+        ))
     }
 }
 
@@ -148,14 +145,13 @@ fn dot_diffuse_rgb_int<S: Sample, L: PixelLayout>(
 ) -> Result<()> {
     let width = buffer.width;
     let height = buffer.height;
-    let format = buffer.format;
     let max_value = integer_sample_max::<S>()?;
     let dims = DiffusionDims {
         width,
         height,
         max_value,
     };
-    let sample_channels = format.channels();
+    let sample_channels = L::CHANNELS;
     let channels = 3_usize;
     let pixel_count = width
         .checked_mul(height)
@@ -164,7 +160,7 @@ fn dot_diffuse_rgb_int<S: Sample, L: PixelLayout>(
         .checked_mul(channels)
         .ok_or(Error::InvalidArgument("error buffer size overflow"))?;
     let mut errors = vec![0.0_f32; error_len];
-    let is_rgba = format.has_alpha();
+    let is_rgba = L::HAS_ALPHA;
 
     for class in 0..CLASS_COUNT as u8 {
         for y in 0..height {
@@ -236,8 +232,7 @@ fn dot_diffuse_rgb_float<S: Sample, L: PixelLayout>(
 ) -> Result<()> {
     let width = buffer.width;
     let height = buffer.height;
-    let format = buffer.format;
-    let sample_channels = format.channels();
+    let sample_channels = L::CHANNELS;
     let channels = 3_usize;
     let pixel_count = width
         .checked_mul(height)
@@ -246,7 +241,7 @@ fn dot_diffuse_rgb_float<S: Sample, L: PixelLayout>(
         .checked_mul(channels)
         .ok_or(Error::InvalidArgument("error buffer size overflow"))?;
     let mut errors = vec![0.0_f32; error_len];
-    let is_rgba = format.has_alpha();
+    let is_rgba = L::HAS_ALPHA;
 
     for class in 0..CLASS_COUNT as u8 {
         for y in 0..height {

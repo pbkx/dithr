@@ -1,7 +1,7 @@
 use crate::{
     core::{PixelLayout, Sample},
     math::fixed::mul_div_i32,
-    Buffer, Error, PixelFormat, Result,
+    Buffer, Error, Result,
 };
 use std::mem::size_of;
 
@@ -45,7 +45,7 @@ pub fn direct_binary_search_in_place<S: Sample, L: PixelLayout>(
     max_iters: usize,
 ) -> Result<()> {
     buffer.validate()?;
-    ensure_grayscale_integer_format(buffer.format)?;
+    ensure_grayscale_integer_format::<S, L>()?;
 
     let width = buffer.width;
     let height = buffer.height;
@@ -156,7 +156,7 @@ pub fn lattice_boltzmann_in_place<S: Sample, L: PixelLayout>(
     max_steps: usize,
 ) -> Result<()> {
     buffer.validate()?;
-    ensure_grayscale_integer_format(buffer.format)?;
+    ensure_grayscale_integer_format::<S, L>()?;
 
     let width = buffer.width;
     let height = buffer.height;
@@ -213,7 +213,7 @@ pub fn electrostatic_halftoning_in_place<S: Sample, L: PixelLayout>(
     max_steps: usize,
 ) -> Result<()> {
     buffer.validate()?;
-    ensure_grayscale_integer_format(buffer.format)?;
+    ensure_grayscale_integer_format::<S, L>()?;
 
     let width = buffer.width;
     let height = buffer.height;
@@ -477,12 +477,13 @@ fn initial_particles(darkness: &[u8], particle_count: usize) -> (Vec<bool>, Vec<
     (occupied, particles)
 }
 
-fn ensure_grayscale_integer_format<L: PixelLayout>(format: PixelFormat<L>) -> Result<()> {
-    match format {
-        PixelFormat::Gray8 | PixelFormat::Gray16 => Ok(()),
-        _ => Err(Error::UnsupportedFormat(
+fn ensure_grayscale_integer_format<S: Sample, L: PixelLayout>() -> Result<()> {
+    if L::CHANNELS == 1 && !L::HAS_ALPHA && !S::IS_FLOAT {
+        Ok(())
+    } else {
+        Err(Error::UnsupportedFormat(
             "research algorithms support Gray8 and Gray16 only",
-        )),
+        ))
     }
 }
 

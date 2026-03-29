@@ -2,7 +2,7 @@ use crate::{
     core::{PixelLayout, Sample},
     data::{OSTROMOUKHOV_COEFFS, ZHOU_FANG_MODULATION},
     math::fixed::mul_div_i32,
-    quantize_pixel, Buffer, Error, PixelFormat, QuantizeMode, Result,
+    quantize_pixel, Buffer, Error, QuantizeMode, Result,
 };
 use std::mem::size_of;
 
@@ -41,13 +41,10 @@ fn diffuse_gray_only_variable<S: Sample, L: PixelLayout>(
 ) -> Result<()> {
     buffer.validate()?;
 
-    match buffer.format {
-        PixelFormat::Gray8 | PixelFormat::Gray16 => {}
-        _ => {
-            return Err(Error::UnsupportedFormat(
-                "variable diffusion algorithms support grayscale formats only",
-            ));
-        }
+    if L::CHANNELS != 1 || L::HAS_ALPHA {
+        return Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support grayscale formats only",
+        ));
     }
 
     match algorithm {

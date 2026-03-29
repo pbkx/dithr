@@ -1,51 +1,27 @@
 use crate::core::{Gray, PixelLayout, Rgb, Rgba, Sample};
+use std::marker::PhantomData;
 use std::mem::size_of;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum PixelFormat<L = ()> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BufferKind {
     Gray8,
     Rgb8,
     Rgba8,
     Gray16,
     Rgb16,
     Rgba16,
+    Gray32F,
     Rgb32F,
     Rgba32F,
-    #[doc(hidden)]
-    __Layout(std::marker::PhantomData<L>),
 }
 
-impl<L> Copy for PixelFormat<L> {}
-
-impl<L> Clone for PixelFormat<L> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<L> PixelFormat<L> {
-    #[must_use]
-    pub const fn with_layout<NL>(self) -> PixelFormat<NL> {
-        match self {
-            Self::Gray8 => PixelFormat::Gray8,
-            Self::Rgb8 => PixelFormat::Rgb8,
-            Self::Rgba8 => PixelFormat::Rgba8,
-            Self::Gray16 => PixelFormat::Gray16,
-            Self::Rgb16 => PixelFormat::Rgb16,
-            Self::Rgba16 => PixelFormat::Rgba16,
-            Self::Rgb32F => PixelFormat::Rgb32F,
-            Self::Rgba32F => PixelFormat::Rgba32F,
-            Self::__Layout(_) => PixelFormat::__Layout(std::marker::PhantomData),
-        }
-    }
-
+impl BufferKind {
     #[must_use]
     pub const fn channels(self) -> usize {
         match self {
-            Self::Gray8 | Self::Gray16 => 1,
+            Self::Gray8 | Self::Gray16 | Self::Gray32F => 1,
             Self::Rgb8 | Self::Rgb16 | Self::Rgb32F => 3,
             Self::Rgba8 | Self::Rgba16 | Self::Rgba32F => 4,
-            Self::__Layout(_) => 0,
         }
     }
 
@@ -57,22 +33,18 @@ impl<L> PixelFormat<L> {
             | Self::Rgb8
             | Self::Gray16
             | Self::Rgb16
-            | Self::Rgb32F
-            | Self::__Layout(_) => false,
+            | Self::Gray32F
+            | Self::Rgb32F => false,
         }
     }
 
     #[must_use]
     pub const fn is_float(self) -> bool {
         match self {
-            Self::Rgb32F | Self::Rgba32F => true,
-            Self::Gray8
-            | Self::Rgb8
-            | Self::Rgba8
-            | Self::Gray16
-            | Self::Rgb16
-            | Self::Rgba16
-            | Self::__Layout(_) => false,
+            Self::Gray32F | Self::Rgb32F | Self::Rgba32F => true,
+            Self::Gray8 | Self::Rgb8 | Self::Rgba8 | Self::Gray16 | Self::Rgb16 | Self::Rgba16 => {
+                false
+            }
         }
     }
 
@@ -81,8 +53,7 @@ impl<L> PixelFormat<L> {
         match self {
             Self::Gray8 | Self::Rgb8 | Self::Rgba8 => 1,
             Self::Gray16 | Self::Rgb16 | Self::Rgba16 => 2,
-            Self::Rgb32F | Self::Rgba32F => 4,
-            Self::__Layout(_) => 0,
+            Self::Gray32F | Self::Rgb32F | Self::Rgba32F => 4,
         }
     }
 
@@ -90,15 +61,9 @@ impl<L> PixelFormat<L> {
     pub const fn bytes_per_pixel(self) -> usize {
         self.channels() * self.bytes_per_channel()
     }
-
-    #[must_use]
-    pub fn supports_sample<S: Sample>(self) -> bool {
-        if self.is_float() != S::IS_FLOAT {
-            return false;
-        }
-        self.bytes_per_channel() == size_of::<S>()
-    }
 }
+
+pub type PixelFormat = BufferKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BufferError {
@@ -107,7 +72,7 @@ pub enum BufferError {
     ZeroDimensions,
     RowOutOfBounds,
     PixelOutOfBounds,
-    FormatSampleMismatch,
+    KindMismatch,
     OutOfBounds,
 }
 
@@ -119,9 +84,7 @@ impl std::fmt::Display for BufferError {
             Self::ZeroDimensions => f.write_str("buffer width and height must be non-zero"),
             Self::RowOutOfBounds => f.write_str("row index is out of bounds"),
             Self::PixelOutOfBounds => f.write_str("pixel coordinates are out of bounds"),
-            Self::FormatSampleMismatch => {
-                f.write_str("pixel format and sample type are not compatible")
-            }
+            Self::KindMismatch => f.write_str("buffer kind does not match sample/layout type"),
             Self::OutOfBounds => f.write_str("buffer arithmetic overflow or out-of-bounds access"),
         }
     }
@@ -129,12 +92,12 @@ impl std::fmt::Display for BufferError {
 
 impl std::error::Error for BufferError {}
 
-pub struct Buffer<'a, S: Sample = u8, L: PixelLayout = ()> {
+pub struct Buffer<'a, S: Sample, L: PixelLayout> {
     pub data: &'a mut [S],
     pub width: usize,
     pub height: usize,
     pub stride: usize,
-    pub format: PixelFormat<L>,
+    _layout: PhantomData<L>,
 }
 
 pub type GrayBuffer<'a, S> = Buffer<'a, S, Gray>;
@@ -149,6 +112,7 @@ pub type GrayBuffer16<'a> = Buffer<'a, u16, Gray>;
 pub type RgbBuffer16<'a> = Buffer<'a, u16, Rgb>;
 pub type RgbaBuffer16<'a> = Buffer<'a, u16, Rgba>;
 
+pub type GrayBuffer32F<'a> = Buffer<'a, f32, Gray>;
 pub type RgbBuffer32F<'a> = Buffer<'a, f32, Rgb>;
 pub type RgbaBuffer32F<'a> = Buffer<'a, f32, Rgba>;
 
@@ -158,17 +122,34 @@ impl<'a, S: Sample, L: PixelLayout> Buffer<'a, S, L> {
         width: usize,
         height: usize,
         stride: usize,
-        format: PixelFormat,
+        kind: BufferKind,
+    ) -> Result<Self, BufferError> {
+        let buffer = Self::new_typed(data, width, height, stride)?;
+        if buffer.kind() != kind {
+            return Err(BufferError::KindMismatch);
+        }
+        Ok(buffer)
+    }
+
+    pub fn new_typed(
+        data: &'a mut [S],
+        width: usize,
+        height: usize,
+        stride: usize,
     ) -> Result<Self, BufferError> {
         let buffer = Self {
             data,
             width,
             height,
             stride,
-            format: format.with_layout(),
+            _layout: PhantomData,
         };
         buffer.validate()?;
         Ok(buffer)
+    }
+
+    pub fn kind(&self) -> BufferKind {
+        kind_for::<S, L>()
     }
 
     pub fn width_bytes(&self) -> Result<usize, BufferError> {
@@ -177,7 +158,7 @@ impl<'a, S: Sample, L: PixelLayout> Buffer<'a, S, L> {
 
     pub fn try_width_bytes(&self) -> Result<usize, BufferError> {
         self.try_width_samples()?
-            .checked_mul(self.format.bytes_per_channel())
+            .checked_mul(size_of::<S>())
             .ok_or(BufferError::OutOfBounds)
     }
 
@@ -197,10 +178,6 @@ impl<'a, S: Sample, L: PixelLayout> Buffer<'a, S, L> {
     }
 
     pub fn validate(&self) -> Result<(), BufferError> {
-        if !self.format.supports_sample::<S>() {
-            return Err(BufferError::FormatSampleMismatch);
-        }
-
         let required_len = self.required_len()?;
         if self.data.len() < required_len {
             return Err(BufferError::DataTooShort);
@@ -305,7 +282,22 @@ impl<'a, S: Sample, L: PixelLayout> Buffer<'a, S, L> {
     }
 
     fn channels_per_pixel(&self) -> usize {
-        self.format.channels()
+        L::CHANNELS
+    }
+}
+
+fn kind_for<S: Sample, L: PixelLayout>() -> BufferKind {
+    match (L::CHANNELS, L::HAS_ALPHA, S::IS_FLOAT, size_of::<S>()) {
+        (1, false, false, 1) => BufferKind::Gray8,
+        (3, false, false, 1) => BufferKind::Rgb8,
+        (4, true, false, 1) => BufferKind::Rgba8,
+        (1, false, false, 2) => BufferKind::Gray16,
+        (3, false, false, 2) => BufferKind::Rgb16,
+        (4, true, false, 2) => BufferKind::Rgba16,
+        (1, false, true, 4) => BufferKind::Gray32F,
+        (3, false, true, 4) => BufferKind::Rgb32F,
+        (4, true, true, 4) => BufferKind::Rgba32F,
+        _ => panic!("unsupported buffer kind for sample/layout combination"),
     }
 }
 
@@ -315,7 +307,7 @@ pub fn gray_u8<'a>(
     height: usize,
     stride: usize,
 ) -> Result<GrayBuffer8<'a>, BufferError> {
-    Buffer::new(data, width, height, stride, PixelFormat::Gray8)
+    Buffer::new_typed(data, width, height, stride)
 }
 
 pub fn rgb_u8<'a>(
@@ -324,7 +316,7 @@ pub fn rgb_u8<'a>(
     height: usize,
     stride: usize,
 ) -> Result<RgbBuffer8<'a>, BufferError> {
-    Buffer::new(data, width, height, stride, PixelFormat::Rgb8)
+    Buffer::new_typed(data, width, height, stride)
 }
 
 pub fn rgba_u8<'a>(
@@ -333,7 +325,7 @@ pub fn rgba_u8<'a>(
     height: usize,
     stride: usize,
 ) -> Result<RgbaBuffer8<'a>, BufferError> {
-    Buffer::new(data, width, height, stride, PixelFormat::Rgba8)
+    Buffer::new_typed(data, width, height, stride)
 }
 
 pub fn gray_u16<'a>(
@@ -342,7 +334,7 @@ pub fn gray_u16<'a>(
     height: usize,
     stride: usize,
 ) -> Result<GrayBuffer16<'a>, BufferError> {
-    Buffer::new(data, width, height, stride, PixelFormat::Gray16)
+    Buffer::new_typed(data, width, height, stride)
 }
 
 pub fn rgb_u16<'a>(
@@ -351,7 +343,7 @@ pub fn rgb_u16<'a>(
     height: usize,
     stride: usize,
 ) -> Result<RgbBuffer16<'a>, BufferError> {
-    Buffer::new(data, width, height, stride, PixelFormat::Rgb16)
+    Buffer::new_typed(data, width, height, stride)
 }
 
 pub fn rgba_u16<'a>(
@@ -360,5 +352,32 @@ pub fn rgba_u16<'a>(
     height: usize,
     stride: usize,
 ) -> Result<RgbaBuffer16<'a>, BufferError> {
-    Buffer::new(data, width, height, stride, PixelFormat::Rgba16)
+    Buffer::new_typed(data, width, height, stride)
+}
+
+pub fn gray_f32<'a>(
+    data: &'a mut [f32],
+    width: usize,
+    height: usize,
+    stride: usize,
+) -> Result<GrayBuffer32F<'a>, BufferError> {
+    Buffer::new_typed(data, width, height, stride)
+}
+
+pub fn rgb_f32<'a>(
+    data: &'a mut [f32],
+    width: usize,
+    height: usize,
+    stride: usize,
+) -> Result<RgbBuffer32F<'a>, BufferError> {
+    Buffer::new_typed(data, width, height, stride)
+}
+
+pub fn rgba_f32<'a>(
+    data: &'a mut [f32],
+    width: usize,
+    height: usize,
+    stride: usize,
+) -> Result<RgbaBuffer32F<'a>, BufferError> {
+    Buffer::new_typed(data, width, height, stride)
 }

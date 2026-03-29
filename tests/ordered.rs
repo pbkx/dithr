@@ -10,8 +10,8 @@ use dithr::data::{
 use dithr::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
     cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
-    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place, Buffer, Error, OrderedError,
-    Palette, PixelFormat, QuantizeMode,
+    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place, Error, OrderedError, Palette,
+    QuantizeMode,
 };
 
 const BAYER_2X2_FLAT: [u8; 4] = [0, 2, 3, 1];
@@ -65,13 +65,7 @@ fn cluster_maps_have_expected_dimensions() {
 #[test]
 fn bayer_2x2_quantizes_only_to_allowed_values() {
     let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     bayer_2x2_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 2x2 should succeed");
 
@@ -81,13 +75,7 @@ fn bayer_2x2_quantizes_only_to_allowed_values() {
 #[test]
 fn bayer_4x4_periodicity_matches_4() {
     let mut data = vec![127_u8; 64];
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     bayer_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 4x4 should succeed");
 
@@ -107,13 +95,7 @@ fn bayer_4x4_periodicity_matches_4() {
 #[test]
 fn bayer_8x8_periodicity_matches_8() {
     let mut data = vec![127_u8; 256];
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 8x8 should succeed");
 
@@ -133,13 +115,7 @@ fn bayer_8x8_periodicity_matches_8() {
 #[test]
 fn bayer_16x16_runs_on_16x16_without_panic() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     bayer_16x16_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("bayer 16x16 should succeed");
@@ -151,13 +127,7 @@ fn bayer_16x16_runs_on_16x16_without_panic() {
 #[test]
 fn cluster_dot_4x4_runs_and_quantizes() {
     let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     cluster_dot_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("cluster-dot 4x4 should succeed");
@@ -168,13 +138,7 @@ fn cluster_dot_4x4_runs_and_quantizes() {
 #[test]
 fn cluster_dot_8x8_runs_and_quantizes() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     cluster_dot_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("cluster-dot 8x8 should succeed");
@@ -185,13 +149,7 @@ fn cluster_dot_8x8_runs_and_quantizes() {
 #[test]
 fn custom_ordered_rejects_empty_map() {
     let mut data = vec![0_u8; 4];
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 2,
-        height: 2,
-        stride: 2,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 2, 2, 2).expect("valid buffer should construct");
 
     let result = custom_ordered_in_place(&mut buffer, QuantizeMode::GrayBits(1), &[], 0, 0, 64);
 
@@ -201,13 +159,7 @@ fn custom_ordered_rejects_empty_map() {
 #[test]
 fn custom_ordered_rejects_bad_dimensions() {
     let mut data = vec![0_u8; 4];
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 2,
-        height: 2,
-        stride: 2,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 2, 2, 2).expect("valid buffer should construct");
 
     let map = [0_u8, 1, 2];
     let result = custom_ordered_in_place(&mut buffer, QuantizeMode::GrayBits(1), &map, 2, 2, 64);
@@ -218,13 +170,7 @@ fn custom_ordered_rejects_bad_dimensions() {
 #[test]
 fn custom_ordered_rejects_out_of_range_map_values() {
     let mut data = gray_ramp_8x8();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
     let normalized_map = [0_u8, 85, 170, 255];
 
     let result = custom_ordered_in_place(
@@ -243,20 +189,8 @@ fn custom_ordered_2x2_matches_manual_small_case() {
     let mut data_a: Vec<u8> = (0_u8..16).map(|value| value.saturating_mul(16)).collect();
     let mut data_b = data_a.clone();
 
-    let mut buffer_a = Buffer {
-        data: &mut data_a,
-        width: 4,
-        height: 4,
-        stride: 4,
-        format: PixelFormat::<()>::Gray8,
-    };
-    let mut buffer_b = Buffer {
-        data: &mut data_b,
-        width: 4,
-        height: 4,
-        stride: 4,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer_a = dithr::gray_u8(&mut data_a, 4, 4, 4).expect("valid buffer should construct");
+    let mut buffer_b = dithr::gray_u8(&mut data_b, 4, 4, 4).expect("valid buffer should construct");
 
     custom_ordered_in_place(
         &mut buffer_a,
@@ -286,13 +220,7 @@ fn yliluoma_1_output_is_always_palette_member() {
         [255, 0, 255],
     ])
     .expect("palette should be valid");
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 24,
-        format: PixelFormat::<()>::Rgb8,
-    };
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
 
     yliluoma_1_in_place(&mut buffer, &palette).expect("yliluoma 1 should succeed");
 
@@ -317,20 +245,8 @@ fn yliluoma_1_deterministic_rgb_fixture() {
         [255, 0, 255],
     ])
     .expect("palette should be valid");
-    let mut buffer_a = Buffer {
-        data: &mut data_a,
-        width: 8,
-        height: 8,
-        stride: 24,
-        format: PixelFormat::<()>::Rgb8,
-    };
-    let mut buffer_b = Buffer {
-        data: &mut data_b,
-        width: 8,
-        height: 8,
-        stride: 24,
-        format: PixelFormat::<()>::Rgb8,
-    };
+    let mut buffer_a = dithr::rgb_u8(&mut data_a, 8, 8, 24).expect("valid buffer should construct");
+    let mut buffer_b = dithr::rgb_u8(&mut data_b, 8, 8, 24).expect("valid buffer should construct");
 
     yliluoma_1_in_place(&mut buffer_a, &palette).expect("yliluoma 1 should succeed");
     yliluoma_1_in_place(&mut buffer_b, &palette).expect("yliluoma 1 should succeed");
@@ -352,13 +268,7 @@ fn yliluoma_2_output_is_always_palette_member() {
         [255, 0, 255],
     ])
     .expect("palette should be valid");
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 24,
-        format: PixelFormat::<()>::Rgb8,
-    };
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
 
     yliluoma_2_in_place(&mut buffer, &palette).expect("yliluoma 2 should succeed");
 
@@ -382,13 +292,7 @@ fn yliluoma_3_output_is_always_palette_member() {
         [255, 0, 255],
     ])
     .expect("palette should be valid");
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 24,
-        format: PixelFormat::<()>::Rgb8,
-    };
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
 
     yliluoma_3_in_place(&mut buffer, &palette).expect("yliluoma 3 should succeed");
 
@@ -422,13 +326,8 @@ fn yliluoma_u16_palette_member_invariant() {
         [65_535, 0, 65_535],
     ])
     .expect("palette should be valid");
-    let mut buffer = Buffer {
-        data: &mut data,
-        width,
-        height,
-        stride: width * 3,
-        format: PixelFormat::<()>::Rgb16,
-    };
+    let mut buffer =
+        dithr::rgb_u16(&mut data, width, height, width * 3).expect("valid buffer should construct");
 
     yliluoma_1_in_place(&mut buffer, &palette).expect("yliluoma 1 should succeed");
 
@@ -462,13 +361,8 @@ fn yliluoma_f32_palette_member_invariant() {
         [1.0, 0.0, 1.0],
     ])
     .expect("palette should be valid");
-    let mut buffer = Buffer {
-        data: &mut data,
-        width,
-        height,
-        stride: width * 3,
-        format: PixelFormat::<()>::Rgb32F,
-    };
+    let mut buffer =
+        dithr::rgb_f32(&mut data, width, height, width * 3).expect("valid buffer should construct");
 
     yliluoma_1_in_place(&mut buffer, &palette).expect("yliluoma 1 should succeed");
 
@@ -494,13 +388,8 @@ fn yliluoma_rgba_alpha_preserved_u16() {
         [0, 0, 65_535],
     ])
     .expect("palette should be valid");
-    let mut buffer = Buffer {
-        data: &mut data,
-        width,
-        height,
-        stride: width * 4,
-        format: PixelFormat::<()>::Rgba16,
-    };
+    let mut buffer = dithr::rgba_u16(&mut data, width, height, width * 4)
+        .expect("valid buffer should construct");
 
     yliluoma_2_in_place(&mut buffer, &palette).expect("yliluoma 2 should succeed");
 
@@ -511,13 +400,7 @@ fn yliluoma_rgba_alpha_preserved_u16() {
 #[test]
 fn ordered_engine_gray_uses_only_quantized_values() {
     let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     custom_ordered_in_place(
         &mut buffer,
@@ -547,13 +430,7 @@ fn ordered_engine_rgb_palette_output_is_palette_member() {
         [0, 0, 255],
     ])
     .expect("palette should be valid");
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 4,
-        height: 4,
-        stride: 12,
-        format: PixelFormat::<()>::Rgb8,
-    };
+    let mut buffer = dithr::rgb_u8(&mut data, 4, 4, 12).expect("valid buffer should construct");
 
     custom_ordered_in_place(
         &mut buffer,
@@ -579,20 +456,8 @@ fn ordered_engine_is_deterministic() {
     let mut a = seed_data.clone();
     let mut b = seed_data;
 
-    let mut buffer_a = Buffer {
-        data: &mut a,
-        width: 8,
-        height: 5,
-        stride: 24,
-        format: PixelFormat::<()>::Rgb8,
-    };
-    let mut buffer_b = Buffer {
-        data: &mut b,
-        width: 8,
-        height: 5,
-        stride: 24,
-        format: PixelFormat::<()>::Rgb8,
-    };
+    let mut buffer_a = dithr::rgb_u8(&mut a, 8, 5, 24).expect("valid buffer should construct");
+    let mut buffer_b = dithr::rgb_u8(&mut b, 8, 5, 24).expect("valid buffer should construct");
 
     custom_ordered_in_place(
         &mut buffer_a,
@@ -622,13 +487,7 @@ fn ordered_engine_preserves_alpha_channel() {
         .map(|value| ((value * 19 + 11) % 256) as u8)
         .collect();
     let before_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 4,
-        height: 5,
-        stride: 16,
-        format: PixelFormat::<()>::Rgba8,
-    };
+    let mut buffer = dithr::rgba_u8(&mut data, 4, 5, 16).expect("valid buffer should construct");
 
     custom_ordered_in_place(
         &mut buffer,
@@ -649,13 +508,7 @@ fn bayer_8x8_u16_runs_and_quantizes() {
     let mut data: Vec<u16> = (0_u32..256)
         .map(|value| ((value * 257) % 65_536) as u16)
         .collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray16,
-    };
+    let mut buffer = dithr::gray_u16(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayLevels(2)).expect("bayer 8x8 should succeed");
 
@@ -667,13 +520,7 @@ fn bayer_8x8_f32_runs_and_quantizes() {
     let mut data: Vec<f32> = (0_u32..(16 * 16 * 3))
         .map(|value| (value % 256) as f32 / 255.0)
         .collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 48,
-        format: PixelFormat::<()>::Rgb32F,
-    };
+    let mut buffer = dithr::rgb_f32(&mut data, 16, 16, 48).expect("valid buffer should construct");
 
     bayer_8x8_in_place(&mut buffer, QuantizeMode::RgbLevels(2)).expect("bayer 8x8 should succeed");
 
@@ -686,13 +533,8 @@ fn ordered_engine_preserves_alpha_across_u8_u16_f32() {
 
     let mut rgba_u8: Vec<u8> = (0_u16..64).map(|v| (v * 3) as u8).collect();
     let before_u8: Vec<u8> = rgba_u8.iter().skip(3).step_by(4).copied().collect();
-    let mut buffer_u8 = Buffer {
-        data: &mut rgba_u8,
-        width: 4,
-        height: 4,
-        stride: 16,
-        format: PixelFormat::<()>::Rgba8,
-    };
+    let mut buffer_u8 =
+        dithr::rgba_u8(&mut rgba_u8, 4, 4, 16).expect("valid buffer should construct");
     custom_ordered_in_place(&mut buffer_u8, QuantizeMode::RgbBits(2), &map, 2, 2, 48)
         .expect("u8 ordered dithering should succeed");
     let after_u8: Vec<u8> = rgba_u8.iter().skip(3).step_by(4).copied().collect();
@@ -700,13 +542,8 @@ fn ordered_engine_preserves_alpha_across_u8_u16_f32() {
 
     let mut rgba_u16: Vec<u16> = (0_u32..64).map(|v| ((v * 1009) % 65_536) as u16).collect();
     let before_u16: Vec<u16> = rgba_u16.iter().skip(3).step_by(4).copied().collect();
-    let mut buffer_u16 = Buffer {
-        data: &mut rgba_u16,
-        width: 4,
-        height: 4,
-        stride: 16,
-        format: PixelFormat::<()>::Rgba16,
-    };
+    let mut buffer_u16 =
+        dithr::rgba_u16(&mut rgba_u16, 4, 4, 16).expect("valid buffer should construct");
     custom_ordered_in_place(&mut buffer_u16, QuantizeMode::RgbLevels(4), &map, 2, 2, 48)
         .expect("u16 ordered dithering should succeed");
     let after_u16: Vec<u16> = rgba_u16.iter().skip(3).step_by(4).copied().collect();
@@ -714,13 +551,8 @@ fn ordered_engine_preserves_alpha_across_u8_u16_f32() {
 
     let mut rgba_f32: Vec<f32> = (0_u32..64).map(|v| (v as f32) / 63.0).collect();
     let before_f32: Vec<f32> = rgba_f32.iter().skip(3).step_by(4).copied().collect();
-    let mut buffer_f32 = Buffer {
-        data: &mut rgba_f32,
-        width: 4,
-        height: 4,
-        stride: 16,
-        format: PixelFormat::<()>::Rgba32F,
-    };
+    let mut buffer_f32 =
+        dithr::rgba_f32(&mut rgba_f32, 4, 4, 16).expect("valid buffer should construct");
     custom_ordered_in_place(&mut buffer_f32, QuantizeMode::RgbLevels(4), &map, 2, 2, 48)
         .expect("f32 ordered dithering should succeed");
     let after_f32: Vec<f32> = rgba_f32.iter().skip(3).step_by(4).copied().collect();
@@ -730,13 +562,7 @@ fn ordered_engine_preserves_alpha_across_u8_u16_f32() {
 #[test]
 fn custom_ordered_map_tiling_is_consistent() {
     let mut data = vec![127_u8; 64];
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
     custom_ordered_in_place(
         &mut buffer,
@@ -803,20 +629,10 @@ fn bayer_8x8_parallel_matches_sequential() {
 
     let mut seq = gray_ramp_16x16();
     let mut par = seq.clone();
-    let mut seq_buffer = Buffer {
-        data: &mut seq,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
-    let mut par_buffer = Buffer {
-        data: &mut par,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut seq_buffer =
+        dithr::gray_u8(&mut seq, 16, 16, 16).expect("valid buffer should construct");
+    let mut par_buffer =
+        dithr::gray_u8(&mut par, 16, 16, 16).expect("valid buffer should construct");
 
     bayer_8x8_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1))
         .expect("sequential should succeed");
@@ -833,20 +649,10 @@ fn cluster_dot_8x8_parallel_matches_sequential() {
 
     let mut seq = gray_ramp_16x16();
     let mut par = seq.clone();
-    let mut seq_buffer = Buffer {
-        data: &mut seq,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
-    let mut par_buffer = Buffer {
-        data: &mut par,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut seq_buffer =
+        dithr::gray_u8(&mut seq, 16, 16, 16).expect("valid buffer should construct");
+    let mut par_buffer =
+        dithr::gray_u8(&mut par, 16, 16, 16).expect("valid buffer should construct");
 
     cluster_dot_8x8_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1))
         .expect("sequential should succeed");
@@ -864,20 +670,10 @@ fn custom_ordered_parallel_matches_sequential() {
     let map = [0_u8, 2, 3, 1];
     let mut seq = gray_ramp_16x16();
     let mut par = seq.clone();
-    let mut seq_buffer = Buffer {
-        data: &mut seq,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
-    let mut par_buffer = Buffer {
-        data: &mut par,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut seq_buffer =
+        dithr::gray_u8(&mut seq, 16, 16, 16).expect("valid buffer should construct");
+    let mut par_buffer =
+        dithr::gray_u8(&mut par, 16, 16, 16).expect("valid buffer should construct");
 
     custom_ordered_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1), &map, 2, 2, 64)
         .expect("sequential should succeed");

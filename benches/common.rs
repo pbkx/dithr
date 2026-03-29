@@ -2,8 +2,8 @@ use std::sync::OnceLock;
 
 use criterion::{black_box, measurement::WallTime, BatchSize, BenchmarkGroup, Throughput};
 use dithr::{
-    cga_palette, grayscale_16, grayscale_2, grayscale_4, Buffer, GrayBuffer16, Palette,
-    PixelFormat, QuantizeMode, Result as DithrResult,
+    cga_palette, gray_u16, gray_u8, grayscale_16, grayscale_2, grayscale_4, rgb_u8, GrayBuffer16,
+    GrayBuffer8, Palette, QuantizeMode, Result as DithrResult, RgbBuffer8,
 };
 
 pub const CUSTOM_2X2_MAP: [u8; 4] = [0, 2, 3, 1];
@@ -118,7 +118,7 @@ pub fn bench_gray_case<F>(
     height: usize,
     mut run: F,
 ) where
-    F: FnMut(&mut Buffer<'_>) -> DithrResult<()>,
+    F: FnMut(&mut GrayBuffer8<'_>) -> DithrResult<()>,
 {
     group.bench_function(name, |b| {
         b.iter_batched(
@@ -141,7 +141,7 @@ pub fn bench_rgb_case<F>(
     height: usize,
     mut run: F,
 ) where
-    F: FnMut(&mut Buffer<'_>) -> DithrResult<()>,
+    F: FnMut(&mut RgbBuffer8<'_>) -> DithrResult<()>,
 {
     group.bench_function(name, |b| {
         b.iter_batched(
@@ -160,8 +160,8 @@ pub fn bench_rgb_case<F>(
 #[allow(dead_code)]
 pub fn assert_gray_seq_par_equal<F, G>(fixture: &[u8], width: usize, height: usize, seq: F, par: G)
 where
-    F: Fn(&mut Buffer<'_>) -> DithrResult<()>,
-    G: Fn(&mut Buffer<'_>) -> DithrResult<()>,
+    F: Fn(&mut GrayBuffer8<'_>) -> DithrResult<()>,
+    G: Fn(&mut GrayBuffer8<'_>) -> DithrResult<()>,
 {
     let mut seq_data = fixture.to_vec();
     let mut par_data = fixture.to_vec();
@@ -255,34 +255,16 @@ pub fn rgb_noise(width: usize, height: usize, seed: u64) -> Vec<u8> {
     out
 }
 
-pub fn gray_buffer<'a>(data: &'a mut [u8], width: usize, height: usize) -> Buffer<'a> {
-    Buffer {
-        data,
-        width,
-        height,
-        stride: width,
-        format: PixelFormat::Gray8,
-    }
+pub fn gray_buffer<'a>(data: &'a mut [u8], width: usize, height: usize) -> GrayBuffer8<'a> {
+    gray_u8(data, width, height, width).expect("valid Gray8 benchmark buffer")
 }
 
 pub fn gray_buffer_u16<'a>(data: &'a mut [u16], width: usize, height: usize) -> GrayBuffer16<'a> {
-    Buffer {
-        data,
-        width,
-        height,
-        stride: width,
-        format: PixelFormat::Gray16,
-    }
+    gray_u16(data, width, height, width).expect("valid Gray16 benchmark buffer")
 }
 
-pub fn rgb_buffer<'a>(data: &'a mut [u8], width: usize, height: usize) -> Buffer<'a> {
-    Buffer {
-        data,
-        width,
-        height,
-        stride: width.saturating_mul(3),
-        format: PixelFormat::Rgb8,
-    }
+pub fn rgb_buffer<'a>(data: &'a mut [u8], width: usize, height: usize) -> RgbBuffer8<'a> {
+    rgb_u8(data, width, height, width.saturating_mul(3)).expect("valid Rgb8 benchmark buffer")
 }
 
 pub fn palette_bw() -> Palette {

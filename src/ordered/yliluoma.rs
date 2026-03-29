@@ -2,7 +2,7 @@ use crate::{
     core::{PixelLayout, Sample},
     data::BAYER_8X8,
     math::color::rgb_distance_sq,
-    Buffer, BufferError, Error, Palette, PixelFormat, Result,
+    Buffer, BufferError, Error, Palette, Result,
 };
 use std::collections::HashMap;
 
@@ -77,8 +77,13 @@ pub(crate) fn yliluoma_1_in_place<S: Sample, L: PixelLayout>(
     let view = PaletteView::new(palette);
     let width = buffer.width;
     let height = buffer.height;
-    let format = buffer.format;
-    let channels = format.channels();
+    if (L::CHANNELS != 3 || L::HAS_ALPHA) && (L::CHANNELS != 4 || !L::HAS_ALPHA) {
+        return Err(Error::UnsupportedFormat(
+            "yliluoma ordered dithering supports Rgb and Rgba formats only",
+        ));
+    }
+    let channels = L::CHANNELS;
+    let is_rgba = L::HAS_ALPHA;
     let mut cache = HashMap::<u32, MixingPlan>::new();
 
     for y in 0..height {
@@ -86,23 +91,11 @@ pub(crate) fn yliluoma_1_in_place<S: Sample, L: PixelLayout>(
 
         for x in 0..width {
             let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
-            let source_rgb = match format {
-                PixelFormat::Rgb8
-                | PixelFormat::Rgb16
-                | PixelFormat::Rgb32F
-                | PixelFormat::Rgba8
-                | PixelFormat::Rgba16
-                | PixelFormat::Rgba32F => [
-                    sample_to_byte(row[offset]),
-                    sample_to_byte(row[offset + 1]),
-                    sample_to_byte(row[offset + 2]),
-                ],
-                _ => {
-                    return Err(Error::UnsupportedFormat(
-                        "yliluoma ordered dithering supports Rgb and Rgba formats only",
-                    ));
-                }
-            };
+            let source_rgb = [
+                sample_to_byte(row[offset]),
+                sample_to_byte(row[offset + 1]),
+                sample_to_byte(row[offset + 2]),
+            ];
             let key = pack_rgb(source_rgb);
             let plan = if let Some(&cached) = cache.get(&key) {
                 cached
@@ -118,24 +111,16 @@ pub(crate) fn yliluoma_1_in_place<S: Sample, L: PixelLayout>(
                 view.colors[plan.first_index]
             };
 
-            match format {
-                PixelFormat::Rgb8 | PixelFormat::Rgb16 | PixelFormat::Rgb32F => {
-                    row[offset] = chosen[0];
-                    row[offset + 1] = chosen[1];
-                    row[offset + 2] = chosen[2];
-                }
-                PixelFormat::Rgba8 | PixelFormat::Rgba16 | PixelFormat::Rgba32F => {
-                    let alpha = row[offset + 3];
-                    row[offset] = chosen[0];
-                    row[offset + 1] = chosen[1];
-                    row[offset + 2] = chosen[2];
-                    row[offset + 3] = alpha;
-                }
-                _ => {
-                    return Err(Error::UnsupportedFormat(
-                        "yliluoma ordered dithering supports Rgb and Rgba formats only",
-                    ));
-                }
+            if is_rgba {
+                let alpha = row[offset + 3];
+                row[offset] = chosen[0];
+                row[offset + 1] = chosen[1];
+                row[offset + 2] = chosen[2];
+                row[offset + 3] = alpha;
+            } else {
+                row[offset] = chosen[0];
+                row[offset + 1] = chosen[1];
+                row[offset + 2] = chosen[2];
             }
         }
     }
@@ -152,8 +137,13 @@ pub(crate) fn yliluoma_2_in_place<S: Sample, L: PixelLayout>(
     let view = PaletteView::new(palette);
     let width = buffer.width;
     let height = buffer.height;
-    let format = buffer.format;
-    let channels = format.channels();
+    if (L::CHANNELS != 3 || L::HAS_ALPHA) && (L::CHANNELS != 4 || !L::HAS_ALPHA) {
+        return Err(Error::UnsupportedFormat(
+            "yliluoma ordered dithering supports Rgb and Rgba formats only",
+        ));
+    }
+    let channels = L::CHANNELS;
+    let is_rgba = L::HAS_ALPHA;
     let mut cache = HashMap::<u32, Vec<usize>>::new();
 
     for y in 0..height {
@@ -161,23 +151,11 @@ pub(crate) fn yliluoma_2_in_place<S: Sample, L: PixelLayout>(
 
         for x in 0..width {
             let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
-            let source_rgb = match format {
-                PixelFormat::Rgb8
-                | PixelFormat::Rgb16
-                | PixelFormat::Rgb32F
-                | PixelFormat::Rgba8
-                | PixelFormat::Rgba16
-                | PixelFormat::Rgba32F => [
-                    sample_to_byte(row[offset]),
-                    sample_to_byte(row[offset + 1]),
-                    sample_to_byte(row[offset + 2]),
-                ],
-                _ => {
-                    return Err(Error::UnsupportedFormat(
-                        "yliluoma ordered dithering supports Rgb and Rgba formats only",
-                    ));
-                }
-            };
+            let source_rgb = [
+                sample_to_byte(row[offset]),
+                sample_to_byte(row[offset + 1]),
+                sample_to_byte(row[offset + 2]),
+            ];
             let key = pack_rgb(source_rgb);
             let selected = {
                 let plan = cache.entry(key).or_insert_with(|| {
@@ -193,24 +171,16 @@ pub(crate) fn yliluoma_2_in_place<S: Sample, L: PixelLayout>(
             };
             let chosen = view.colors[selected];
 
-            match format {
-                PixelFormat::Rgb8 | PixelFormat::Rgb16 | PixelFormat::Rgb32F => {
-                    row[offset] = chosen[0];
-                    row[offset + 1] = chosen[1];
-                    row[offset + 2] = chosen[2];
-                }
-                PixelFormat::Rgba8 | PixelFormat::Rgba16 | PixelFormat::Rgba32F => {
-                    let alpha = row[offset + 3];
-                    row[offset] = chosen[0];
-                    row[offset + 1] = chosen[1];
-                    row[offset + 2] = chosen[2];
-                    row[offset + 3] = alpha;
-                }
-                _ => {
-                    return Err(Error::UnsupportedFormat(
-                        "yliluoma ordered dithering supports Rgb and Rgba formats only",
-                    ));
-                }
+            if is_rgba {
+                let alpha = row[offset + 3];
+                row[offset] = chosen[0];
+                row[offset + 1] = chosen[1];
+                row[offset + 2] = chosen[2];
+                row[offset + 3] = alpha;
+            } else {
+                row[offset] = chosen[0];
+                row[offset + 1] = chosen[1];
+                row[offset + 2] = chosen[2];
             }
         }
     }
@@ -227,8 +197,13 @@ pub(crate) fn yliluoma_3_in_place<S: Sample, L: PixelLayout>(
     let view = PaletteView::new(palette);
     let width = buffer.width;
     let height = buffer.height;
-    let format = buffer.format;
-    let channels = format.channels();
+    if (L::CHANNELS != 3 || L::HAS_ALPHA) && (L::CHANNELS != 4 || !L::HAS_ALPHA) {
+        return Err(Error::UnsupportedFormat(
+            "yliluoma ordered dithering supports Rgb and Rgba formats only",
+        ));
+    }
+    let channels = L::CHANNELS;
+    let is_rgba = L::HAS_ALPHA;
     let mut cache = HashMap::<u32, Vec<usize>>::new();
     let palette_gamma = view.gamma_table();
 
@@ -237,23 +212,11 @@ pub(crate) fn yliluoma_3_in_place<S: Sample, L: PixelLayout>(
 
         for x in 0..width {
             let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
-            let source_rgb = match format {
-                PixelFormat::Rgb8
-                | PixelFormat::Rgb16
-                | PixelFormat::Rgb32F
-                | PixelFormat::Rgba8
-                | PixelFormat::Rgba16
-                | PixelFormat::Rgba32F => [
-                    sample_to_byte(row[offset]),
-                    sample_to_byte(row[offset + 1]),
-                    sample_to_byte(row[offset + 2]),
-                ],
-                _ => {
-                    return Err(Error::UnsupportedFormat(
-                        "yliluoma ordered dithering supports Rgb and Rgba formats only",
-                    ));
-                }
-            };
+            let source_rgb = [
+                sample_to_byte(row[offset]),
+                sample_to_byte(row[offset + 1]),
+                sample_to_byte(row[offset + 2]),
+            ];
             let key = pack_rgb(source_rgb);
             let selected = {
                 let plan = cache.entry(key).or_insert_with(|| {
@@ -269,24 +232,16 @@ pub(crate) fn yliluoma_3_in_place<S: Sample, L: PixelLayout>(
             };
             let chosen = view.colors[selected];
 
-            match format {
-                PixelFormat::Rgb8 | PixelFormat::Rgb16 | PixelFormat::Rgb32F => {
-                    row[offset] = chosen[0];
-                    row[offset + 1] = chosen[1];
-                    row[offset + 2] = chosen[2];
-                }
-                PixelFormat::Rgba8 | PixelFormat::Rgba16 | PixelFormat::Rgba32F => {
-                    let alpha = row[offset + 3];
-                    row[offset] = chosen[0];
-                    row[offset + 1] = chosen[1];
-                    row[offset + 2] = chosen[2];
-                    row[offset + 3] = alpha;
-                }
-                _ => {
-                    return Err(Error::UnsupportedFormat(
-                        "yliluoma ordered dithering supports Rgb and Rgba formats only",
-                    ));
-                }
+            if is_rgba {
+                let alpha = row[offset + 3];
+                row[offset] = chosen[0];
+                row[offset + 1] = chosen[1];
+                row[offset + 2] = chosen[2];
+                row[offset + 3] = alpha;
+            } else {
+                row[offset] = chosen[0];
+                row[offset + 1] = chosen[1];
+                row[offset + 2] = chosen[2];
             }
         }
     }

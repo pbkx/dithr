@@ -1,12 +1,13 @@
 use crate::{
+    core::PixelLayout,
     math::{color::luma_u8, utils::clamp_u8},
-    quantize_pixel, Buffer, BufferError, PixelFormat, QuantizeMode, Result,
+    quantize_pixel, Buffer, BufferError, QuantizeMode, Result,
 };
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
-pub fn threshold_binary_in_place(
-    buffer: &mut Buffer<'_>,
+pub fn threshold_binary_in_place<L: PixelLayout>(
+    buffer: &mut Buffer<'_, u8, L>,
     mode: QuantizeMode<'_>,
     threshold: u8,
 ) -> Result<()> {
@@ -14,8 +15,7 @@ pub fn threshold_binary_in_place(
 
     let width = buffer.width;
     let height = buffer.height;
-    let format = buffer.format;
-    let bpp = format.bytes_per_pixel();
+    let bpp = L::CHANNELS;
 
     for y in 0..height {
         let row = buffer.try_row_mut(y)?;
@@ -23,46 +23,41 @@ pub fn threshold_binary_in_place(
         for x in 0..width {
             let offset = x.checked_mul(bpp).ok_or(BufferError::OutOfBounds)?;
 
-            match format {
-                PixelFormat::Gray8 => {
-                    let light = row[offset] > threshold;
-                    let sample = if light { [255_u8] } else { [0_u8] };
-                    let quantized = quantize_pixel::<u8, crate::core::Gray>(&sample, mode)?;
-                    row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
-                }
-                PixelFormat::Rgb8 => {
-                    let source = [row[offset], row[offset + 1], row[offset + 2]];
-                    let light = luma_u8(source) > threshold;
-                    let sample = if light {
-                        [255_u8, 255_u8, 255_u8]
-                    } else {
-                        [0_u8, 0_u8, 0_u8]
-                    };
-                    let quantized = quantize_pixel::<u8, crate::core::Rgb>(&sample, mode)?;
-                    row[offset] = quantized[0];
-                    row[offset + 1] = quantized[1];
-                    row[offset + 2] = quantized[2];
-                }
-                PixelFormat::Rgba8 => {
-                    let alpha = row[offset + 3];
-                    let source = [row[offset], row[offset + 1], row[offset + 2]];
-                    let light = luma_u8(source) > threshold;
-                    let sample = if light {
-                        [255_u8, 255_u8, 255_u8, alpha]
-                    } else {
-                        [0_u8, 0_u8, 0_u8, alpha]
-                    };
-                    let quantized = quantize_pixel::<u8, crate::core::Rgba>(&sample, mode)?;
-                    row[offset] = quantized[0];
-                    row[offset + 1] = quantized[1];
-                    row[offset + 2] = quantized[2];
-                    row[offset + 3] = alpha;
-                }
-                _ => {
-                    return Err(crate::Error::UnsupportedFormat(
-                        "stochastic dithering supports Gray8, Rgb8, and Rgba8 only",
-                    ));
-                }
+            if L::CHANNELS == 1 && !L::HAS_ALPHA {
+                let light = row[offset] > threshold;
+                let sample = if light { [255_u8] } else { [0_u8] };
+                let quantized = quantize_pixel::<u8, crate::core::Gray>(&sample, mode)?;
+                row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
+            } else if L::CHANNELS == 3 && !L::HAS_ALPHA {
+                let source = [row[offset], row[offset + 1], row[offset + 2]];
+                let light = luma_u8(source) > threshold;
+                let sample = if light {
+                    [255_u8, 255_u8, 255_u8]
+                } else {
+                    [0_u8, 0_u8, 0_u8]
+                };
+                let quantized = quantize_pixel::<u8, crate::core::Rgb>(&sample, mode)?;
+                row[offset] = quantized[0];
+                row[offset + 1] = quantized[1];
+                row[offset + 2] = quantized[2];
+            } else if L::CHANNELS == 4 && L::HAS_ALPHA {
+                let alpha = row[offset + 3];
+                let source = [row[offset], row[offset + 1], row[offset + 2]];
+                let light = luma_u8(source) > threshold;
+                let sample = if light {
+                    [255_u8, 255_u8, 255_u8, alpha]
+                } else {
+                    [0_u8, 0_u8, 0_u8, alpha]
+                };
+                let quantized = quantize_pixel::<u8, crate::core::Rgba>(&sample, mode)?;
+                row[offset] = quantized[0];
+                row[offset + 1] = quantized[1];
+                row[offset + 2] = quantized[2];
+                row[offset + 3] = alpha;
+            } else {
+                return Err(crate::Error::UnsupportedFormat(
+                    "stochastic dithering supports Gray8, Rgb8, and Rgba8 only",
+                ));
             }
         }
     }
@@ -70,8 +65,8 @@ pub fn threshold_binary_in_place(
     Ok(())
 }
 
-pub fn random_binary_in_place(
-    buffer: &mut Buffer<'_>,
+pub fn random_binary_in_place<L: PixelLayout>(
+    buffer: &mut Buffer<'_, u8, L>,
     mode: QuantizeMode<'_>,
     seed: u64,
     strength: u8,
@@ -80,8 +75,7 @@ pub fn random_binary_in_place(
 
     let width = buffer.width;
     let height = buffer.height;
-    let format = buffer.format;
-    let bpp = format.bytes_per_pixel();
+    let bpp = L::CHANNELS;
     let mut prng = XorShift64::new(seed);
 
     for y in 0..height {
@@ -91,14 +85,74 @@ pub fn random_binary_in_place(
             let threshold = perturbed_threshold(&mut prng, seed, x, y, strength);
             let offset = x.checked_mul(bpp).ok_or(BufferError::OutOfBounds)?;
 
-            match format {
-                PixelFormat::Gray8 => {
+            if L::CHANNELS == 1 && !L::HAS_ALPHA {
+                let light = row[offset] > threshold;
+                let sample = if light { [255_u8] } else { [0_u8] };
+                let quantized = quantize_pixel::<u8, crate::core::Gray>(&sample, mode)?;
+                row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
+            } else if L::CHANNELS == 3 && !L::HAS_ALPHA {
+                let source = [row[offset], row[offset + 1], row[offset + 2]];
+                let light = luma_u8(source) > threshold;
+                let sample = if light {
+                    [255_u8, 255_u8, 255_u8]
+                } else {
+                    [0_u8, 0_u8, 0_u8]
+                };
+                let quantized = quantize_pixel::<u8, crate::core::Rgb>(&sample, mode)?;
+                row[offset] = quantized[0];
+                row[offset + 1] = quantized[1];
+                row[offset + 2] = quantized[2];
+            } else if L::CHANNELS == 4 && L::HAS_ALPHA {
+                let alpha = row[offset + 3];
+                let source = [row[offset], row[offset + 1], row[offset + 2]];
+                let light = luma_u8(source) > threshold;
+                let sample = if light {
+                    [255_u8, 255_u8, 255_u8, alpha]
+                } else {
+                    [0_u8, 0_u8, 0_u8, alpha]
+                };
+                let quantized = quantize_pixel::<u8, crate::core::Rgba>(&sample, mode)?;
+                row[offset] = quantized[0];
+                row[offset + 1] = quantized[1];
+                row[offset + 2] = quantized[2];
+                row[offset + 3] = alpha;
+            } else {
+                return Err(crate::Error::UnsupportedFormat(
+                    "stochastic dithering supports Gray8, Rgb8, and Rgba8 only",
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "rayon")]
+pub fn threshold_binary_in_place_par<L: PixelLayout>(
+    buffer: &mut Buffer<'_, u8, L>,
+    mode: QuantizeMode<'_>,
+    threshold: u8,
+) -> Result<()> {
+    buffer.validate()?;
+
+    let width = buffer.width;
+    let height = buffer.height;
+    let bpp = L::CHANNELS;
+    let stride = buffer.stride;
+
+    buffer
+        .data
+        .par_chunks_mut(stride)
+        .take(height)
+        .try_for_each(|row| -> Result<()> {
+            for x in 0..width {
+                let offset = x * bpp;
+                if L::CHANNELS == 1 && !L::HAS_ALPHA {
                     let light = row[offset] > threshold;
                     let sample = if light { [255_u8] } else { [0_u8] };
                     let quantized = quantize_pixel::<u8, crate::core::Gray>(&sample, mode)?;
                     row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
-                }
-                PixelFormat::Rgb8 => {
+                } else if L::CHANNELS == 3 && !L::HAS_ALPHA {
                     let source = [row[offset], row[offset + 1], row[offset + 2]];
                     let light = luma_u8(source) > threshold;
                     let sample = if light {
@@ -110,8 +164,7 @@ pub fn random_binary_in_place(
                     row[offset] = quantized[0];
                     row[offset + 1] = quantized[1];
                     row[offset + 2] = quantized[2];
-                }
-                PixelFormat::Rgba8 => {
+                } else if L::CHANNELS == 4 && L::HAS_ALPHA {
                     let alpha = row[offset + 3];
                     let source = [row[offset], row[offset + 1], row[offset + 2]];
                     let light = luma_u8(source) > threshold;
@@ -125,80 +178,10 @@ pub fn random_binary_in_place(
                     row[offset + 1] = quantized[1];
                     row[offset + 2] = quantized[2];
                     row[offset + 3] = alpha;
-                }
-                _ => {
+                } else {
                     return Err(crate::Error::UnsupportedFormat(
                         "stochastic dithering supports Gray8, Rgb8, and Rgba8 only",
                     ));
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
-
-#[cfg(feature = "rayon")]
-pub fn threshold_binary_in_place_par(
-    buffer: &mut Buffer<'_>,
-    mode: QuantizeMode<'_>,
-    threshold: u8,
-) -> Result<()> {
-    buffer.validate()?;
-
-    let width = buffer.width;
-    let height = buffer.height;
-    let format = buffer.format;
-    let bpp = format.bytes_per_pixel();
-    let stride = buffer.stride;
-
-    buffer
-        .data
-        .par_chunks_mut(stride)
-        .take(height)
-        .try_for_each(|row| -> Result<()> {
-            for x in 0..width {
-                let offset = x * bpp;
-                match format {
-                    PixelFormat::Gray8 => {
-                        let light = row[offset] > threshold;
-                        let sample = if light { [255_u8] } else { [0_u8] };
-                        let quantized = quantize_pixel::<u8, crate::core::Gray>(&sample, mode)?;
-                        row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
-                    }
-                    PixelFormat::Rgb8 => {
-                        let source = [row[offset], row[offset + 1], row[offset + 2]];
-                        let light = luma_u8(source) > threshold;
-                        let sample = if light {
-                            [255_u8, 255_u8, 255_u8]
-                        } else {
-                            [0_u8, 0_u8, 0_u8]
-                        };
-                        let quantized = quantize_pixel::<u8, crate::core::Rgb>(&sample, mode)?;
-                        row[offset] = quantized[0];
-                        row[offset + 1] = quantized[1];
-                        row[offset + 2] = quantized[2];
-                    }
-                    PixelFormat::Rgba8 => {
-                        let alpha = row[offset + 3];
-                        let source = [row[offset], row[offset + 1], row[offset + 2]];
-                        let light = luma_u8(source) > threshold;
-                        let sample = if light {
-                            [255_u8, 255_u8, 255_u8, alpha]
-                        } else {
-                            [0_u8, 0_u8, 0_u8, alpha]
-                        };
-                        let quantized = quantize_pixel::<u8, crate::core::Rgba>(&sample, mode)?;
-                        row[offset] = quantized[0];
-                        row[offset + 1] = quantized[1];
-                        row[offset + 2] = quantized[2];
-                        row[offset + 3] = alpha;
-                    }
-                    _ => {
-                        return Err(crate::Error::UnsupportedFormat(
-                            "stochastic dithering supports Gray8, Rgb8, and Rgba8 only",
-                        ));
-                    }
                 }
             }
             Ok(())
@@ -208,8 +191,8 @@ pub fn threshold_binary_in_place_par(
 }
 
 #[cfg(feature = "rayon")]
-pub fn random_binary_in_place_par(
-    buffer: &mut Buffer<'_>,
+pub fn random_binary_in_place_par<L: PixelLayout>(
+    buffer: &mut Buffer<'_, u8, L>,
     mode: QuantizeMode<'_>,
     seed: u64,
     strength: u8,
@@ -218,8 +201,7 @@ pub fn random_binary_in_place_par(
 
     let width = buffer.width;
     let height = buffer.height;
-    let format = buffer.format;
-    let bpp = format.bytes_per_pixel();
+    let bpp = L::CHANNELS;
     let stride = buffer.stride;
     let threshold_len = width.checked_mul(height).ok_or(BufferError::OutOfBounds)?;
     let mut thresholds = vec![0_u8; threshold_len];
@@ -240,46 +222,41 @@ pub fn random_binary_in_place_par(
                 let threshold = thresholds[y * width + x];
                 let offset = x * bpp;
 
-                match format {
-                    PixelFormat::Gray8 => {
-                        let light = row[offset] > threshold;
-                        let sample = if light { [255_u8] } else { [0_u8] };
-                        let quantized = quantize_pixel::<u8, crate::core::Gray>(&sample, mode)?;
-                        row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
-                    }
-                    PixelFormat::Rgb8 => {
-                        let source = [row[offset], row[offset + 1], row[offset + 2]];
-                        let light = luma_u8(source) > threshold;
-                        let sample = if light {
-                            [255_u8, 255_u8, 255_u8]
-                        } else {
-                            [0_u8, 0_u8, 0_u8]
-                        };
-                        let quantized = quantize_pixel::<u8, crate::core::Rgb>(&sample, mode)?;
-                        row[offset] = quantized[0];
-                        row[offset + 1] = quantized[1];
-                        row[offset + 2] = quantized[2];
-                    }
-                    PixelFormat::Rgba8 => {
-                        let alpha = row[offset + 3];
-                        let source = [row[offset], row[offset + 1], row[offset + 2]];
-                        let light = luma_u8(source) > threshold;
-                        let sample = if light {
-                            [255_u8, 255_u8, 255_u8, alpha]
-                        } else {
-                            [0_u8, 0_u8, 0_u8, alpha]
-                        };
-                        let quantized = quantize_pixel::<u8, crate::core::Rgba>(&sample, mode)?;
-                        row[offset] = quantized[0];
-                        row[offset + 1] = quantized[1];
-                        row[offset + 2] = quantized[2];
-                        row[offset + 3] = alpha;
-                    }
-                    _ => {
-                        return Err(crate::Error::UnsupportedFormat(
-                            "stochastic dithering supports Gray8, Rgb8, and Rgba8 only",
-                        ));
-                    }
+                if L::CHANNELS == 1 && !L::HAS_ALPHA {
+                    let light = row[offset] > threshold;
+                    let sample = if light { [255_u8] } else { [0_u8] };
+                    let quantized = quantize_pixel::<u8, crate::core::Gray>(&sample, mode)?;
+                    row[offset] = luma_u8([quantized[0], quantized[1], quantized[2]]);
+                } else if L::CHANNELS == 3 && !L::HAS_ALPHA {
+                    let source = [row[offset], row[offset + 1], row[offset + 2]];
+                    let light = luma_u8(source) > threshold;
+                    let sample = if light {
+                        [255_u8, 255_u8, 255_u8]
+                    } else {
+                        [0_u8, 0_u8, 0_u8]
+                    };
+                    let quantized = quantize_pixel::<u8, crate::core::Rgb>(&sample, mode)?;
+                    row[offset] = quantized[0];
+                    row[offset + 1] = quantized[1];
+                    row[offset + 2] = quantized[2];
+                } else if L::CHANNELS == 4 && L::HAS_ALPHA {
+                    let alpha = row[offset + 3];
+                    let source = [row[offset], row[offset + 1], row[offset + 2]];
+                    let light = luma_u8(source) > threshold;
+                    let sample = if light {
+                        [255_u8, 255_u8, 255_u8, alpha]
+                    } else {
+                        [0_u8, 0_u8, 0_u8, alpha]
+                    };
+                    let quantized = quantize_pixel::<u8, crate::core::Rgba>(&sample, mode)?;
+                    row[offset] = quantized[0];
+                    row[offset + 1] = quantized[1];
+                    row[offset + 2] = quantized[2];
+                    row[offset + 3] = alpha;
+                } else {
+                    return Err(crate::Error::UnsupportedFormat(
+                        "stochastic dithering supports Gray8, Rgb8, and Rgba8 only",
+                    ));
                 }
             }
             Ok(())
@@ -288,16 +265,16 @@ pub fn random_binary_in_place_par(
     Ok(())
 }
 
-pub fn threshold_in_place(
-    buffer: &mut Buffer<'_>,
+pub fn threshold_in_place<L: PixelLayout>(
+    buffer: &mut Buffer<'_, u8, L>,
     mode: QuantizeMode<'_>,
     threshold: u8,
 ) -> Result<()> {
     threshold_binary_in_place(buffer, mode, threshold)
 }
 
-pub fn random_in_place(
-    buffer: &mut Buffer<'_>,
+pub fn random_in_place<L: PixelLayout>(
+    buffer: &mut Buffer<'_, u8, L>,
     mode: QuantizeMode<'_>,
     seed: u64,
     strength: u8,

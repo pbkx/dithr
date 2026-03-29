@@ -42,55 +42,29 @@ fn buffer_validate_rgba_ok() {
 #[test]
 fn buffer_validate_rejects_zero_dimensions() {
     let mut data = vec![0_u8; 4];
-    let buffer: GrayBuffer8<'_> = Buffer {
-        data: &mut data,
-        width: 0,
-        height: 1,
-        stride: 1,
-        format: PixelFormat::Gray8,
-    };
-
-    assert_eq!(buffer.validate(), Err(BufferError::ZeroDimensions));
+    let result = dithr::gray_u8(&mut data, 0, 1, 1);
+    assert!(matches!(result, Err(BufferError::ZeroDimensions)));
 }
 
 #[test]
 fn buffer_validate_rejects_small_stride() {
     let mut data = vec![0_u8; 8];
-    let buffer: RgbBuffer8<'_> = Buffer {
-        data: &mut data,
-        width: 3,
-        height: 2,
-        stride: 3,
-        format: PixelFormat::Rgb8,
-    };
-
-    assert_eq!(buffer.validate(), Err(BufferError::StrideTooSmall));
+    let result = dithr::rgb_u8(&mut data, 3, 2, 3);
+    assert!(matches!(result, Err(BufferError::StrideTooSmall)));
 }
 
 #[test]
 fn buffer_validate_rejects_short_data() {
     let mut data = vec![0_u8; 7];
-    let buffer: GrayBuffer8<'_> = Buffer {
-        data: &mut data,
-        width: 2,
-        height: 2,
-        stride: 4,
-        format: PixelFormat::Gray8,
-    };
-
-    assert_eq!(buffer.validate(), Err(BufferError::DataTooShort));
+    let result = dithr::gray_u8(&mut data, 2, 2, 4);
+    assert!(matches!(result, Err(BufferError::DataTooShort)));
 }
 
 #[test]
 fn buffer_pixel_offset_matches_expected() {
     let mut data = vec![0_u8; 20];
-    let buffer: RgbBuffer8<'_> = Buffer {
-        data: &mut data,
-        width: 3,
-        height: 2,
-        stride: 10,
-        format: PixelFormat::Rgb8,
-    };
+    let buffer: RgbBuffer8<'_> =
+        dithr::rgb_u8(&mut data, 3, 2, 10).expect("valid buffer should construct");
 
     assert_eq!(buffer.pixel_offset(2, 1), Ok(16));
 }
@@ -98,13 +72,8 @@ fn buffer_pixel_offset_matches_expected() {
 #[test]
 fn buffer_row_returns_correct_slice() {
     let mut data: Vec<u8> = (0..12).collect();
-    let buffer: GrayBuffer8<'_> = Buffer {
-        data: &mut data,
-        width: 2,
-        height: 3,
-        stride: 4,
-        format: PixelFormat::Gray8,
-    };
+    let buffer: GrayBuffer8<'_> =
+        dithr::gray_u8(&mut data, 2, 3, 4).expect("valid buffer should construct");
 
     assert_eq!(buffer.row(1), Ok(&[4, 5, 6, 7][..]));
 }
@@ -113,7 +82,7 @@ fn buffer_row_returns_correct_slice() {
 fn buffer_new_validates_ok() {
     let mut data = vec![0_u8; 32];
     let buffer: GrayBuffer8<'_> =
-        Buffer::new(&mut data, 8, 4, 8, PixelFormat::Gray8).expect("valid buffer should construct");
+        dithr::gray_u8(&mut data, 8, 4, 8).expect("valid buffer should construct");
 
     assert_eq!(buffer.validate(), Ok(()));
 }
@@ -122,7 +91,7 @@ fn buffer_new_validates_ok() {
 fn buffer_required_len_matches_stride_times_height() {
     let mut data = vec![0_u8; 40];
     let buffer: RgbBuffer8<'_> =
-        Buffer::new(&mut data, 3, 4, 10, PixelFormat::Rgb8).expect("valid buffer should construct");
+        dithr::rgb_u8(&mut data, 3, 4, 10).expect("valid buffer should construct");
 
     assert_eq!(buffer.required_len(), Ok(40));
 }
@@ -131,7 +100,7 @@ fn buffer_required_len_matches_stride_times_height() {
 fn buffer_try_row_rejects_y_out_of_bounds() {
     let mut data = vec![0_u8; 12];
     let buffer: GrayBuffer8<'_> =
-        Buffer::new(&mut data, 4, 3, 4, PixelFormat::Gray8).expect("valid buffer should construct");
+        dithr::gray_u8(&mut data, 4, 3, 4).expect("valid buffer should construct");
 
     assert_eq!(buffer.try_row(3), Err(BufferError::RowOutOfBounds));
 }
@@ -140,7 +109,7 @@ fn buffer_try_row_rejects_y_out_of_bounds() {
 fn buffer_try_row_mut_rejects_y_out_of_bounds() {
     let mut data = vec![0_u8; 12];
     let mut buffer: GrayBuffer8<'_> =
-        Buffer::new(&mut data, 4, 3, 4, PixelFormat::Gray8).expect("valid buffer should construct");
+        dithr::gray_u8(&mut data, 4, 3, 4).expect("valid buffer should construct");
 
     assert_eq!(buffer.try_row_mut(3), Err(BufferError::RowOutOfBounds));
 }
@@ -185,6 +154,59 @@ fn buffer_validate_rgb32f_ok() {
         .expect("valid rgb f32 buffer should construct");
 
     assert_eq!(buffer.validate(), Ok(()));
+}
+
+#[test]
+fn buffer_kind_matches_gray_u8() {
+    let mut data = vec![0_u8; 16];
+    let buffer = gray_u8(&mut data, 4, 4, 4).expect("valid gray u8 buffer should construct");
+    assert_eq!(buffer.kind(), PixelFormat::Gray8);
+}
+
+#[test]
+fn buffer_kind_matches_rgb_u16() {
+    let mut data = vec![0_u16; 4 * 4 * 3];
+    let buffer = rgb_u16(&mut data, 4, 4, 12).expect("valid rgb u16 buffer should construct");
+    assert_eq!(buffer.kind(), PixelFormat::Rgb16);
+}
+
+#[test]
+fn buffer_kind_matches_rgba_f32() {
+    let mut data = vec![0.0_f32; 4 * 4 * 4];
+    let buffer =
+        dithr::rgba_f32(&mut data, 4, 4, 16).expect("valid rgba f32 buffer should construct");
+    assert_eq!(buffer.kind(), PixelFormat::Rgba32F);
+}
+
+#[test]
+fn buffer_validate_uses_layout_not_runtime_tag() {
+    let mut data = vec![0_u8; 48];
+    let result: dithr::Result<dithr::RgbBuffer8<'_>> =
+        Buffer::new(&mut data, 4, 4, 12, PixelFormat::Gray8).map_err(Error::from);
+    assert!(matches!(
+        result,
+        Err(Error::Buffer(BufferError::KindMismatch))
+    ));
+
+    let mut data = vec![0_u8; 4 * 4 * 3];
+    let buffer = Buffer::<u8, dithr::core::Rgb>::new_typed(&mut data, 4, 4, 12)
+        .expect("typed constructor should validate");
+    assert_eq!(buffer.validate(), Ok(()));
+}
+
+#[test]
+fn buffer_channels_come_from_layout() {
+    let mut data = vec![0_u8; 2 * 2 * 4];
+    let buffer = dithr::rgba_u8(&mut data, 2, 2, 8).expect("valid rgba u8 buffer should construct");
+    assert_eq!(buffer.pixel_offset(1, 1), Ok(12));
+}
+
+#[test]
+fn buffer_no_redundant_format_storage_path_smoke() {
+    type LegacyLike<'a> = (&'a mut [u8], usize, usize, usize, PixelFormat);
+    let current = std::mem::size_of::<GrayBuffer8<'_>>();
+    let legacy = std::mem::size_of::<LegacyLike<'_>>();
+    assert!(current < legacy);
 }
 
 #[test]
@@ -236,30 +258,30 @@ fn buffer_row_length_matches_stride_samples() {
 
 #[test]
 fn pixel_format_metadata_matches_expected() {
-    assert_eq!(PixelFormat::<()>::Gray8.channels(), 1);
-    assert!(!PixelFormat::<()>::Gray8.has_alpha());
-    assert!(!PixelFormat::<()>::Gray8.is_float());
-    assert_eq!(PixelFormat::<()>::Gray8.bytes_per_channel(), 1);
+    assert_eq!(PixelFormat::Gray8.channels(), 1);
+    assert!(!PixelFormat::Gray8.has_alpha());
+    assert!(!PixelFormat::Gray8.is_float());
+    assert_eq!(PixelFormat::Gray8.bytes_per_channel(), 1);
 
-    assert_eq!(PixelFormat::<()>::Rgba8.channels(), 4);
-    assert!(PixelFormat::<()>::Rgba8.has_alpha());
-    assert!(!PixelFormat::<()>::Rgba8.is_float());
-    assert_eq!(PixelFormat::<()>::Rgba8.bytes_per_channel(), 1);
+    assert_eq!(PixelFormat::Rgba8.channels(), 4);
+    assert!(PixelFormat::Rgba8.has_alpha());
+    assert!(!PixelFormat::Rgba8.is_float());
+    assert_eq!(PixelFormat::Rgba8.bytes_per_channel(), 1);
 
-    assert_eq!(PixelFormat::<()>::Gray16.channels(), 1);
-    assert!(!PixelFormat::<()>::Gray16.has_alpha());
-    assert!(!PixelFormat::<()>::Gray16.is_float());
-    assert_eq!(PixelFormat::<()>::Gray16.bytes_per_channel(), 2);
+    assert_eq!(PixelFormat::Gray16.channels(), 1);
+    assert!(!PixelFormat::Gray16.has_alpha());
+    assert!(!PixelFormat::Gray16.is_float());
+    assert_eq!(PixelFormat::Gray16.bytes_per_channel(), 2);
 
-    assert_eq!(PixelFormat::<()>::Rgb32F.channels(), 3);
-    assert!(!PixelFormat::<()>::Rgb32F.has_alpha());
-    assert!(PixelFormat::<()>::Rgb32F.is_float());
-    assert_eq!(PixelFormat::<()>::Rgb32F.bytes_per_channel(), 4);
+    assert_eq!(PixelFormat::Rgb32F.channels(), 3);
+    assert!(!PixelFormat::Rgb32F.has_alpha());
+    assert!(PixelFormat::Rgb32F.is_float());
+    assert_eq!(PixelFormat::Rgb32F.bytes_per_channel(), 4);
 
-    assert_eq!(PixelFormat::<()>::Rgba32F.channels(), 4);
-    assert!(PixelFormat::<()>::Rgba32F.has_alpha());
-    assert!(PixelFormat::<()>::Rgba32F.is_float());
-    assert_eq!(PixelFormat::<()>::Rgba32F.bytes_per_channel(), 4);
+    assert_eq!(PixelFormat::Rgba32F.channels(), 4);
+    assert!(PixelFormat::Rgba32F.has_alpha());
+    assert!(PixelFormat::Rgba32F.is_float());
+    assert_eq!(PixelFormat::Rgba32F.bytes_per_channel(), 4);
 }
 
 #[test]
@@ -562,13 +584,7 @@ fn built_in_palettes_construct_valid_palette() {
 #[test]
 fn threshold_binary_gray_threshold_127_splits_expected() {
     let mut data = vec![0_u8, 64, 127, 128, 200, 255];
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 6,
-        height: 1,
-        stride: 6,
-        format: PixelFormat::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 6, 1, 6).expect("valid buffer should construct");
 
     threshold_binary_in_place(&mut buffer, QuantizeMode::GrayBits(1), 127)
         .expect("threshold binary should succeed");
@@ -579,13 +595,7 @@ fn threshold_binary_gray_threshold_127_splits_expected() {
 #[test]
 fn threshold_binary_rgb_uses_luma() {
     let mut data = vec![255_u8, 0, 0, 0, 255, 0, 0, 0, 255];
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 3,
-        height: 1,
-        stride: 9,
-        format: PixelFormat::Rgb8,
-    };
+    let mut buffer = dithr::rgb_u8(&mut data, 3, 1, 9).expect("valid buffer should construct");
 
     threshold_binary_in_place(&mut buffer, QuantizeMode::RgbBits(1), 127)
         .expect("threshold binary should succeed");
@@ -599,20 +609,8 @@ fn random_binary_same_seed_same_output() {
     let mut data_a = source.clone();
     let mut data_b = source;
 
-    let mut buffer_a = Buffer {
-        data: &mut data_a,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::Gray8,
-    };
-    let mut buffer_b = Buffer {
-        data: &mut data_b,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::Gray8,
-    };
+    let mut buffer_a = dithr::gray_u8(&mut data_a, 8, 8, 8).expect("valid buffer should construct");
+    let mut buffer_b = dithr::gray_u8(&mut data_b, 8, 8, 8).expect("valid buffer should construct");
 
     random_binary_in_place(&mut buffer_a, QuantizeMode::GrayBits(1), 42, 64)
         .expect("random binary should succeed");
@@ -627,20 +625,8 @@ fn random_binary_different_seed_different_output() {
     let mut data_a = vec![127_u8; 64];
     let mut data_b = vec![127_u8; 64];
 
-    let mut buffer_a = Buffer {
-        data: &mut data_a,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::Gray8,
-    };
-    let mut buffer_b = Buffer {
-        data: &mut data_b,
-        width: 8,
-        height: 8,
-        stride: 8,
-        format: PixelFormat::Gray8,
-    };
+    let mut buffer_a = dithr::gray_u8(&mut data_a, 8, 8, 8).expect("valid buffer should construct");
+    let mut buffer_b = dithr::gray_u8(&mut data_b, 8, 8, 8).expect("valid buffer should construct");
 
     random_binary_in_place(&mut buffer_a, QuantizeMode::GrayBits(1), 1, 127)
         .expect("random binary should succeed");
@@ -657,20 +643,10 @@ fn threshold_binary_parallel_matches_sequential() {
 
     let mut seq = gray_ramp_16x16();
     let mut par = seq.clone();
-    let mut seq_buffer = Buffer {
-        data: &mut seq,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::Gray8,
-    };
-    let mut par_buffer = Buffer {
-        data: &mut par,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::Gray8,
-    };
+    let mut seq_buffer =
+        dithr::gray_u8(&mut seq, 16, 16, 16).expect("valid buffer should construct");
+    let mut par_buffer =
+        dithr::gray_u8(&mut par, 16, 16, 16).expect("valid buffer should construct");
 
     threshold_binary_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1), 127)
         .expect("sequential threshold should succeed");
@@ -687,20 +663,10 @@ fn random_binary_parallel_matches_sequential_fixed_seed() {
 
     let mut seq = gray_ramp_16x16();
     let mut par = seq.clone();
-    let mut seq_buffer = Buffer {
-        data: &mut seq,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::Gray8,
-    };
-    let mut par_buffer = Buffer {
-        data: &mut par,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::Gray8,
-    };
+    let mut seq_buffer =
+        dithr::gray_u8(&mut seq, 16, 16, 16).expect("valid buffer should construct");
+    let mut par_buffer =
+        dithr::gray_u8(&mut par, 16, 16, 16).expect("valid buffer should construct");
 
     random_binary_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1), 42, 64)
         .expect("sequential random should succeed");
@@ -782,14 +748,9 @@ fn rgb32f_example_style_smoke() {
         }
     }
 
-    let mut buffer: RgbBuffer32F<'_> = Buffer::new(
-        &mut data,
-        width,
-        height,
-        width * 3,
-        PixelFormat::<()>::Rgb32F,
-    )
-    .expect("valid rgb32f buffer");
+    let mut buffer: RgbBuffer32F<'_> =
+        Buffer::new(&mut data, width, height, width * 3, PixelFormat::Rgb32F)
+            .expect("valid rgb32f buffer");
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::RgbLevels(2))
         .expect("floyd-steinberg should succeed");
 

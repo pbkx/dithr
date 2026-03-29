@@ -1,5 +1,5 @@
 use crate::{
-    Error, GrayBuffer16, GrayBuffer8, PixelFormat, Result, RgbBuffer16, RgbBuffer32F, RgbBuffer8,
+    Buffer, Error, GrayBuffer16, GrayBuffer8, Result, RgbBuffer16, RgbBuffer32F, RgbBuffer8,
     RgbaBuffer16, RgbaBuffer32F, RgbaBuffer8,
 };
 
@@ -20,13 +20,7 @@ pub type Rgba16Image = image::ImageBuffer<image::Rgba<u16>, Vec<u16>>;
 
 pub fn gray_image_as_buffer(img: &mut image::GrayImage) -> Result<GrayBuffer8<'_>> {
     let (width, height) = image_dims(img.width(), img.height())?;
-    Ok(GrayBuffer8 {
-        data: img.as_mut(),
-        width,
-        height,
-        stride: width,
-        format: PixelFormat::Gray8,
-    })
+    Ok(Buffer::new_typed(img.as_mut(), width, height, width)?)
 }
 
 pub fn rgb_image_as_buffer(img: &mut image::RgbImage) -> Result<RgbBuffer8<'_>> {
@@ -34,13 +28,7 @@ pub fn rgb_image_as_buffer(img: &mut image::RgbImage) -> Result<RgbBuffer8<'_>> 
     let stride = width
         .checked_mul(3)
         .ok_or(Error::InvalidArgument("rgb stride overflow"))?;
-    Ok(RgbBuffer8 {
-        data: img.as_mut(),
-        width,
-        height,
-        stride,
-        format: PixelFormat::Rgb8,
-    })
+    Ok(Buffer::new_typed(img.as_mut(), width, height, stride)?)
 }
 
 pub fn rgba_image_as_buffer(img: &mut image::RgbaImage) -> Result<RgbaBuffer8<'_>> {
@@ -48,24 +36,12 @@ pub fn rgba_image_as_buffer(img: &mut image::RgbaImage) -> Result<RgbaBuffer8<'_
     let stride = width
         .checked_mul(4)
         .ok_or(Error::InvalidArgument("rgba stride overflow"))?;
-    Ok(RgbaBuffer8 {
-        data: img.as_mut(),
-        width,
-        height,
-        stride,
-        format: PixelFormat::Rgba8,
-    })
+    Ok(Buffer::new_typed(img.as_mut(), width, height, stride)?)
 }
 
 pub fn gray16_image_as_buffer(img: &mut Gray16Image) -> Result<GrayBuffer16<'_>> {
     let (width, height) = image_dims(img.width(), img.height())?;
-    Ok(GrayBuffer16 {
-        data: img.as_mut(),
-        width,
-        height,
-        stride: width,
-        format: PixelFormat::Gray16,
-    })
+    Ok(Buffer::new_typed(img.as_mut(), width, height, width)?)
 }
 
 pub fn rgb16_image_as_buffer(img: &mut Rgb16Image) -> Result<RgbBuffer16<'_>> {
@@ -73,13 +49,7 @@ pub fn rgb16_image_as_buffer(img: &mut Rgb16Image) -> Result<RgbBuffer16<'_>> {
     let stride = width
         .checked_mul(3)
         .ok_or(Error::InvalidArgument("rgb16 stride overflow"))?;
-    Ok(RgbBuffer16 {
-        data: img.as_mut(),
-        width,
-        height,
-        stride,
-        format: PixelFormat::Rgb16,
-    })
+    Ok(Buffer::new_typed(img.as_mut(), width, height, stride)?)
 }
 
 pub fn rgba16_image_as_buffer(img: &mut Rgba16Image) -> Result<RgbaBuffer16<'_>> {
@@ -87,13 +57,7 @@ pub fn rgba16_image_as_buffer(img: &mut Rgba16Image) -> Result<RgbaBuffer16<'_>>
     let stride = width
         .checked_mul(4)
         .ok_or(Error::InvalidArgument("rgba16 stride overflow"))?;
-    Ok(RgbaBuffer16 {
-        data: img.as_mut(),
-        width,
-        height,
-        stride,
-        format: PixelFormat::Rgba16,
-    })
+    Ok(Buffer::new_typed(img.as_mut(), width, height, stride)?)
 }
 
 pub fn rgb32f_image_as_buffer(img: &mut image::Rgb32FImage) -> Result<RgbBuffer32F<'_>> {
@@ -101,13 +65,7 @@ pub fn rgb32f_image_as_buffer(img: &mut image::Rgb32FImage) -> Result<RgbBuffer3
     let stride = width
         .checked_mul(3)
         .ok_or(Error::InvalidArgument("rgb32f stride overflow"))?;
-    Ok(RgbBuffer32F {
-        data: img.as_mut(),
-        width,
-        height,
-        stride,
-        format: PixelFormat::Rgb32F,
-    })
+    Ok(Buffer::new_typed(img.as_mut(), width, height, stride)?)
 }
 
 pub fn rgba32f_image_as_buffer(img: &mut image::Rgba32FImage) -> Result<RgbaBuffer32F<'_>> {
@@ -115,13 +73,7 @@ pub fn rgba32f_image_as_buffer(img: &mut image::Rgba32FImage) -> Result<RgbaBuff
     let stride = width
         .checked_mul(4)
         .ok_or(Error::InvalidArgument("rgba32f stride overflow"))?;
-    Ok(RgbaBuffer32F {
-        data: img.as_mut(),
-        width,
-        height,
-        stride,
-        format: PixelFormat::Rgba32F,
-    })
+    Ok(Buffer::new_typed(img.as_mut(), width, height, stride)?)
 }
 
 pub fn dynamic_image_as_buffer(img: &mut image::DynamicImage) -> Result<DynamicImageBuffer<'_>> {
@@ -175,7 +127,7 @@ mod tests {
     use super::{
         dynamic_image_as_buffer, gray16_image_as_buffer, gray_image_as_buffer, DynamicImageBuffer,
     };
-    use crate::{Error, PixelFormat};
+    use crate::{BufferKind, Error};
 
     #[test]
     fn gray_image_adapter_uses_packed_stride() {
@@ -185,7 +137,7 @@ mod tests {
         assert_eq!(buffer.width, 4);
         assert_eq!(buffer.height, 3);
         assert_eq!(buffer.stride, 4);
-        assert_eq!(buffer.format, PixelFormat::Gray8);
+        assert_eq!(buffer.kind(), BufferKind::Gray8);
     }
 
     #[test]
@@ -196,7 +148,7 @@ mod tests {
         assert_eq!(buffer.width, 4);
         assert_eq!(buffer.height, 3);
         assert_eq!(buffer.stride, 4);
-        assert_eq!(buffer.format, PixelFormat::Gray16);
+        assert_eq!(buffer.kind(), BufferKind::Gray16);
     }
 
     #[test]
@@ -209,7 +161,7 @@ mod tests {
                 assert_eq!(buffer.width, 2);
                 assert_eq!(buffer.height, 2);
                 assert_eq!(buffer.stride, 6);
-                assert_eq!(buffer.format, PixelFormat::Rgb8);
+                assert_eq!(buffer.kind(), BufferKind::Rgb8);
             }
             _ => panic!("expected rgb8 buffer"),
         }
@@ -225,7 +177,7 @@ mod tests {
                 assert_eq!(buffer.width, 2);
                 assert_eq!(buffer.height, 2);
                 assert_eq!(buffer.stride, 2);
-                assert_eq!(buffer.format, PixelFormat::Gray16);
+                assert_eq!(buffer.kind(), BufferKind::Gray16);
             }
             _ => panic!("expected gray16 buffer"),
         }
@@ -241,7 +193,7 @@ mod tests {
                 assert_eq!(buffer.width, 2);
                 assert_eq!(buffer.height, 2);
                 assert_eq!(buffer.stride, 6);
-                assert_eq!(buffer.format, PixelFormat::Rgb16);
+                assert_eq!(buffer.kind(), BufferKind::Rgb16);
             }
             _ => panic!("expected rgb16 buffer"),
         }
@@ -257,7 +209,7 @@ mod tests {
                 assert_eq!(buffer.width, 2);
                 assert_eq!(buffer.height, 2);
                 assert_eq!(buffer.stride, 8);
-                assert_eq!(buffer.format, PixelFormat::Rgba16);
+                assert_eq!(buffer.kind(), BufferKind::Rgba16);
             }
             _ => panic!("expected rgba16 buffer"),
         }
@@ -273,7 +225,7 @@ mod tests {
                 assert_eq!(buffer.width, 2);
                 assert_eq!(buffer.height, 2);
                 assert_eq!(buffer.stride, 6);
-                assert_eq!(buffer.format, PixelFormat::Rgb32F);
+                assert_eq!(buffer.kind(), BufferKind::Rgb32F);
             }
             _ => panic!("expected rgb32f buffer"),
         }
@@ -289,7 +241,7 @@ mod tests {
                 assert_eq!(buffer.width, 2);
                 assert_eq!(buffer.height, 2);
                 assert_eq!(buffer.stride, 8);
-                assert_eq!(buffer.format, PixelFormat::Rgba32F);
+                assert_eq!(buffer.kind(), BufferKind::Rgba32F);
             }
             _ => panic!("expected rgba32f buffer"),
         }

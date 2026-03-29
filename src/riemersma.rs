@@ -1,6 +1,6 @@
 use crate::{
     core::{PixelLayout, Sample},
-    quantize_pixel, Buffer, Error, PixelFormat, QuantizeMode, Result,
+    quantize_pixel, Buffer, Error, QuantizeMode, Result,
 };
 use std::mem::size_of;
 
@@ -21,7 +21,13 @@ pub fn riemersma_in_place<S: Sample, L: PixelLayout>(
 
     let width = buffer.width;
     let height = buffer.height;
-    let format = buffer.format;
+    let channels = L::CHANNELS;
+    let is_rgba = L::HAS_ALPHA;
+    if channels != 1 && channels != 3 && !(channels == 4 && is_rgba) {
+        return Err(Error::UnsupportedFormat(
+            "riemersma supports Gray, Rgb, and Rgba formats only",
+        ));
+    }
     let pixel_count = width
         .checked_mul(height)
         .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
@@ -53,164 +59,143 @@ pub fn riemersma_in_place<S: Sample, L: PixelLayout>(
         let offset = buffer.try_pixel_offset(x, y)?;
         let new_error = if S::IS_FLOAT {
             let weighted = weighted_error_float(&history, head, filled);
-            match format {
-                PixelFormat::Gray8 | PixelFormat::Gray16 => {
-                    let adjusted =
-                        (buffer.data[offset].to_unit_f32() + weighted[0]).clamp(0.0, 1.0);
-                    let quantized = quantize_pixel::<S, crate::core::Gray>(
-                        &[S::from_unit_f32(adjusted)],
-                        mode,
-                    )?;
-                    let quantized_gray = quantized[0];
-                    buffer.data[offset] = quantized_gray;
-                    [adjusted - quantized_gray.to_unit_f32(), 0.0, 0.0]
-                }
-                PixelFormat::Rgb8 | PixelFormat::Rgb16 | PixelFormat::Rgb32F => {
-                    let adjusted = [
-                        (buffer.data[offset].to_unit_f32() + weighted[0]).clamp(0.0, 1.0),
-                        (buffer.data[offset + 1].to_unit_f32() + weighted[1]).clamp(0.0, 1.0),
-                        (buffer.data[offset + 2].to_unit_f32() + weighted[2]).clamp(0.0, 1.0),
-                    ];
-                    let pixel = [
-                        S::from_unit_f32(adjusted[0]),
-                        S::from_unit_f32(adjusted[1]),
-                        S::from_unit_f32(adjusted[2]),
-                    ];
-                    let quantized = quantize_pixel::<S, crate::core::Rgb>(&pixel, mode)?;
-                    buffer.data[offset] = quantized[0];
-                    buffer.data[offset + 1] = quantized[1];
-                    buffer.data[offset + 2] = quantized[2];
-                    [
-                        adjusted[0] - quantized[0].to_unit_f32(),
-                        adjusted[1] - quantized[1].to_unit_f32(),
-                        adjusted[2] - quantized[2].to_unit_f32(),
-                    ]
-                }
-                PixelFormat::Rgba8 | PixelFormat::Rgba16 | PixelFormat::Rgba32F => {
-                    let alpha = buffer.data[offset + 3];
-                    let adjusted = [
-                        (buffer.data[offset].to_unit_f32() + weighted[0]).clamp(0.0, 1.0),
-                        (buffer.data[offset + 1].to_unit_f32() + weighted[1]).clamp(0.0, 1.0),
-                        (buffer.data[offset + 2].to_unit_f32() + weighted[2]).clamp(0.0, 1.0),
-                    ];
-                    let pixel = [
-                        S::from_unit_f32(adjusted[0]),
-                        S::from_unit_f32(adjusted[1]),
-                        S::from_unit_f32(adjusted[2]),
-                        alpha,
-                    ];
-                    let quantized = quantize_pixel::<S, crate::core::Rgba>(&pixel, mode)?;
-                    buffer.data[offset] = quantized[0];
-                    buffer.data[offset + 1] = quantized[1];
-                    buffer.data[offset + 2] = quantized[2];
-                    buffer.data[offset + 3] = alpha;
-                    [
-                        adjusted[0] - quantized[0].to_unit_f32(),
-                        adjusted[1] - quantized[1].to_unit_f32(),
-                        adjusted[2] - quantized[2].to_unit_f32(),
-                    ]
-                }
-                _ => {
-                    return Err(Error::UnsupportedFormat(
-                        "riemersma supports Gray, Rgb, and Rgba formats only",
-                    ));
-                }
+            if channels == 1 {
+                let adjusted = (buffer.data[offset].to_unit_f32() + weighted[0]).clamp(0.0, 1.0);
+                let quantized =
+                    quantize_pixel::<S, crate::core::Gray>(&[S::from_unit_f32(adjusted)], mode)?;
+                let quantized_gray = quantized[0];
+                buffer.data[offset] = quantized_gray;
+                [adjusted - quantized_gray.to_unit_f32(), 0.0, 0.0]
+            } else if is_rgba {
+                let alpha = buffer.data[offset + 3];
+                let adjusted = [
+                    (buffer.data[offset].to_unit_f32() + weighted[0]).clamp(0.0, 1.0),
+                    (buffer.data[offset + 1].to_unit_f32() + weighted[1]).clamp(0.0, 1.0),
+                    (buffer.data[offset + 2].to_unit_f32() + weighted[2]).clamp(0.0, 1.0),
+                ];
+                let pixel = [
+                    S::from_unit_f32(adjusted[0]),
+                    S::from_unit_f32(adjusted[1]),
+                    S::from_unit_f32(adjusted[2]),
+                    alpha,
+                ];
+                let quantized = quantize_pixel::<S, crate::core::Rgba>(&pixel, mode)?;
+                buffer.data[offset] = quantized[0];
+                buffer.data[offset + 1] = quantized[1];
+                buffer.data[offset + 2] = quantized[2];
+                buffer.data[offset + 3] = alpha;
+                [
+                    adjusted[0] - quantized[0].to_unit_f32(),
+                    adjusted[1] - quantized[1].to_unit_f32(),
+                    adjusted[2] - quantized[2].to_unit_f32(),
+                ]
+            } else {
+                let adjusted = [
+                    (buffer.data[offset].to_unit_f32() + weighted[0]).clamp(0.0, 1.0),
+                    (buffer.data[offset + 1].to_unit_f32() + weighted[1]).clamp(0.0, 1.0),
+                    (buffer.data[offset + 2].to_unit_f32() + weighted[2]).clamp(0.0, 1.0),
+                ];
+                let pixel = [
+                    S::from_unit_f32(adjusted[0]),
+                    S::from_unit_f32(adjusted[1]),
+                    S::from_unit_f32(adjusted[2]),
+                ];
+                let quantized = quantize_pixel::<S, crate::core::Rgb>(&pixel, mode)?;
+                buffer.data[offset] = quantized[0];
+                buffer.data[offset + 1] = quantized[1];
+                buffer.data[offset + 2] = quantized[2];
+                [
+                    adjusted[0] - quantized[0].to_unit_f32(),
+                    adjusted[1] - quantized[1].to_unit_f32(),
+                    adjusted[2] - quantized[2].to_unit_f32(),
+                ]
             }
         } else {
             let weighted = weighted_error_int(&history, head, filled, max_value);
-            match format {
-                PixelFormat::Gray8 | PixelFormat::Gray16 => {
-                    let adjusted = (sample_to_domain(buffer.data[offset], max_value) + weighted[0])
-                        .clamp(0, max_value);
-                    let quantized = quantize_pixel::<S, crate::core::Gray>(
-                        &[domain_to_sample::<S>(adjusted, max_value)],
-                        mode,
-                    )?;
-                    let quantized_gray = quantized[0];
-                    buffer.data[offset] = quantized_gray;
-                    [
-                        domain_to_unit(
-                            adjusted - sample_to_domain(quantized_gray, max_value),
-                            max_value,
-                        ),
-                        0.0,
-                        0.0,
-                    ]
-                }
-                PixelFormat::Rgb8 | PixelFormat::Rgb16 | PixelFormat::Rgb32F => {
-                    let adjusted = [
-                        (sample_to_domain(buffer.data[offset], max_value) + weighted[0])
-                            .clamp(0, max_value),
-                        (sample_to_domain(buffer.data[offset + 1], max_value) + weighted[1])
-                            .clamp(0, max_value),
-                        (sample_to_domain(buffer.data[offset + 2], max_value) + weighted[2])
-                            .clamp(0, max_value),
-                    ];
-                    let pixel = [
-                        domain_to_sample::<S>(adjusted[0], max_value),
-                        domain_to_sample::<S>(adjusted[1], max_value),
-                        domain_to_sample::<S>(adjusted[2], max_value),
-                    ];
-                    let quantized = quantize_pixel::<S, crate::core::Rgb>(&pixel, mode)?;
-                    buffer.data[offset] = quantized[0];
-                    buffer.data[offset + 1] = quantized[1];
-                    buffer.data[offset + 2] = quantized[2];
-                    [
-                        domain_to_unit(
-                            adjusted[0] - sample_to_domain(quantized[0], max_value),
-                            max_value,
-                        ),
-                        domain_to_unit(
-                            adjusted[1] - sample_to_domain(quantized[1], max_value),
-                            max_value,
-                        ),
-                        domain_to_unit(
-                            adjusted[2] - sample_to_domain(quantized[2], max_value),
-                            max_value,
-                        ),
-                    ]
-                }
-                PixelFormat::Rgba8 | PixelFormat::Rgba16 | PixelFormat::Rgba32F => {
-                    let alpha = buffer.data[offset + 3];
-                    let adjusted = [
-                        (sample_to_domain(buffer.data[offset], max_value) + weighted[0])
-                            .clamp(0, max_value),
-                        (sample_to_domain(buffer.data[offset + 1], max_value) + weighted[1])
-                            .clamp(0, max_value),
-                        (sample_to_domain(buffer.data[offset + 2], max_value) + weighted[2])
-                            .clamp(0, max_value),
-                    ];
-                    let pixel = [
-                        domain_to_sample::<S>(adjusted[0], max_value),
-                        domain_to_sample::<S>(adjusted[1], max_value),
-                        domain_to_sample::<S>(adjusted[2], max_value),
-                        alpha,
-                    ];
-                    let quantized = quantize_pixel::<S, crate::core::Rgba>(&pixel, mode)?;
-                    buffer.data[offset] = quantized[0];
-                    buffer.data[offset + 1] = quantized[1];
-                    buffer.data[offset + 2] = quantized[2];
-                    buffer.data[offset + 3] = alpha;
-                    [
-                        domain_to_unit(
-                            adjusted[0] - sample_to_domain(quantized[0], max_value),
-                            max_value,
-                        ),
-                        domain_to_unit(
-                            adjusted[1] - sample_to_domain(quantized[1], max_value),
-                            max_value,
-                        ),
-                        domain_to_unit(
-                            adjusted[2] - sample_to_domain(quantized[2], max_value),
-                            max_value,
-                        ),
-                    ]
-                }
-                _ => {
-                    return Err(Error::UnsupportedFormat(
-                        "riemersma supports Gray, Rgb, and Rgba formats only",
-                    ));
-                }
+            if channels == 1 {
+                let adjusted = (sample_to_domain(buffer.data[offset], max_value) + weighted[0])
+                    .clamp(0, max_value);
+                let quantized = quantize_pixel::<S, crate::core::Gray>(
+                    &[domain_to_sample::<S>(adjusted, max_value)],
+                    mode,
+                )?;
+                let quantized_gray = quantized[0];
+                buffer.data[offset] = quantized_gray;
+                [
+                    domain_to_unit(
+                        adjusted - sample_to_domain(quantized_gray, max_value),
+                        max_value,
+                    ),
+                    0.0,
+                    0.0,
+                ]
+            } else if is_rgba {
+                let alpha = buffer.data[offset + 3];
+                let adjusted = [
+                    (sample_to_domain(buffer.data[offset], max_value) + weighted[0])
+                        .clamp(0, max_value),
+                    (sample_to_domain(buffer.data[offset + 1], max_value) + weighted[1])
+                        .clamp(0, max_value),
+                    (sample_to_domain(buffer.data[offset + 2], max_value) + weighted[2])
+                        .clamp(0, max_value),
+                ];
+                let pixel = [
+                    domain_to_sample::<S>(adjusted[0], max_value),
+                    domain_to_sample::<S>(adjusted[1], max_value),
+                    domain_to_sample::<S>(adjusted[2], max_value),
+                    alpha,
+                ];
+                let quantized = quantize_pixel::<S, crate::core::Rgba>(&pixel, mode)?;
+                buffer.data[offset] = quantized[0];
+                buffer.data[offset + 1] = quantized[1];
+                buffer.data[offset + 2] = quantized[2];
+                buffer.data[offset + 3] = alpha;
+                [
+                    domain_to_unit(
+                        adjusted[0] - sample_to_domain(quantized[0], max_value),
+                        max_value,
+                    ),
+                    domain_to_unit(
+                        adjusted[1] - sample_to_domain(quantized[1], max_value),
+                        max_value,
+                    ),
+                    domain_to_unit(
+                        adjusted[2] - sample_to_domain(quantized[2], max_value),
+                        max_value,
+                    ),
+                ]
+            } else {
+                let adjusted = [
+                    (sample_to_domain(buffer.data[offset], max_value) + weighted[0])
+                        .clamp(0, max_value),
+                    (sample_to_domain(buffer.data[offset + 1], max_value) + weighted[1])
+                        .clamp(0, max_value),
+                    (sample_to_domain(buffer.data[offset + 2], max_value) + weighted[2])
+                        .clamp(0, max_value),
+                ];
+                let pixel = [
+                    domain_to_sample::<S>(adjusted[0], max_value),
+                    domain_to_sample::<S>(adjusted[1], max_value),
+                    domain_to_sample::<S>(adjusted[2], max_value),
+                ];
+                let quantized = quantize_pixel::<S, crate::core::Rgb>(&pixel, mode)?;
+                buffer.data[offset] = quantized[0];
+                buffer.data[offset + 1] = quantized[1];
+                buffer.data[offset + 2] = quantized[2];
+                [
+                    domain_to_unit(
+                        adjusted[0] - sample_to_domain(quantized[0], max_value),
+                        max_value,
+                    ),
+                    domain_to_unit(
+                        adjusted[1] - sample_to_domain(quantized[1], max_value),
+                        max_value,
+                    ),
+                    domain_to_unit(
+                        adjusted[2] - sample_to_domain(quantized[2], max_value),
+                        max_value,
+                    ),
+                ]
             }
         };
 

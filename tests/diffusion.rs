@@ -9,22 +9,17 @@ use dithr::{
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place,
     jarvis_judice_ninke_in_place, ostromoukhov_in_place, shiau_fan_2_in_place, shiau_fan_in_place,
     sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place,
-    two_row_sierra_in_place, zhou_fang_in_place, Buffer, Error, Palette, PixelFormat, QuantizeMode,
+    two_row_sierra_in_place, zhou_fang_in_place, Error, GrayBuffer16, Palette, QuantizeMode,
+    RgbBuffer32F,
 };
 
-type DiffusionWrapperU16 = fn(&mut Buffer<'_, u16>, QuantizeMode<'_, u16>) -> dithr::Result<()>;
-type DiffusionWrapperF32 = fn(&mut Buffer<'_, f32>, QuantizeMode<'_, f32>) -> dithr::Result<()>;
+type DiffusionWrapperU16 = fn(&mut GrayBuffer16<'_>, QuantizeMode<'_, u16>) -> dithr::Result<()>;
+type DiffusionWrapperF32 = fn(&mut RgbBuffer32F<'_>, QuantizeMode<'_, f32>) -> dithr::Result<()>;
 
 #[test]
 fn diffusion_engine_gray_binary_output_for_graybits1() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("floyd-steinberg should succeed");
@@ -35,13 +30,7 @@ fn diffusion_engine_gray_binary_output_for_graybits1() {
 #[test]
 fn floyd_steinberg_gray_bits1_binary_only() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("floyd-steinberg should succeed");
@@ -52,13 +41,7 @@ fn floyd_steinberg_gray_bits1_binary_only() {
 #[test]
 fn false_floyd_steinberg_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     false_floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("false floyd-steinberg should succeed");
@@ -69,13 +52,7 @@ fn false_floyd_steinberg_runs() {
 #[test]
 fn jarvis_judice_ninke_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     jarvis_judice_ninke_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("jarvis-judice-ninke should succeed");
@@ -86,13 +63,7 @@ fn jarvis_judice_ninke_runs() {
 #[test]
 fn stucki_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     stucki_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("stucki should succeed");
 
@@ -102,13 +73,7 @@ fn stucki_runs() {
 #[test]
 fn burkes_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     burkes_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("burkes should succeed");
 
@@ -118,13 +83,7 @@ fn burkes_runs() {
 #[test]
 fn sierra_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("sierra should succeed");
 
@@ -134,13 +93,7 @@ fn sierra_runs() {
 #[test]
 fn two_row_sierra_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     two_row_sierra_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("two-row sierra should succeed");
@@ -151,13 +104,7 @@ fn two_row_sierra_runs() {
 #[test]
 fn sierra_lite_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     sierra_lite_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("sierra lite should succeed");
@@ -168,13 +115,7 @@ fn sierra_lite_runs() {
 #[test]
 fn stevenson_arce_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     stevenson_arce_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("stevenson-arce should succeed");
@@ -185,13 +126,7 @@ fn stevenson_arce_runs() {
 #[test]
 fn atkinson_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     atkinson_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("atkinson should succeed");
 
@@ -201,13 +136,7 @@ fn atkinson_runs() {
 #[test]
 fn fan_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     fan_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("fan should succeed");
 
@@ -217,13 +146,7 @@ fn fan_runs() {
 #[test]
 fn shiau_fan_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     shiau_fan_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("shiau-fan should succeed");
 
@@ -233,13 +156,7 @@ fn shiau_fan_runs() {
 #[test]
 fn shiau_fan_2_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     shiau_fan_2_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("shiau-fan-2 should succeed");
@@ -250,13 +167,7 @@ fn shiau_fan_2_runs() {
 #[test]
 fn ostromoukhov_runs_gray() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     ostromoukhov_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("ostromoukhov should succeed");
@@ -267,13 +178,7 @@ fn ostromoukhov_runs_gray() {
 #[test]
 fn ostromoukhov_coeff_index_in_range() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     ostromoukhov_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("ostromoukhov should succeed");
@@ -284,13 +189,7 @@ fn ostromoukhov_coeff_index_in_range() {
 #[test]
 fn zhou_fang_runs_gray() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     zhou_fang_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("zhou-fang should succeed");
 
@@ -300,13 +199,7 @@ fn zhou_fang_runs_gray() {
 #[test]
 fn zhou_fang_modulation_in_range() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     zhou_fang_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("zhou-fang should succeed");
 
@@ -316,13 +209,7 @@ fn zhou_fang_modulation_in_range() {
 #[test]
 fn gradient_based_error_diffusion_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
     gradient_based_error_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("gradient-based diffusion should succeed");
@@ -333,13 +220,7 @@ fn gradient_based_error_diffusion_runs() {
 #[test]
 fn ostromoukhov_rejects_non_gray_formats() {
     let mut rgb = vec![128_u8; 4 * 4 * 3];
-    let mut rgb_buffer = Buffer {
-        data: &mut rgb,
-        width: 4,
-        height: 4,
-        stride: 12,
-        format: PixelFormat::<()>::Rgb8,
-    };
+    let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
     let rgb_result = ostromoukhov_in_place(&mut rgb_buffer, QuantizeMode::GrayBits(1));
     assert!(matches!(
         rgb_result,
@@ -349,13 +230,8 @@ fn ostromoukhov_rejects_non_gray_formats() {
     ));
 
     let mut rgba = vec![128_u8; 4 * 4 * 4];
-    let mut rgba_buffer = Buffer {
-        data: &mut rgba,
-        width: 4,
-        height: 4,
-        stride: 16,
-        format: PixelFormat::<()>::Rgba8,
-    };
+    let mut rgba_buffer =
+        dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
     let rgba_result = ostromoukhov_in_place(&mut rgba_buffer, QuantizeMode::GrayBits(1));
     assert!(matches!(
         rgba_result,
@@ -368,13 +244,7 @@ fn ostromoukhov_rejects_non_gray_formats() {
 #[test]
 fn zhou_fang_rejects_non_gray_formats() {
     let mut rgb = vec![128_u8; 4 * 4 * 3];
-    let mut rgb_buffer = Buffer {
-        data: &mut rgb,
-        width: 4,
-        height: 4,
-        stride: 12,
-        format: PixelFormat::<()>::Rgb8,
-    };
+    let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
     let rgb_result = zhou_fang_in_place(&mut rgb_buffer, QuantizeMode::GrayBits(1));
     assert!(matches!(
         rgb_result,
@@ -384,13 +254,8 @@ fn zhou_fang_rejects_non_gray_formats() {
     ));
 
     let mut rgba = vec![128_u8; 4 * 4 * 4];
-    let mut rgba_buffer = Buffer {
-        data: &mut rgba,
-        width: 4,
-        height: 4,
-        stride: 16,
-        format: PixelFormat::<()>::Rgba8,
-    };
+    let mut rgba_buffer =
+        dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
     let rgba_result = zhou_fang_in_place(&mut rgba_buffer, QuantizeMode::GrayBits(1));
     assert!(matches!(
         rgba_result,
@@ -403,13 +268,7 @@ fn zhou_fang_rejects_non_gray_formats() {
 #[test]
 fn gradient_based_error_diffusion_rejects_non_gray_formats() {
     let mut rgb = vec![128_u8; 4 * 4 * 3];
-    let mut rgb_buffer = Buffer {
-        data: &mut rgb,
-        width: 4,
-        height: 4,
-        stride: 12,
-        format: PixelFormat::<()>::Rgb8,
-    };
+    let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
     let rgb_result =
         gradient_based_error_diffusion_in_place(&mut rgb_buffer, QuantizeMode::GrayBits(1));
     assert!(matches!(
@@ -420,13 +279,8 @@ fn gradient_based_error_diffusion_rejects_non_gray_formats() {
     ));
 
     let mut rgba = vec![128_u8; 4 * 4 * 4];
-    let mut rgba_buffer = Buffer {
-        data: &mut rgba,
-        width: 4,
-        height: 4,
-        stride: 16,
-        format: PixelFormat::<()>::Rgba8,
-    };
+    let mut rgba_buffer =
+        dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
     let rgba_result =
         gradient_based_error_diffusion_in_place(&mut rgba_buffer, QuantizeMode::GrayBits(1));
     assert!(matches!(
@@ -452,13 +306,7 @@ fn diffusion_engine_rgb_palette_output_is_palette_member() {
         [0_u8, 0, 255],
     ])
     .expect("palette should be valid");
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 4,
-        height: 4,
-        stride: 12,
-        format: PixelFormat::<()>::Rgb8,
-    };
+    let mut buffer = dithr::rgb_u8(&mut data, 4, 4, 12).expect("valid buffer should construct");
 
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::Palette(&palette))
         .expect("floyd-steinberg should succeed");
@@ -475,13 +323,7 @@ fn diffusion_engine_preserves_alpha() {
         .map(|value| ((value * 17 + 9) % 256) as u8)
         .collect();
     let before_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 6,
-        height: 5,
-        stride: 24,
-        format: PixelFormat::<()>::Rgba8,
-    };
+    let mut buffer = dithr::rgba_u8(&mut data, 6, 5, 24).expect("valid buffer should construct");
 
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::RgbBits(2))
         .expect("floyd-steinberg should succeed");
@@ -493,13 +335,7 @@ fn diffusion_engine_preserves_alpha() {
 #[test]
 fn diffusion_engine_does_not_panic_on_1x1() {
     let mut data = vec![128_u8];
-    let mut buffer = Buffer {
-        data: &mut data,
-        width: 1,
-        height: 1,
-        stride: 1,
-        format: PixelFormat::<()>::Gray8,
-    };
+    let mut buffer = dithr::gray_u8(&mut data, 1, 1, 1).expect("valid buffer should construct");
 
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
         .expect("floyd-steinberg should succeed");
@@ -515,20 +351,8 @@ fn diffusion_engine_is_deterministic() {
     let mut a = seed_data.clone();
     let mut b = seed_data;
 
-    let mut buffer_a = Buffer {
-        data: &mut a,
-        width: 8,
-        height: 6,
-        stride: 24,
-        format: PixelFormat::<()>::Rgb8,
-    };
-    let mut buffer_b = Buffer {
-        data: &mut b,
-        width: 8,
-        height: 6,
-        stride: 24,
-        format: PixelFormat::<()>::Rgb8,
-    };
+    let mut buffer_a = dithr::rgb_u8(&mut a, 8, 6, 24).expect("valid buffer should construct");
+    let mut buffer_b = dithr::rgb_u8(&mut b, 8, 6, 24).expect("valid buffer should construct");
 
     floyd_steinberg_in_place(&mut buffer_a, QuantizeMode::RgbBits(3))
         .expect("floyd-steinberg should succeed");
@@ -598,13 +422,8 @@ fn diffusion_u16_every_wrapper_smoke_gray() {
         let mut data: Vec<u16> = (0_u32..256)
             .map(|value| ((value * 257) % 65_536) as u16)
             .collect();
-        let mut buffer = Buffer {
-            data: &mut data,
-            width: 16,
-            height: 16,
-            stride: 16,
-            format: PixelFormat::<()>::Gray16,
-        };
+        let mut buffer =
+            dithr::gray_u16(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
         wrapper(&mut buffer, QuantizeMode::GrayLevels(2)).expect("u16 wrapper should succeed");
         assert!(data.iter().all(|&value| value == 0 || value == 65_535));
@@ -633,13 +452,8 @@ fn diffusion_f32_every_wrapper_smoke_gray() {
         let mut data: Vec<f32> = (0_u32..(16 * 16 * 3))
             .map(|value| (value % 256) as f32 / 255.0)
             .collect();
-        let mut buffer = Buffer {
-            data: &mut data,
-            width: 16,
-            height: 16,
-            stride: 48,
-            format: PixelFormat::<()>::Rgb32F,
-        };
+        let mut buffer =
+            dithr::rgb_f32(&mut data, 16, 16, 48).expect("valid buffer should construct");
 
         wrapper(&mut buffer, QuantizeMode::GrayLevels(2)).expect("f32 wrapper should succeed");
         assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
@@ -655,13 +469,8 @@ fn diffusion_f32_every_wrapper_smoke_gray() {
         let mut data: Vec<f32> = (0_u32..(16 * 16 * 3))
             .map(|value| (value % 256) as f32 / 255.0)
             .collect();
-        let mut buffer = Buffer {
-            data: &mut data,
-            width: 16,
-            height: 16,
-            stride: 48,
-            format: PixelFormat::<()>::Rgb32F,
-        };
+        let mut buffer =
+            dithr::rgb_f32(&mut data, 16, 16, 48).expect("valid buffer should construct");
 
         let result = wrapper(&mut buffer, QuantizeMode::GrayLevels(2));
         assert!(matches!(

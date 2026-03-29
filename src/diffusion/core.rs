@@ -2,7 +2,7 @@ use crate::{
     core::{PixelLayout, Sample},
     data::ErrorKernel,
     math::fixed::mul_div_i32,
-    quantize_pixel, Buffer, BufferError, Error, PixelFormat, QuantizeMode, Result,
+    quantize_pixel, Buffer, BufferError, Error, QuantizeMode, Result,
 };
 use std::mem::size_of;
 
@@ -18,17 +18,14 @@ pub(crate) fn error_diffuse_in_place<S: Sample, L: PixelLayout>(
         ));
     }
 
-    match buffer.format {
-        PixelFormat::Gray8 | PixelFormat::Gray16 => diffuse_gray_row_major(buffer, mode, kernel),
-        PixelFormat::Rgb8
-        | PixelFormat::Rgba8
-        | PixelFormat::Rgb16
-        | PixelFormat::Rgba16
-        | PixelFormat::Rgb32F
-        | PixelFormat::Rgba32F => diffuse_rgb_row_major(buffer, mode, kernel),
-        _ => Err(Error::UnsupportedFormat(
+    if L::CHANNELS == 1 && !L::HAS_ALPHA {
+        diffuse_gray_row_major(buffer, mode, kernel)
+    } else if (L::CHANNELS == 3 && !L::HAS_ALPHA) || (L::CHANNELS == 4 && L::HAS_ALPHA) {
+        diffuse_rgb_row_major(buffer, mode, kernel)
+    } else {
+        Err(Error::UnsupportedFormat(
             "error diffusion core supports Gray, Rgb, and Rgba formats only",
-        )),
+        ))
     }
 }
 
@@ -214,11 +211,10 @@ fn diffuse_rgb_row_major_int<S: Sample, L: PixelLayout>(
 ) -> Result<()> {
     let width = buffer.width;
     let height = buffer.height;
-    let format = buffer.format;
     let max_value = integer_sample_max::<S>()?;
     let denominator = i32::from(kernel.weight_den);
     let channels = 3_usize;
-    let sample_channels = format.channels();
+    let sample_channels = L::CHANNELS;
     let pixel_count = width
         .checked_mul(height)
         .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
@@ -226,7 +222,7 @@ fn diffuse_rgb_row_major_int<S: Sample, L: PixelLayout>(
         .checked_mul(channels)
         .ok_or(Error::InvalidArgument("error buffer size overflow"))?;
     let mut errors = vec![0_i32; error_len];
-    let is_rgba = format.has_alpha();
+    let is_rgba = L::HAS_ALPHA;
 
     for y in 0..height {
         let row = buffer.try_row_mut(y)?;
@@ -302,10 +298,9 @@ fn diffuse_rgb_row_major_float<S: Sample, L: PixelLayout>(
 ) -> Result<()> {
     let width = buffer.width;
     let height = buffer.height;
-    let format = buffer.format;
     let denominator = f32::from(kernel.weight_den);
     let channels = 3_usize;
-    let sample_channels = format.channels();
+    let sample_channels = L::CHANNELS;
     let pixel_count = width
         .checked_mul(height)
         .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
@@ -313,7 +308,7 @@ fn diffuse_rgb_row_major_float<S: Sample, L: PixelLayout>(
         .checked_mul(channels)
         .ok_or(Error::InvalidArgument("error buffer size overflow"))?;
     let mut errors = vec![0.0_f32; error_len];
-    let is_rgba = format.has_alpha();
+    let is_rgba = L::HAS_ALPHA;
 
     for y in 0..height {
         let row = buffer.try_row_mut(y)?;

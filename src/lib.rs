@@ -21,9 +21,10 @@ pub use adapter::{
     rgba_image_as_buffer, DynamicImageBuffer,
 };
 pub use buffer::{
-    gray_u16, gray_u8, rgb_u16, rgb_u8, rgba_u16, rgba_u8, Buffer, BufferError, GrayBuffer,
-    GrayBuffer16, GrayBuffer8, PixelFormat, RgbBuffer, RgbBuffer16, RgbBuffer32F, RgbBuffer8,
-    RgbaBuffer, RgbaBuffer16, RgbaBuffer32F, RgbaBuffer8,
+    gray_f32, gray_u16, gray_u8, rgb_f32, rgb_u16, rgb_u8, rgba_f32, rgba_u16, rgba_u8, Buffer,
+    BufferError, BufferKind, GrayBuffer, GrayBuffer16, GrayBuffer32F, GrayBuffer8, PixelFormat,
+    RgbBuffer, RgbBuffer16, RgbBuffer32F, RgbBuffer8, RgbaBuffer, RgbaBuffer16, RgbaBuffer32F,
+    RgbaBuffer8,
 };
 pub use data::{cga_palette, grayscale_16, grayscale_2, grayscale_4};
 pub use dbs::{

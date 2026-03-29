@@ -16,6 +16,18 @@ use dithr::{
     yliluoma_3_in_place, zhou_fang_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
 };
 
+fn variable_gray_challenge_64x64() -> Vec<u8> {
+    let mut out = Vec::with_capacity(64 * 64);
+
+    for y in 0..64_usize {
+        for x in 0..64_usize {
+            out.push(((x * 17 + y * 31 + ((x * y) % 97)) % 256) as u8);
+        }
+    }
+
+    out
+}
+
 #[test]
 fn golden_fixture_hashes() {
     let checker = checker_8x8();
@@ -76,19 +88,19 @@ fn golden_bayer_2x2_gray_ramp_8x8() {
 }
 
 #[test]
-fn golden_bayer_4x4_gray_ramp_8x8() {
-    let mut data = gray_ramp_8x8();
+fn golden_bayer_4x4_gray_ramp_16x16() {
+    let mut data = gray_ramp_16x16();
     let mut buffer = Buffer {
         data: &mut data,
-        width: 8,
-        height: 8,
-        stride: 8,
+        width: 16,
+        height: 16,
+        stride: 16,
         format: PixelFormat::Gray8,
     };
 
     bayer_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 4x4 should succeed");
 
-    assert_eq!(fnv1a64(&data), 5_176_068_339_558_256_461_u64);
+    assert_eq!(fnv1a64(&data), 11_223_927_337_015_380_774_u64);
 }
 
 #[test]
@@ -473,47 +485,41 @@ fn golden_shiau_fan_2_gray_ramp_16x16() {
 }
 
 #[test]
-fn golden_ostromoukhov_gray_ramp_16x16() {
-    let mut data = gray_ramp_16x16();
+fn golden_ostromoukhov_gray_challenge_64x64() {
+    let mut data = variable_gray_challenge_64x64();
     let mut buffer = Buffer {
         data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
+        width: 64,
+        height: 64,
+        stride: 64,
         format: PixelFormat::Gray8,
     };
 
-    ostromoukhov_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+    ostromoukhov_in_place(&mut buffer, QuantizeMode::GrayBits(2))
         .expect("ostromoukhov should succeed");
 
-    assert_eq!(fnv1a64(&data), 17_702_997_615_327_889_358_u64);
+    assert_eq!(fnv1a64(&data), 9_747_673_611_797_434_568_u64);
 }
 
 #[test]
-fn golden_zhou_fang_gray_ramp_16x16() {
-    let mut data = gray_ramp_16x16();
+fn golden_zhou_fang_gray_challenge_64x64() {
+    let mut data = variable_gray_challenge_64x64();
     let mut buffer = Buffer {
         data: &mut data,
-        width: 16,
-        height: 16,
-        stride: 16,
+        width: 64,
+        height: 64,
+        stride: 64,
         format: PixelFormat::Gray8,
     };
 
-    zhou_fang_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("zhou-fang should succeed");
+    zhou_fang_in_place(&mut buffer, QuantizeMode::GrayBits(2)).expect("zhou-fang should succeed");
 
-    assert_eq!(fnv1a64(&data), 17_702_997_615_327_889_358_u64);
+    assert_eq!(fnv1a64(&data), 6_260_907_527_888_148_487_u64);
 }
 
 #[test]
 fn golden_variable_diffusion_distinguishes_ostromoukhov_and_zhou_fang() {
-    let mut ostromoukhov_data = Vec::with_capacity(64 * 64);
-    for y in 0..64_usize {
-        for x in 0..64_usize {
-            let value = ((x * 17 + y * 31 + ((x * y) % 97)) % 256) as u8;
-            ostromoukhov_data.push(value);
-        }
-    }
+    let mut ostromoukhov_data = variable_gray_challenge_64x64();
     let mut zhou_fang_data = ostromoukhov_data.clone();
 
     let mut ostromoukhov_buffer = Buffer {

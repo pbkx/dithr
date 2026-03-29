@@ -23,19 +23,14 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         [255, 255, 255],
         [255, 96, 0],
         [0, 160, 255],
-    ])
-    .map_err(|err| std::io::Error::other(format!("failed to build palette: {err:?}")))?;
+    ])?;
 
-    match dynamic_image_as_buffer(&mut image)
-        .map_err(|err| std::io::Error::other(format!("failed to adapt image buffer: {err:?}")))?
-    {
+    match dynamic_image_as_buffer(&mut image)? {
         DynamicImageBuffer::Gray(mut buffer) => {
-            floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))
-                .map_err(|err| std::io::Error::other(format!("failed to dither image: {err:?}")))?;
+            floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayBits(1))?;
         }
         DynamicImageBuffer::Rgb(mut buffer) | DynamicImageBuffer::Rgba(mut buffer) => {
-            yliluoma_2_in_place(&mut buffer, &palette)
-                .map_err(|err| std::io::Error::other(format!("failed to dither image: {err:?}")))?;
+            yliluoma_2_in_place(&mut buffer, &palette)?;
         }
     }
 

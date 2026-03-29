@@ -15,16 +15,12 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut image = image::open(&input)?;
     let palette = cga_palette();
 
-    match dynamic_image_as_buffer(&mut image)
-        .map_err(|err| std::io::Error::other(format!("failed to adapt image buffer: {err:?}")))?
-    {
+    match dynamic_image_as_buffer(&mut image)? {
         DynamicImageBuffer::Gray(mut buffer) => {
-            bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1))
-                .map_err(|err| std::io::Error::other(format!("failed to dither image: {err:?}")))?;
+            bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1))?;
         }
         DynamicImageBuffer::Rgb(mut buffer) | DynamicImageBuffer::Rgba(mut buffer) => {
-            bayer_8x8_in_place(&mut buffer, QuantizeMode::Palette(&palette))
-                .map_err(|err| std::io::Error::other(format!("failed to dither image: {err:?}")))?;
+            bayer_8x8_in_place(&mut buffer, QuantizeMode::Palette(&palette))?;
         }
     }
 

@@ -19,6 +19,7 @@ pub(crate) fn ordered_dither_in_place(
     buffer.validate()?;
     validate_map(map, map_w, map_h)?;
 
+    let map_min = map.iter().copied().min().unwrap_or_default();
     let map_max = map.iter().copied().max().unwrap_or_default();
     let width = buffer.width;
     let height = buffer.height;
@@ -30,7 +31,7 @@ pub(crate) fn ordered_dither_in_place(
 
         for x in 0..width {
             let threshold = ordered_threshold_for_xy(x, y, map, map_w, map_h)?;
-            let bias = threshold_bias(threshold, map_max, strength);
+            let bias = threshold_bias(threshold, map_min, map_max, strength);
             let offset = x.checked_mul(bpp).ok_or(BufferError::OutOfBounds)?;
 
             match format {
@@ -83,6 +84,7 @@ pub(crate) fn ordered_dither_in_place_par(
     buffer.validate()?;
     validate_map(map, map_w, map_h)?;
 
+    let map_min = map.iter().copied().min().unwrap_or_default();
     let map_max = map.iter().copied().max().unwrap_or_default();
     let width = buffer.width;
     let height = buffer.height;
@@ -98,7 +100,7 @@ pub(crate) fn ordered_dither_in_place_par(
         .try_for_each(|(y, row)| -> Result<()> {
             for x in 0..width {
                 let threshold = ordered_threshold_for_xy(x, y, map, map_w, map_h)?;
-                let bias = threshold_bias(threshold, map_max, strength);
+                let bias = threshold_bias(threshold, map_min, map_max, strength);
                 let offset = x * bpp;
 
                 match format {
@@ -194,13 +196,16 @@ fn validate_map(map: &[u8], map_w: usize, map_h: usize) -> Result<()> {
     Ok(())
 }
 
-fn threshold_bias(threshold: u8, map_max: u8, strength: i16) -> i16 {
-    if map_max == 0 || strength == 0 {
+fn threshold_bias(threshold: u8, map_min: u8, map_max: u8, strength: i16) -> i16 {
+    if map_min >= map_max || strength == 0 {
         return 0;
     }
 
-    let centered = i32::from(threshold) * 2 - i32::from(map_max);
-    let scaled = centered * i32::from(strength) / i32::from(map_max);
+    let min = i32::from(map_min);
+    let max = i32::from(map_max);
+    let centered = i32::from(threshold) * 2 - (min + max);
+    let range = max - min;
+    let scaled = centered * i32::from(strength) / range;
 
     clamp_i16(scaled)
 }

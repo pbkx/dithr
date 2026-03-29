@@ -28,13 +28,19 @@ impl std::fmt::Display for PaletteError {
 
 impl std::error::Error for PaletteError {}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IndexedImage {
+#[derive(Debug, Clone, PartialEq)]
+pub struct IndexedImage<S: Sample = u8> {
     pub indices: Vec<u8>,
     pub width: usize,
     pub height: usize,
-    pub palette: Palette8,
+    pub palette: Palette<S>,
 }
+
+impl<S: Sample + Eq> Eq for IndexedImage<S> {}
+
+pub type IndexedImage8 = IndexedImage<u8>;
+pub type IndexedImage16 = IndexedImage<u16>;
+pub type IndexedImage32F = IndexedImage<f32>;
 
 impl<S: Sample> Palette<S> {
     pub const MIN_LEN: usize = 1;
@@ -108,5 +114,28 @@ impl<S: Sample + PartialEq> Palette<S> {
     #[must_use]
     pub fn nearest_rgb(&self, rgb: [S; 3]) -> usize {
         self.nearest_rgb_index(rgb)
+    }
+}
+
+impl<S: Sample> IndexedImage<S> {
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.indices.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.indices.is_empty()
+    }
+
+    #[must_use]
+    pub fn color_at(&self, x: usize, y: usize) -> Option<[S; 3]> {
+        if x >= self.width || y >= self.height {
+            return None;
+        }
+
+        let idx = y.checked_mul(self.width)?.checked_add(x)?;
+        let palette_idx = usize::from(*self.indices.get(idx)?);
+        self.palette.get(palette_idx)
     }
 }

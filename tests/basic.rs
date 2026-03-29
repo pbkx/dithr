@@ -9,7 +9,8 @@ use dithr::{
     grayscale_16, grayscale_2, grayscale_4, levels_from_bits, quantize_error, quantize_gray_u8,
     quantize_pixel, quantize_rgb_u8, random_binary_in_place, rgb_u16, rgb_u8, rgba_u8,
     threshold_binary_in_place, Buffer, BufferError, Error, GrayBuffer16, GrayBuffer8, IndexedImage,
-    Palette, PaletteError, PixelFormat, QuantizeMode, RgbBuffer32F, RgbBuffer8, RgbaBuffer8,
+    IndexedImage16, IndexedImage32F, IndexedImage8, Palette, PaletteError, PixelFormat,
+    QuantizeMode, RgbBuffer32F, RgbBuffer8, RgbaBuffer8,
 };
 
 #[test]
@@ -341,10 +342,10 @@ fn palette_contains_true_for_member() {
 }
 
 #[test]
-fn indexed_image_stores_dimensions_and_palette() {
+fn indexed_image8_stores_palette8() {
     let palette =
-        Palette::new(vec![[0_u8, 0, 0], [255, 255, 255]]).expect("palette should be valid");
-    let image = IndexedImage {
+        Palette::<u8>::new(vec![[0, 0, 0], [255, 255, 255]]).expect("palette should be valid");
+    let image: IndexedImage8 = IndexedImage {
         indices: vec![0, 1, 1, 0],
         width: 2,
         height: 2,
@@ -355,6 +356,76 @@ fn indexed_image_stores_dimensions_and_palette() {
     assert_eq!(image.width, 2);
     assert_eq!(image.height, 2);
     assert_eq!(image.palette, palette);
+}
+
+#[test]
+fn indexed_image16_stores_palette16() {
+    let palette = Palette::<u16>::new(vec![[0, 0, 0], [65_535, 65_535, 65_535]])
+        .expect("palette should be valid");
+    let image: IndexedImage16 = IndexedImage {
+        indices: vec![0, 1, 1, 0],
+        width: 2,
+        height: 2,
+        palette: palette.clone(),
+    };
+
+    assert_eq!(image.len(), 4);
+    assert!(!image.is_empty());
+    assert_eq!(image.palette, palette);
+}
+
+#[test]
+fn indexed_image32f_stores_palette32f() {
+    let palette =
+        Palette::<f32>::new(vec![[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]).expect("valid palette");
+    let image: IndexedImage32F = IndexedImage {
+        indices: vec![0, 1, 1, 0],
+        width: 2,
+        height: 2,
+        palette: palette.clone(),
+    };
+
+    assert_eq!(image.len(), 4);
+    assert!(!image.is_empty());
+    assert_eq!(image.palette, palette);
+}
+
+#[test]
+fn indexed_image_color_at_returns_palette_color() {
+    let palette = Palette::<u16>::new(vec![[0, 0, 0], [65_535, 0, 0], [0, 65_535, 0]])
+        .expect("palette should be valid");
+    let image: IndexedImage16 = IndexedImage {
+        indices: vec![0, 1, 2, 1],
+        width: 2,
+        height: 2,
+        palette,
+    };
+
+    assert_eq!(image.color_at(0, 0), Some([0, 0, 0]));
+    assert_eq!(image.color_at(1, 0), Some([65_535, 0, 0]));
+    assert_eq!(image.color_at(0, 1), Some([0, 65_535, 0]));
+    assert_eq!(image.color_at(2, 1), None);
+}
+
+#[test]
+fn palette_length_256_still_allows_u8_indices() {
+    let colors: Vec<[u8; 3]> = (0..256)
+        .map(|value| {
+            let v = value as u8;
+            [v, v, v]
+        })
+        .collect();
+    let palette = Palette::<u8>::new(colors).expect("palette should be valid");
+    let image: IndexedImage8 = IndexedImage {
+        indices: vec![0, 127, 255],
+        width: 3,
+        height: 1,
+        palette,
+    };
+
+    assert_eq!(image.color_at(0, 0), Some([0, 0, 0]));
+    assert_eq!(image.color_at(1, 0), Some([127, 127, 127]));
+    assert_eq!(image.color_at(2, 0), Some([255, 255, 255]));
 }
 
 #[test]
@@ -546,10 +617,7 @@ fn quantize_single_color_preserves_intermediate_levels() {
 #[test]
 fn single_color_levels_generic_u16() {
     let fg = [50_000_u16, 32_767_u16, 16_383_u16];
-    let mode = QuantizeMode::SingleColor {
-        fg,
-        levels: 4,
-    };
+    let mode = QuantizeMode::SingleColor { fg, levels: 4 };
     let quantized = quantize_pixel::<u16, dithr::core::Gray>(&[32_768], mode)
         .expect("single-color quantization should succeed");
     assert!(quantized[0] <= fg[0]);

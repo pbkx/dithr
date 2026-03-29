@@ -10,8 +10,8 @@ use dithr::data::{
 use dithr::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
     cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
-    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place, Error, OrderedError, Palette,
-    QuantizeMode,
+    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place, Error, IndexedImage,
+    IndexedImage16, OrderedError, Palette, QuantizeMode,
 };
 
 const BAYER_2X2_FLAT: [u8; 4] = [0, 2, 3, 1];
@@ -395,6 +395,61 @@ fn yliluoma_rgba_alpha_preserved_u16() {
 
     let after_alpha: Vec<u16> = data.iter().skip(3).step_by(4).copied().collect();
     assert_eq!(before_alpha, after_alpha);
+}
+
+#[test]
+fn yliluoma_to_indexed_u16_palette_member_consistency() {
+    let width = 8_usize;
+    let height = 8_usize;
+    let mut data = vec![0_u16; width * height * 3];
+    for y in 0..height {
+        for x in 0..width {
+            let offset = (y * width + x) * 3;
+            data[offset] = ((x * 65_535) / (width - 1)) as u16;
+            data[offset + 1] = ((y * 65_535) / (height - 1)) as u16;
+            data[offset + 2] = (((x + y) * 65_535) / (width + height - 2)) as u16;
+        }
+    }
+
+    let palette = Palette::<u16>::new(vec![
+        [0, 0, 0],
+        [65_535, 65_535, 65_535],
+        [65_535, 0, 0],
+        [0, 65_535, 0],
+        [0, 0, 65_535],
+        [65_535, 65_535, 0],
+        [0, 65_535, 65_535],
+        [65_535, 0, 65_535],
+    ])
+    .expect("palette should be valid");
+
+    let mut buffer =
+        dithr::rgb_u16(&mut data, width, height, width * 3).expect("valid buffer should construct");
+    yliluoma_1_in_place(&mut buffer, &palette).expect("yliluoma 1 should succeed");
+
+    let mut indices = Vec::with_capacity(width * height);
+    for chunk in data.chunks_exact(3) {
+        let rgb = [chunk[0], chunk[1], chunk[2]];
+        assert!(palette.contains(rgb));
+        let idx = palette.nearest_rgb_index(rgb) as u8;
+        assert_eq!(palette.get(usize::from(idx)), Some(rgb));
+        indices.push(idx);
+    }
+
+    let indexed: IndexedImage16 = IndexedImage {
+        indices,
+        width,
+        height,
+        palette,
+    };
+
+    for y in 0..height {
+        for x in 0..width {
+            let offset = (y * width + x) * 3;
+            let rgb = [data[offset], data[offset + 1], data[offset + 2]];
+            assert_eq!(indexed.color_at(x, y), Some(rgb));
+        }
+    }
 }
 
 #[test]

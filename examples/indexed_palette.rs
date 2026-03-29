@@ -1,4 +1,4 @@
-use dithr::{yliluoma_1_in_place, Buffer, IndexedImage, Palette, PixelFormat, Result};
+use dithr::{rgb_u8, yliluoma_1_in_place, IndexedImage, Palette, Result};
 use std::collections::BTreeSet;
 
 fn main() -> Result<()> {
@@ -21,13 +21,7 @@ fn main() -> Result<()> {
         [255, 64, 64],
         [64, 192, 255],
     ])?;
-    let mut buffer: Buffer<'_, u8> = Buffer::new(
-        &mut data,
-        width,
-        height,
-        width * PixelFormat::<()>::Rgb8.bytes_per_pixel(),
-        PixelFormat::<()>::Rgb8,
-    )?;
+    let mut buffer = rgb_u8(&mut data, width, height, width * 3)?;
 
     yliluoma_1_in_place(&mut buffer, &palette)?;
 

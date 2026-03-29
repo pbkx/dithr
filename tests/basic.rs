@@ -4,10 +4,11 @@ use common::{
     checker_8x8, fnv1a64, gray_ramp_16x16, gray_ramp_8x8, rgb_cube_strip, rgb_gradient_8x8,
 };
 use dithr::{
-    cga_palette, gray_u16, gray_u8, grayscale_16, grayscale_2, grayscale_4, quantize_error,
-    quantize_gray_u8, quantize_pixel, quantize_rgb_u8, random_binary_in_place, rgb_u8, rgba_u8,
-    threshold_binary_in_place, Buffer, BufferError, Error, GrayBuffer16, GrayBuffer8, IndexedImage,
-    Palette, PaletteError, PixelFormat, QuantizeMode, RgbBuffer32F, RgbBuffer8, RgbaBuffer8,
+    bayer_8x8_rgb16_in_place, cga_palette, floyd_steinberg_in_place, gray_u16, gray_u8,
+    grayscale_16, grayscale_2, grayscale_4, quantize_error, quantize_gray_u8, quantize_pixel,
+    quantize_rgb_u8, random_binary_in_place, rgb_u16, rgb_u8, rgba_u8, threshold_binary_in_place,
+    Buffer, BufferError, Error, GrayBuffer16, GrayBuffer8, IndexedImage, Palette, PaletteError,
+    PixelFormat, QuantizeMode, RgbBuffer32F, RgbBuffer8, RgbaBuffer8,
 };
 
 #[test]
@@ -730,4 +731,54 @@ fn fixture_builders_are_deterministic() {
     assert_eq!(fnv1a64(&checker), fnv1a64(&checker_8x8()));
     assert_eq!(fnv1a64(&gradient), fnv1a64(&rgb_gradient_8x8()));
     assert_eq!(fnv1a64(&cube), fnv1a64(&rgb_cube_strip()));
+}
+
+#[test]
+fn rgb16_example_style_smoke() {
+    let width = 8_usize;
+    let height = 8_usize;
+    let mut data = vec![0_u16; width * height * 3];
+
+    for y in 0..height {
+        for x in 0..width {
+            let offset = (y * width + x) * 3;
+            data[offset] = (x * 65_535 / (width - 1)) as u16;
+            data[offset + 1] = (y * 65_535 / (height - 1)) as u16;
+            data[offset + 2] = ((x + y) * 65_535 / (width + height - 2)) as u16;
+        }
+    }
+
+    let mut buffer = rgb_u16(&mut data, width, height, width * 3).expect("valid rgb16 buffer");
+    bayer_8x8_rgb16_in_place(&mut buffer, 2).expect("bayer rgb16 should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+}
+
+#[test]
+fn rgb32f_example_style_smoke() {
+    let width = 8_usize;
+    let height = 8_usize;
+    let mut data = vec![0.0_f32; width * height * 3];
+
+    for y in 0..height {
+        for x in 0..width {
+            let offset = (y * width + x) * 3;
+            data[offset] = x as f32 / (width - 1) as f32;
+            data[offset + 1] = y as f32 / (height - 1) as f32;
+            data[offset + 2] = (x + y) as f32 / (width + height - 2) as f32;
+        }
+    }
+
+    let mut buffer: RgbBuffer32F<'_> = Buffer::new(
+        &mut data,
+        width,
+        height,
+        width * 3,
+        PixelFormat::<()>::Rgb32F,
+    )
+    .expect("valid rgb32f buffer");
+    floyd_steinberg_in_place(&mut buffer, QuantizeMode::RgbLevels(2))
+        .expect("floyd-steinberg should succeed");
+
+    assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
 }

@@ -1,7 +1,5 @@
 #[cfg(feature = "image")]
-use dithr::{
-    bayer_8x8_in_place, cga_palette, dynamic_image_as_buffer, DynamicImageBuffer, QuantizeMode,
-};
+use dithr::{bayer_8x8_in_place, dynamic_image_as_buffer, DynamicImageBuffer, QuantizeMode};
 #[cfg(feature = "image")]
 use std::path::PathBuf;
 
@@ -13,14 +11,30 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     };
 
     let mut image = image::open(&input)?;
-    let palette = cga_palette();
-
     match dynamic_image_as_buffer(&mut image)? {
-        DynamicImageBuffer::Gray(mut buffer) => {
+        DynamicImageBuffer::Gray8(mut buffer) => {
             bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1))?;
         }
-        DynamicImageBuffer::Rgb(mut buffer) | DynamicImageBuffer::Rgba(mut buffer) => {
-            bayer_8x8_in_place(&mut buffer, QuantizeMode::Palette(&palette))?;
+        DynamicImageBuffer::Rgb8(mut buffer) => {
+            bayer_8x8_in_place(&mut buffer, QuantizeMode::RgbBits(1))?;
+        }
+        DynamicImageBuffer::Rgba8(mut buffer) => {
+            bayer_8x8_in_place(&mut buffer, QuantizeMode::RgbBits(1))?;
+        }
+        DynamicImageBuffer::Gray16(mut buffer) => {
+            bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayLevels(2))?;
+        }
+        DynamicImageBuffer::Rgb16(mut buffer) => {
+            bayer_8x8_in_place(&mut buffer, QuantizeMode::RgbLevels(2))?;
+        }
+        DynamicImageBuffer::Rgba16(mut buffer) => {
+            bayer_8x8_in_place(&mut buffer, QuantizeMode::RgbLevels(2))?;
+        }
+        DynamicImageBuffer::Rgb32F(mut buffer) => {
+            bayer_8x8_in_place(&mut buffer, QuantizeMode::RgbLevels(2))?;
+        }
+        DynamicImageBuffer::Rgba32F(mut buffer) => {
+            bayer_8x8_in_place(&mut buffer, QuantizeMode::RgbLevels(2))?;
         }
     }
 

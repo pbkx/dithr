@@ -16,8 +16,9 @@ pub mod stochastic;
 
 #[cfg(feature = "image")]
 pub use adapter::{
-    dynamic_image_as_buffer, gray_image_as_buffer, rgb_image_as_buffer, rgba_image_as_buffer,
-    DynamicImageBuffer,
+    dynamic_image_as_buffer, gray16_image_as_buffer, gray_image_as_buffer, rgb16_image_as_buffer,
+    rgb32f_image_as_buffer, rgb_image_as_buffer, rgba16_image_as_buffer, rgba32f_image_as_buffer,
+    rgba_image_as_buffer, DynamicImageBuffer,
 };
 pub use buffer::{
     gray_u16, gray_u8, rgb_u16, rgb_u8, rgba_u16, rgba_u8, Buffer, BufferError, GrayBuffer,
@@ -59,3 +60,11 @@ pub use stochastic::{
 };
 #[cfg(feature = "rayon")]
 pub use stochastic::{random_binary_in_place_par, threshold_binary_in_place_par};
+
+pub fn floyd_steinberg_gray_u16_in_place(buffer: &mut GrayBuffer16<'_>, levels: u16) -> Result<()> {
+    floyd_steinberg_in_place(buffer, QuantizeMode::GrayLevels(levels))
+}
+
+pub fn bayer_8x8_rgb16_in_place(buffer: &mut RgbBuffer16<'_>, levels: u16) -> Result<()> {
+    bayer_8x8_in_place(buffer, QuantizeMode::RgbLevels(levels))
+}

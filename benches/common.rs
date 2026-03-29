@@ -60,11 +60,11 @@ pub const PARALLEL_ALGORITHMS: [&str; 9] = [
 ];
 
 pub fn coverage_count() -> usize {
-    let mut count = SEQUENTIAL_ALGORITHMS.len();
     #[cfg(feature = "rayon")]
-    {
-        count += PARALLEL_ALGORITHMS.len();
-    }
+    let count = SEQUENTIAL_ALGORITHMS.len() + PARALLEL_ALGORITHMS.len();
+    #[cfg(not(feature = "rayon"))]
+    let count = SEQUENTIAL_ALGORITHMS.len();
+
     count
 }
 

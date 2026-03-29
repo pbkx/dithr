@@ -1,18 +1,13 @@
+mod bayer;
+mod cluster;
 pub(crate) mod core;
 mod yliluoma;
 
 use crate::{
     core::{PixelLayout, Sample},
-    data::{
-        generate_bayer_16x16_flat, BAYER_2X2_FLAT, BAYER_4X4_FLAT, BAYER_8X8_FLAT,
-        CLUSTER_DOT_4X4_FLAT, CLUSTER_DOT_8X8_FLAT,
-    },
     Buffer, Palette, QuantizeMode, Result,
 };
-use std::sync::OnceLock;
-
-static BAYER_16X16_FLAT: OnceLock<[u16; 256]> = OnceLock::new();
-const DEFAULT_STRENGTH: f32 = 64.0 / 255.0;
+pub(crate) const DEFAULT_STRENGTH: f32 = 64.0 / 255.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OrderedError {
@@ -34,6 +29,16 @@ impl std::fmt::Display for OrderedError {
 }
 
 impl std::error::Error for OrderedError {}
+
+pub use bayer::{bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place};
+#[cfg(feature = "rayon")]
+pub use bayer::{
+    bayer_16x16_in_place_par, bayer_2x2_in_place_par, bayer_4x4_in_place_par,
+    bayer_8x8_in_place_par,
+};
+pub use cluster::{cluster_dot_4x4_in_place, cluster_dot_8x8_in_place};
+#[cfg(feature = "rayon")]
+pub use cluster::{cluster_dot_4x4_in_place_par, cluster_dot_8x8_in_place_par};
 
 #[doc(hidden)]
 pub(crate) fn ordered_dither_in_place<S: Sample, L: PixelLayout>(
@@ -57,96 +62,6 @@ pub(crate) fn ordered_dither_in_place_par<S: Sample, L: PixelLayout>(
     strength: f32,
 ) -> Result<()> {
     core::ordered_dither_in_place_par(buffer, mode, map, map_w, map_h, strength)
-}
-
-pub fn bayer_2x2_in_place<S: Sample, L: PixelLayout>(
-    buffer: &mut Buffer<'_, S, L>,
-    mode: QuantizeMode<'_, S>,
-) -> Result<()> {
-    ordered_dither_in_place(buffer, mode, &BAYER_2X2_FLAT, 2, 2, DEFAULT_STRENGTH)
-}
-
-#[cfg(feature = "rayon")]
-pub fn bayer_2x2_in_place_par<S: Sample, L: PixelLayout>(
-    buffer: &mut Buffer<'_, S, L>,
-    mode: QuantizeMode<'_, S>,
-) -> Result<()> {
-    ordered_dither_in_place_par(buffer, mode, &BAYER_2X2_FLAT, 2, 2, DEFAULT_STRENGTH)
-}
-
-pub fn bayer_4x4_in_place<S: Sample, L: PixelLayout>(
-    buffer: &mut Buffer<'_, S, L>,
-    mode: QuantizeMode<'_, S>,
-) -> Result<()> {
-    ordered_dither_in_place(buffer, mode, &BAYER_4X4_FLAT, 4, 4, DEFAULT_STRENGTH)
-}
-
-#[cfg(feature = "rayon")]
-pub fn bayer_4x4_in_place_par<S: Sample, L: PixelLayout>(
-    buffer: &mut Buffer<'_, S, L>,
-    mode: QuantizeMode<'_, S>,
-) -> Result<()> {
-    ordered_dither_in_place_par(buffer, mode, &BAYER_4X4_FLAT, 4, 4, DEFAULT_STRENGTH)
-}
-
-pub fn bayer_8x8_in_place<S: Sample, L: PixelLayout>(
-    buffer: &mut Buffer<'_, S, L>,
-    mode: QuantizeMode<'_, S>,
-) -> Result<()> {
-    ordered_dither_in_place(buffer, mode, &BAYER_8X8_FLAT, 8, 8, DEFAULT_STRENGTH)
-}
-
-#[cfg(feature = "rayon")]
-pub fn bayer_8x8_in_place_par<S: Sample, L: PixelLayout>(
-    buffer: &mut Buffer<'_, S, L>,
-    mode: QuantizeMode<'_, S>,
-) -> Result<()> {
-    ordered_dither_in_place_par(buffer, mode, &BAYER_8X8_FLAT, 8, 8, DEFAULT_STRENGTH)
-}
-
-pub fn bayer_16x16_in_place<S: Sample, L: PixelLayout>(
-    buffer: &mut Buffer<'_, S, L>,
-    mode: QuantizeMode<'_, S>,
-) -> Result<()> {
-    ordered_dither_in_place(buffer, mode, bayer_16x16_flat(), 16, 16, DEFAULT_STRENGTH)
-}
-
-#[cfg(feature = "rayon")]
-pub fn bayer_16x16_in_place_par<S: Sample, L: PixelLayout>(
-    buffer: &mut Buffer<'_, S, L>,
-    mode: QuantizeMode<'_, S>,
-) -> Result<()> {
-    ordered_dither_in_place_par(buffer, mode, bayer_16x16_flat(), 16, 16, DEFAULT_STRENGTH)
-}
-
-pub fn cluster_dot_4x4_in_place<S: Sample, L: PixelLayout>(
-    buffer: &mut Buffer<'_, S, L>,
-    mode: QuantizeMode<'_, S>,
-) -> Result<()> {
-    ordered_dither_in_place(buffer, mode, &CLUSTER_DOT_4X4_FLAT, 4, 4, DEFAULT_STRENGTH)
-}
-
-#[cfg(feature = "rayon")]
-pub fn cluster_dot_4x4_in_place_par<S: Sample, L: PixelLayout>(
-    buffer: &mut Buffer<'_, S, L>,
-    mode: QuantizeMode<'_, S>,
-) -> Result<()> {
-    ordered_dither_in_place_par(buffer, mode, &CLUSTER_DOT_4X4_FLAT, 4, 4, DEFAULT_STRENGTH)
-}
-
-pub fn cluster_dot_8x8_in_place<S: Sample, L: PixelLayout>(
-    buffer: &mut Buffer<'_, S, L>,
-    mode: QuantizeMode<'_, S>,
-) -> Result<()> {
-    ordered_dither_in_place(buffer, mode, &CLUSTER_DOT_8X8_FLAT, 8, 8, DEFAULT_STRENGTH)
-}
-
-#[cfg(feature = "rayon")]
-pub fn cluster_dot_8x8_in_place_par<S: Sample, L: PixelLayout>(
-    buffer: &mut Buffer<'_, S, L>,
-    mode: QuantizeMode<'_, S>,
-) -> Result<()> {
-    ordered_dither_in_place_par(buffer, mode, &CLUSTER_DOT_8X8_FLAT, 8, 8, DEFAULT_STRENGTH)
 }
 
 pub fn custom_ordered_in_place<S: Sample, L: PixelLayout>(
@@ -211,10 +126,6 @@ pub fn yliluoma_3_in_place<S: Sample, L: PixelLayout>(
     palette: &Palette<S>,
 ) -> Result<()> {
     yliluoma::yliluoma_3_in_place(buffer, palette)
-}
-
-fn bayer_16x16_flat() -> &'static [u16; 256] {
-    BAYER_16X16_FLAT.get_or_init(generate_bayer_16x16_flat)
 }
 
 fn validate_custom_map(

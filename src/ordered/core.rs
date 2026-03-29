@@ -1,5 +1,5 @@
 use crate::{
-    core::{PixelLayout, Sample},
+    core::{alpha_index, read_unit_pixel, PixelLayout, Sample},
     quantize_pixel, Buffer, BufferError, Error, QuantizeMode, Result,
 };
 #[cfg(feature = "rayon")]
@@ -14,55 +14,22 @@ pub(crate) fn ordered_dither_in_place<S: Sample, L: PixelLayout>(
     strength: f32,
 ) -> Result<()> {
     buffer.validate()?;
-    validate_map(map, map_w, map_h)?;
+    let (map_min, threshold_den) = validate_map(map, map_w, map_h)?;
 
-    let map_min = map.iter().copied().min().unwrap_or_default();
-    let map_max = map.iter().copied().max().unwrap_or_default();
     let width = buffer.width;
     let height = buffer.height;
-    let channels = L::CHANNELS;
+    let ctx = OrderedDitherCtx {
+        map,
+        map_w,
+        map_h,
+        map_min,
+        threshold_den,
+        strength,
+    };
 
     for y in 0..height {
         let row = buffer.try_row_mut(y)?;
-
-        for x in 0..width {
-            let threshold = ordered_threshold_for_xy(x, y, map, map_w, map_h);
-            let bias = threshold_bias_unit(threshold, map_min, map_max, strength);
-            let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
-
-            if L::CHANNELS == 1 && !L::HAS_ALPHA {
-                let value = apply_bias_unit(row[offset], bias);
-                let quantized = quantize_pixel::<S, crate::core::Gray>(&[value], mode)?;
-                row[offset] = quantized[0];
-            } else if L::CHANNELS == 3 && !L::HAS_ALPHA {
-                let adjusted = [
-                    apply_bias_unit(row[offset], bias),
-                    apply_bias_unit(row[offset + 1], bias),
-                    apply_bias_unit(row[offset + 2], bias),
-                ];
-                let quantized = quantize_pixel::<S, crate::core::Rgb>(&adjusted, mode)?;
-                row[offset] = quantized[0];
-                row[offset + 1] = quantized[1];
-                row[offset + 2] = quantized[2];
-            } else if L::CHANNELS == 4 && L::HAS_ALPHA {
-                let alpha = row[offset + 3];
-                let adjusted = [
-                    apply_bias_unit(row[offset], bias),
-                    apply_bias_unit(row[offset + 1], bias),
-                    apply_bias_unit(row[offset + 2], bias),
-                    alpha,
-                ];
-                let quantized = quantize_pixel::<S, crate::core::Rgba>(&adjusted, mode)?;
-                row[offset] = quantized[0];
-                row[offset + 1] = quantized[1];
-                row[offset + 2] = quantized[2];
-                row[offset + 3] = alpha;
-            } else {
-                return Err(Error::UnsupportedFormat(
-                    "ordered dithering supports Gray, Rgb, and Rgba formats only",
-                ));
-            }
-        }
+        ordered_dither_row::<S, L>(row, y, width, &ctx, mode)?;
     }
 
     Ok(())
@@ -78,14 +45,19 @@ pub(crate) fn ordered_dither_in_place_par<S: Sample, L: PixelLayout>(
     strength: f32,
 ) -> Result<()> {
     buffer.validate()?;
-    validate_map(map, map_w, map_h)?;
+    let (map_min, threshold_den) = validate_map(map, map_w, map_h)?;
 
-    let map_min = map.iter().copied().min().unwrap_or_default();
-    let map_max = map.iter().copied().max().unwrap_or_default();
     let width = buffer.width;
     let height = buffer.height;
-    let channels = L::CHANNELS;
     let stride = buffer.stride;
+    let ctx = OrderedDitherCtx {
+        map,
+        map_w,
+        map_h,
+        map_min,
+        threshold_den,
+        strength,
+    };
 
     buffer
         .data
@@ -93,48 +65,111 @@ pub(crate) fn ordered_dither_in_place_par<S: Sample, L: PixelLayout>(
         .take(height)
         .enumerate()
         .try_for_each(|(y, row)| -> Result<()> {
-            for x in 0..width {
-                let threshold = ordered_threshold_for_xy(x, y, map, map_w, map_h);
-                let bias = threshold_bias_unit(threshold, map_min, map_max, strength);
-                let offset = x * channels;
-
-                if L::CHANNELS == 1 && !L::HAS_ALPHA {
-                    let value = apply_bias_unit(row[offset], bias);
-                    let quantized = quantize_pixel::<S, crate::core::Gray>(&[value], mode)?;
-                    row[offset] = quantized[0];
-                } else if L::CHANNELS == 3 && !L::HAS_ALPHA {
-                    let adjusted = [
-                        apply_bias_unit(row[offset], bias),
-                        apply_bias_unit(row[offset + 1], bias),
-                        apply_bias_unit(row[offset + 2], bias),
-                    ];
-                    let quantized = quantize_pixel::<S, crate::core::Rgb>(&adjusted, mode)?;
-                    row[offset] = quantized[0];
-                    row[offset + 1] = quantized[1];
-                    row[offset + 2] = quantized[2];
-                } else if L::CHANNELS == 4 && L::HAS_ALPHA {
-                    let alpha = row[offset + 3];
-                    let adjusted = [
-                        apply_bias_unit(row[offset], bias),
-                        apply_bias_unit(row[offset + 1], bias),
-                        apply_bias_unit(row[offset + 2], bias),
-                        alpha,
-                    ];
-                    let quantized = quantize_pixel::<S, crate::core::Rgba>(&adjusted, mode)?;
-                    row[offset] = quantized[0];
-                    row[offset + 1] = quantized[1];
-                    row[offset + 2] = quantized[2];
-                    row[offset + 3] = alpha;
-                } else {
-                    return Err(Error::UnsupportedFormat(
-                        "ordered dithering supports Gray, Rgb, and Rgba formats only",
-                    ));
-                }
-            }
-            Ok(())
+            ordered_dither_row::<S, L>(row, y, width, &ctx, mode)
         })?;
 
     Ok(())
+}
+
+struct OrderedDitherCtx<'a> {
+    map: &'a [u16],
+    map_w: usize,
+    map_h: usize,
+    map_min: u16,
+    threshold_den: u16,
+    strength: f32,
+}
+
+fn ordered_dither_row<S: Sample, L: PixelLayout>(
+    row: &mut [S],
+    y: usize,
+    width: usize,
+    ctx: &OrderedDitherCtx<'_>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    for x in 0..width {
+        let threshold = ordered_threshold_for_xy(x, y, ctx.map, ctx.map_w, ctx.map_h);
+        let threshold_rank = threshold.saturating_sub(ctx.map_min);
+        let offset = x.checked_mul(L::CHANNELS).ok_or(BufferError::OutOfBounds)?;
+        let end = offset
+            .checked_add(L::CHANNELS)
+            .ok_or(BufferError::OutOfBounds)?;
+        let pixel = row.get_mut(offset..end).ok_or(BufferError::OutOfBounds)?;
+        if ctx.strength == 1.0 {
+            ordered_apply_pixel::<S, L>(pixel, threshold_rank, ctx.threshold_den, mode)?;
+        } else {
+            ordered_apply_pixel_with_strength::<S, L>(
+                pixel,
+                threshold_rank,
+                ctx.threshold_den,
+                ctx.strength,
+                mode,
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) fn ordered_apply_pixel<S: Sample, L: PixelLayout>(
+    pixel: &mut [S],
+    threshold_rank: u16,
+    threshold_den: u16,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    ordered_apply_pixel_with_strength::<S, L>(pixel, threshold_rank, threshold_den, 1.0, mode)
+}
+
+fn ordered_apply_pixel_with_strength<S: Sample, L: PixelLayout>(
+    pixel: &mut [S],
+    threshold_rank: u16,
+    threshold_den: u16,
+    strength: f32,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    if !ordered_layout_supported::<L>() {
+        return Err(Error::UnsupportedFormat(
+            "ordered dithering supports Gray, Rgb, and Rgba formats only",
+        ));
+    }
+
+    if pixel.len() != L::CHANNELS {
+        return Err(Error::InvalidArgument(
+            "pixel slice length does not match layout",
+        ));
+    }
+
+    let preserved_alpha = alpha_index::<L>().and_then(|idx| pixel.get(idx).copied());
+    let mut rgba = read_unit_pixel::<S, L>(pixel);
+    let threshold = ordered_threshold_unit(threshold_rank, threshold_den, strength);
+    for channel in rgba.iter_mut().take(3) {
+        *channel = (*channel + threshold).clamp(0.0, 1.0);
+    }
+
+    let biased = [
+        S::from_unit_f32(rgba[0]),
+        S::from_unit_f32(rgba[1]),
+        S::from_unit_f32(rgba[2]),
+        S::from_unit_f32(rgba[3]),
+    ];
+    let quantized = quantize_pixel::<S, L>(&biased[..L::CHANNELS], mode)?;
+    pixel[..L::COLOR_CHANNELS].copy_from_slice(&quantized[..L::COLOR_CHANNELS]);
+    if let Some(alpha_lane) = alpha_index::<L>() {
+        pixel[alpha_lane] = preserved_alpha.ok_or(BufferError::OutOfBounds)?;
+    }
+
+    Ok(())
+}
+
+pub(crate) fn ordered_threshold_unit(rank: u16, denom: u16, strength: f32) -> f32 {
+    if denom <= 1 || strength == 0.0 {
+        return 0.0;
+    }
+
+    let range = f32::from(denom - 1);
+    let centered = f32::from(rank) * 2.0 - range;
+    let scaled_steps = (centered * (strength * 255.0) / range).trunc();
+    scaled_steps / 255.0
 }
 
 pub(crate) fn ordered_threshold_for_xy(
@@ -153,7 +188,7 @@ pub(crate) fn ordered_threshold_for_xy(
     map[map_y * map_w + map_x]
 }
 
-fn validate_map(map: &[u16], map_w: usize, map_h: usize) -> Result<()> {
+fn validate_map(map: &[u16], map_w: usize, map_h: usize) -> Result<(u16, u16)> {
     if map_w == 0 || map_h == 0 {
         return Err(Error::InvalidArgument(
             "ordered map dimensions must be positive",
@@ -169,23 +204,19 @@ fn validate_map(map: &[u16], map_w: usize, map_h: usize) -> Result<()> {
         ));
     }
 
-    Ok(())
+    let map_min = *map
+        .iter()
+        .min()
+        .ok_or(Error::InvalidArgument("ordered map must not be empty"))?;
+    let map_max = *map
+        .iter()
+        .max()
+        .ok_or(Error::InvalidArgument("ordered map must not be empty"))?;
+    let threshold_den = map_max.saturating_sub(map_min).saturating_add(1);
+
+    Ok((map_min, threshold_den))
 }
 
-fn threshold_bias_unit(threshold: u16, map_min: u16, map_max: u16, strength: f32) -> f32 {
-    if map_min >= map_max || strength == 0.0 {
-        return 0.0;
-    }
-
-    let min = i32::from(map_min);
-    let max = i32::from(map_max);
-    let centered = i32::from(threshold) * 2 - (min + max);
-    let range = (max - min) as f32;
-    let strength_steps = strength * 255.0;
-    let scaled_steps = (centered as f32 * strength_steps / range).trunc();
-    scaled_steps / 255.0
-}
-
-fn apply_bias_unit<S: Sample>(value: S, bias: f32) -> S {
-    S::from_unit_f32((value.to_unit_f32() + bias).clamp(0.0, 1.0))
+const fn ordered_layout_supported<L: PixelLayout>() -> bool {
+    (L::HAS_ALPHA && L::CHANNELS == 4) || (!L::HAS_ALPHA && (L::CHANNELS == 1 || L::CHANNELS == 3))
 }

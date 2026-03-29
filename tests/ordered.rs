@@ -583,6 +583,32 @@ fn bayer_8x8_f32_runs_and_quantizes() {
 }
 
 #[test]
+fn ordered_bayer_u16_runs_with_same_invariants() {
+    let mut data: Vec<u16> = (0_u32..256)
+        .map(|value| ((value * 257) % 65_536) as u16)
+        .collect();
+    let mut buffer = dithr::gray_u16(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayLevels(2)).expect("bayer 8x8 should succeed");
+
+    assert_eq!(data.len(), 256);
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+}
+
+#[test]
+fn ordered_bayer_f32_runs_with_same_invariants() {
+    let mut data: Vec<f32> = (0_u32..(16 * 16 * 3))
+        .map(|value| (value % 256) as f32 / 255.0)
+        .collect();
+    let mut buffer = dithr::rgb_f32(&mut data, 16, 16, 48).expect("valid buffer should construct");
+
+    bayer_8x8_in_place(&mut buffer, QuantizeMode::RgbLevels(2)).expect("bayer 8x8 should succeed");
+
+    assert_eq!(data.len(), 16 * 16 * 3);
+    assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
+}
+
+#[test]
 fn ordered_engine_preserves_alpha_across_u8_u16_f32() {
     let map = [0_u8, 2, 3, 1];
 
@@ -612,6 +638,89 @@ fn ordered_engine_preserves_alpha_across_u8_u16_f32() {
         .expect("f32 ordered dithering should succeed");
     let after_f32: Vec<f32> = rgba_f32.iter().skip(3).step_by(4).copied().collect();
     assert_eq!(before_f32, after_f32);
+}
+
+#[test]
+fn ordered_alpha_preserved_all_sample_types() {
+    let map = [0_u8, 2, 3, 1];
+
+    let mut rgba_u8: Vec<u8> = (0_u16..64).map(|v| (v * 3) as u8).collect();
+    let before_u8: Vec<u8> = rgba_u8.iter().skip(3).step_by(4).copied().collect();
+    let mut buffer_u8 =
+        dithr::rgba_u8(&mut rgba_u8, 4, 4, 16).expect("valid buffer should construct");
+    custom_ordered_in_place(&mut buffer_u8, QuantizeMode::GrayLevels(2), &map, 2, 2, 48)
+        .expect("u8 ordered dithering should succeed");
+    let after_u8: Vec<u8> = rgba_u8.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_u8, after_u8);
+
+    let mut rgba_u16: Vec<u16> = (0_u32..64).map(|v| ((v * 1009) % 65_536) as u16).collect();
+    let before_u16: Vec<u16> = rgba_u16.iter().skip(3).step_by(4).copied().collect();
+    let mut buffer_u16 =
+        dithr::rgba_u16(&mut rgba_u16, 4, 4, 16).expect("valid buffer should construct");
+    custom_ordered_in_place(&mut buffer_u16, QuantizeMode::GrayLevels(2), &map, 2, 2, 48)
+        .expect("u16 ordered dithering should succeed");
+    let after_u16: Vec<u16> = rgba_u16.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_u16, after_u16);
+
+    let mut rgba_f32: Vec<f32> = (0_u32..64).map(|v| (v as f32) / 63.0).collect();
+    let before_f32: Vec<f32> = rgba_f32.iter().skip(3).step_by(4).copied().collect();
+    let mut buffer_f32 =
+        dithr::rgba_f32(&mut rgba_f32, 4, 4, 16).expect("valid buffer should construct");
+    custom_ordered_in_place(&mut buffer_f32, QuantizeMode::GrayLevels(2), &map, 2, 2, 48)
+        .expect("f32 ordered dithering should succeed");
+    let after_f32: Vec<f32> = rgba_f32.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_f32, after_f32);
+}
+
+#[test]
+fn ordered_core_no_duplicate_integer_float_paths_smoke() {
+    let mut gray_u8 = gray_ramp_16x16();
+    let mut gray_f32: Vec<f32> = gray_u8.iter().map(|&v| f32::from(v) / 255.0).collect();
+
+    let mut buffer_u8 =
+        dithr::gray_u8(&mut gray_u8, 16, 16, 16).expect("valid buffer should construct");
+    let mut buffer_f32 =
+        dithr::gray_f32(&mut gray_f32, 16, 16, 16).expect("valid buffer should construct");
+
+    bayer_8x8_in_place(&mut buffer_u8, QuantizeMode::GrayLevels(2)).expect("u8 run should succeed");
+    bayer_8x8_in_place(&mut buffer_f32, QuantizeMode::GrayLevels(2))
+        .expect("f32 run should succeed");
+
+    let mask_u8: Vec<u8> = gray_u8.iter().map(|&v| u8::from(v > 127)).collect();
+    let mask_f32: Vec<u8> = gray_f32.iter().map(|&v| u8::from(v > 0.5)).collect();
+    assert_eq!(mask_u8, mask_f32);
+}
+
+#[test]
+fn ordered_threshold_tile_logic_matches_u8_u16_f32() {
+    let map = [0_u8, 2, 3, 1];
+    let width = 4_usize;
+    let height = 4_usize;
+
+    let mut data_u8 = vec![127_u8; width * height];
+    let mut data_u16 = vec![32_767_u16; width * height];
+    let mut data_f32 = vec![0.5_f32; width * height];
+
+    let mut buffer_u8 =
+        dithr::gray_u8(&mut data_u8, width, height, width).expect("valid buffer should construct");
+    let mut buffer_u16 = dithr::gray_u16(&mut data_u16, width, height, width)
+        .expect("valid buffer should construct");
+    let mut buffer_f32 = dithr::gray_f32(&mut data_f32, width, height, width)
+        .expect("valid buffer should construct");
+
+    custom_ordered_in_place(&mut buffer_u8, QuantizeMode::GrayLevels(2), &map, 2, 2, 64)
+        .expect("u8 run should succeed");
+    custom_ordered_in_place(&mut buffer_u16, QuantizeMode::GrayLevels(2), &map, 2, 2, 64)
+        .expect("u16 run should succeed");
+    custom_ordered_in_place(&mut buffer_f32, QuantizeMode::GrayLevels(2), &map, 2, 2, 64)
+        .expect("f32 run should succeed");
+
+    let mask_u8: Vec<u8> = data_u8.iter().map(|&v| u8::from(v > 127)).collect();
+    let mask_u16: Vec<u8> = data_u16.iter().map(|&v| u8::from(v > 32_767)).collect();
+    let mask_f32: Vec<u8> = data_f32.iter().map(|&v| u8::from(v > 0.5)).collect();
+
+    assert_eq!(mask_u8, mask_u16);
+    assert_eq!(mask_u8, mask_f32);
 }
 
 #[test]

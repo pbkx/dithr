@@ -290,8 +290,7 @@ fn devise_color_sequence(target: [u8; 3], palette: &[[u8; 3]], palette_luma: &[u
         let mut least_penalty = f64::INFINITY;
 
         for (index, &color) in palette.iter().enumerate() {
-            let mut sum = so_far;
-            let mut add = [
+            let color_sum = [
                 u32::from(color[0]),
                 u32::from(color[1]),
                 u32::from(color[2]),
@@ -299,17 +298,16 @@ fn devise_color_sequence(target: [u8; 3], palette: &[[u8; 3]], palette_luma: &[u
             let mut amount = 1_usize;
 
             while amount <= max_test_count {
-                for channel in 0..3 {
-                    sum[channel] = sum[channel].saturating_add(add[channel]);
-                    add[channel] = add[channel].saturating_add(add[channel]);
-                }
-
                 let total = proportion_total.saturating_add(amount);
                 let total_u32 = total as u32;
+                let amount_u32 = amount as u32;
                 let tested = [
-                    (sum[0] / total_u32) as u8,
-                    (sum[1] / total_u32) as u8,
-                    (sum[2] / total_u32) as u8,
+                    (so_far[0].saturating_add(color_sum[0].saturating_mul(amount_u32)) / total_u32)
+                        as u8,
+                    (so_far[1].saturating_add(color_sum[1].saturating_mul(amount_u32)) / total_u32)
+                        as u8,
+                    (so_far[2].saturating_add(color_sum[2].saturating_mul(amount_u32)) / total_u32)
+                        as u8,
                 ];
                 let penalty = color_compare_rgb_luma(target, tested);
 

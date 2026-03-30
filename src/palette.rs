@@ -1,4 +1,4 @@
-use crate::{core::Sample, math::color::rgb_distance_sq_unit};
+use crate::{core::Sample, math::color::rgb_distance_sq_unit, Error};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Palette<S: Sample = u8> {
@@ -46,7 +46,7 @@ impl<S: Sample> Palette<S> {
     pub const MIN_LEN: usize = 1;
     pub const MAX_LEN: usize = 256;
 
-    pub fn new(colors: Vec<[S; 3]>) -> Result<Self, PaletteError> {
+    pub fn new(colors: Vec<[S; 3]>) -> std::result::Result<Self, PaletteError> {
         if colors.is_empty() {
             return Err(PaletteError::Empty);
         }
@@ -118,6 +118,45 @@ impl<S: Sample + PartialEq> Palette<S> {
 }
 
 impl<S: Sample> IndexedImage<S> {
+    pub fn new(
+        indices: Vec<u8>,
+        width: usize,
+        height: usize,
+        palette: Palette<S>,
+    ) -> crate::Result<Self> {
+        if width == 0 || height == 0 {
+            return Err(Error::InvalidArgument(
+                "indexed image dimensions must be positive",
+            ));
+        }
+
+        let expected_len = width
+            .checked_mul(height)
+            .ok_or(Error::InvalidArgument("indexed image dimensions overflow"))?;
+        if indices.len() != expected_len {
+            return Err(Error::InvalidArgument(
+                "indexed image index count must match dimensions",
+            ));
+        }
+
+        let palette_len = palette.len();
+        if indices
+            .iter()
+            .any(|&index| usize::from(index) >= palette_len)
+        {
+            return Err(Error::InvalidArgument(
+                "indexed image contains out-of-range palette indices",
+            ));
+        }
+
+        Ok(Self {
+            indices,
+            width,
+            height,
+            palette,
+        })
+    }
+
     #[must_use]
     pub fn len(&self) -> usize {
         self.indices.len()

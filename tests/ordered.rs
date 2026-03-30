@@ -786,6 +786,15 @@ fn fixture_builders_are_deterministic() {
     assert_eq!(fnv1a64(&cube), fnv1a64(&rgb_cube_strip()));
 }
 
+#[test]
+fn ordered_public_api_packed_constructor_smoke() {
+    let mut data = gray_ramp_8x8();
+    let mut buffer =
+        dithr::gray_u8_packed(&mut data, 8, 8).expect("valid packed gray buffer should construct");
+    bayer_2x2_in_place(&mut buffer, QuantizeMode::GrayLevels(2)).expect("bayer should succeed");
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
 #[cfg(feature = "rayon")]
 #[test]
 fn bayer_8x8_parallel_matches_sequential() {

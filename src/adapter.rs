@@ -18,12 +18,12 @@ pub type Gray16Image = image::ImageBuffer<image::Luma<u16>, Vec<u16>>;
 pub type Rgb16Image = image::ImageBuffer<image::Rgb<u16>, Vec<u16>>;
 pub type Rgba16Image = image::ImageBuffer<image::Rgba<u16>, Vec<u16>>;
 
-pub fn gray_image_as_buffer(img: &mut image::GrayImage) -> Result<GrayBuffer8<'_>> {
+pub fn gray8_image_as_buffer(img: &mut image::GrayImage) -> Result<GrayBuffer8<'_>> {
     let (width, height) = image_dims(img.width(), img.height())?;
     Ok(Buffer::new_typed(img.as_mut(), width, height, width)?)
 }
 
-pub fn rgb_image_as_buffer(img: &mut image::RgbImage) -> Result<RgbBuffer8<'_>> {
+pub fn rgb8_image_as_buffer(img: &mut image::RgbImage) -> Result<RgbBuffer8<'_>> {
     let (width, height) = image_dims(img.width(), img.height())?;
     let stride = width
         .checked_mul(3)
@@ -31,12 +31,24 @@ pub fn rgb_image_as_buffer(img: &mut image::RgbImage) -> Result<RgbBuffer8<'_>> 
     Ok(Buffer::new_typed(img.as_mut(), width, height, stride)?)
 }
 
-pub fn rgba_image_as_buffer(img: &mut image::RgbaImage) -> Result<RgbaBuffer8<'_>> {
+pub fn rgba8_image_as_buffer(img: &mut image::RgbaImage) -> Result<RgbaBuffer8<'_>> {
     let (width, height) = image_dims(img.width(), img.height())?;
     let stride = width
         .checked_mul(4)
         .ok_or(Error::InvalidArgument("rgba stride overflow"))?;
     Ok(Buffer::new_typed(img.as_mut(), width, height, stride)?)
+}
+
+pub fn gray_image_as_buffer(img: &mut image::GrayImage) -> Result<GrayBuffer8<'_>> {
+    gray8_image_as_buffer(img)
+}
+
+pub fn rgb_image_as_buffer(img: &mut image::RgbImage) -> Result<RgbBuffer8<'_>> {
+    rgb8_image_as_buffer(img)
+}
+
+pub fn rgba_image_as_buffer(img: &mut image::RgbaImage) -> Result<RgbaBuffer8<'_>> {
+    rgba8_image_as_buffer(img)
 }
 
 pub fn gray16_image_as_buffer(img: &mut Gray16Image) -> Result<GrayBuffer16<'_>> {
@@ -79,13 +91,13 @@ pub fn rgba32f_image_as_buffer(img: &mut image::Rgba32FImage) -> Result<RgbaBuff
 pub fn dynamic_image_as_buffer(img: &mut image::DynamicImage) -> Result<DynamicImageBuffer<'_>> {
     match img {
         image::DynamicImage::ImageLuma8(inner) => {
-            gray_image_as_buffer(inner).map(DynamicImageBuffer::Gray8)
+            gray8_image_as_buffer(inner).map(DynamicImageBuffer::Gray8)
         }
         image::DynamicImage::ImageRgb8(inner) => {
-            rgb_image_as_buffer(inner).map(DynamicImageBuffer::Rgb8)
+            rgb8_image_as_buffer(inner).map(DynamicImageBuffer::Rgb8)
         }
         image::DynamicImage::ImageRgba8(inner) => {
-            rgba_image_as_buffer(inner).map(DynamicImageBuffer::Rgba8)
+            rgba8_image_as_buffer(inner).map(DynamicImageBuffer::Rgba8)
         }
         image::DynamicImage::ImageLuma16(inner) => {
             gray16_image_as_buffer(inner).map(DynamicImageBuffer::Gray16)
@@ -125,7 +137,8 @@ fn image_dims(width: u32, height: u32) -> Result<(usize, usize)> {
 #[cfg(test)]
 mod tests {
     use super::{
-        dynamic_image_as_buffer, gray16_image_as_buffer, gray_image_as_buffer, DynamicImageBuffer,
+        dynamic_image_as_buffer, gray16_image_as_buffer, gray8_image_as_buffer,
+        gray_image_as_buffer, rgb8_image_as_buffer, rgba8_image_as_buffer, DynamicImageBuffer,
     };
     use crate::{BufferKind, Error};
 
@@ -149,6 +162,21 @@ mod tests {
         assert_eq!(buffer.height, 3);
         assert_eq!(buffer.stride, 4);
         assert_eq!(buffer.kind(), BufferKind::Gray16);
+    }
+
+    #[test]
+    fn explicit_8bit_adapter_names_match_compatibility_names() {
+        let mut gray = image::GrayImage::new(3, 2);
+        let mut rgb = image::RgbImage::new(3, 2);
+        let mut rgba = image::RgbaImage::new(3, 2);
+
+        let gray_new = gray8_image_as_buffer(&mut gray).expect("gray8 should be supported");
+        let rgb_new = rgb8_image_as_buffer(&mut rgb).expect("rgb8 should be supported");
+        let rgba_new = rgba8_image_as_buffer(&mut rgba).expect("rgba8 should be supported");
+
+        assert_eq!(gray_new.stride, 3);
+        assert_eq!(rgb_new.stride, 9);
+        assert_eq!(rgba_new.stride, 12);
     }
 
     #[test]

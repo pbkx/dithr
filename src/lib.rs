@@ -16,12 +16,15 @@ pub mod stochastic;
 
 #[cfg(feature = "image")]
 pub use adapter::{
-    dynamic_image_as_buffer, gray16_image_as_buffer, gray_image_as_buffer, rgb16_image_as_buffer,
-    rgb32f_image_as_buffer, rgb_image_as_buffer, rgba16_image_as_buffer, rgba32f_image_as_buffer,
-    rgba_image_as_buffer, DynamicImageBuffer,
+    dynamic_image_as_buffer, gray16_image_as_buffer, gray8_image_as_buffer, gray_image_as_buffer,
+    rgb16_image_as_buffer, rgb32f_image_as_buffer, rgb8_image_as_buffer, rgb_image_as_buffer,
+    rgba16_image_as_buffer, rgba32f_image_as_buffer, rgba8_image_as_buffer, rgba_image_as_buffer,
+    DynamicImageBuffer,
 };
 pub use buffer::{
-    gray_f32, gray_u16, gray_u8, rgb_f32, rgb_u16, rgb_u8, rgba_f32, rgba_u16, rgba_u8, Buffer,
+    gray_32f, gray_32f_packed, gray_f32, gray_u16, gray_u16_packed, gray_u8, gray_u8_packed,
+    rgb_32f, rgb_32f_packed, rgb_f32, rgb_u16, rgb_u16_packed, rgb_u8, rgb_u8_packed, rgba_32f,
+    rgba_32f_packed, rgba_f32, rgba_u16, rgba_u16_packed, rgba_u8, rgba_u8_packed, Buffer,
     BufferError, BufferKind, GrayBuffer, GrayBuffer16, GrayBuffer32F, GrayBuffer8, PixelFormat,
     RgbBuffer, RgbBuffer16, RgbBuffer32F, RgbBuffer8, RgbaBuffer, RgbaBuffer16, RgbaBuffer32F,
     RgbaBuffer8,

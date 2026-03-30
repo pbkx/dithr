@@ -23,6 +23,21 @@ fn buffer_validate_gray_ok() {
 }
 
 #[test]
+fn buffer_packed_constructors_match_expected_stride() {
+    let mut gray = vec![0_u8; 4 * 3];
+    let gray_buf = dithr::gray_u8_packed(&mut gray, 4, 3).expect("valid gray packed buffer");
+    assert_eq!(gray_buf.stride, 4);
+
+    let mut rgb = vec![0_u16; 4 * 3 * 3];
+    let rgb_buf = dithr::rgb_u16_packed(&mut rgb, 4, 3).expect("valid rgb packed buffer");
+    assert_eq!(rgb_buf.stride, 12);
+
+    let mut rgba = vec![0.0_f32; 4 * 3 * 4];
+    let rgba_buf = dithr::rgba_32f_packed(&mut rgba, 4, 3).expect("valid rgba packed buffer");
+    assert_eq!(rgba_buf.stride, 16);
+}
+
+#[test]
 fn buffer_validate_rgb_ok() {
     let mut data = vec![0_u8; 10 * 3];
     let buffer: RgbBuffer8<'_> =
@@ -408,6 +423,29 @@ fn indexed_image_color_at_returns_palette_color() {
 }
 
 #[test]
+fn indexed_image_new_validates_shape_and_indices() {
+    let palette = Palette::<u8>::new(vec![[0, 0, 0], [255, 255, 255]]).expect("valid palette");
+    let valid = IndexedImage::new(vec![0, 1, 1, 0], 2, 2, palette.clone());
+    assert!(valid.is_ok());
+
+    let bad_len = IndexedImage::new(vec![0, 1, 1], 2, 2, palette.clone());
+    assert_eq!(
+        bad_len,
+        Err(Error::InvalidArgument(
+            "indexed image index count must match dimensions"
+        ))
+    );
+
+    let bad_index = IndexedImage::new(vec![0, 2, 1, 0], 2, 2, palette);
+    assert_eq!(
+        bad_index,
+        Err(Error::InvalidArgument(
+            "indexed image contains out-of-range palette indices"
+        ))
+    );
+}
+
+#[test]
 fn palette_length_256_still_allows_u8_indices() {
     let colors: Vec<[u8; 3]> = (0..256)
         .map(|value| {
@@ -455,6 +493,24 @@ fn rgb_bits_8_maps_to_rgb_levels_256() {
 fn quantize_mode_gray_levels_is_canonical() {
     let mode = QuantizeMode::GrayBits(4);
     assert!(matches!(mode, QuantizeMode::GrayLevels(_)));
+}
+
+#[test]
+fn quantize_mode_constructors_validate_levels() {
+    let ok_gray = QuantizeMode::<u8>::gray_levels(2).expect("valid levels");
+    let ok_rgb = QuantizeMode::<u16>::rgb_levels(256).expect("valid levels");
+    let ok_single = QuantizeMode::<f32>::single_color([1.0, 0.5, 0.25], 8).expect("valid levels");
+    assert!(matches!(ok_gray, QuantizeMode::GrayLevels(2)));
+    assert!(matches!(ok_rgb, QuantizeMode::RgbLevels(256)));
+    assert!(matches!(ok_single, QuantizeMode::SingleColor { .. }));
+
+    let err = QuantizeMode::<u8>::gray_levels(1);
+    assert_eq!(
+        err,
+        Err(Error::InvalidArgument(
+            "quantization levels must be in 2..=65535"
+        ))
+    );
 }
 
 #[test]

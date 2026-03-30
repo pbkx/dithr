@@ -603,6 +603,16 @@ fn classic_diffusion_no_separate_int_float_engine_smoke() {
 }
 
 #[test]
+fn diffusion_public_api_packed_constructor_smoke() {
+    let mut data = gray_ramp_8x8();
+    let mut buffer =
+        dithr::gray_u8_packed(&mut data, 8, 8).expect("valid packed gray buffer should construct");
+    floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("floyd-steinberg should succeed");
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
 fn ostromoukhov_coeff_index_range_test() {
     for luma in 0_u16..=255 {
         let index = usize::from(luma as u8);

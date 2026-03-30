@@ -14,6 +14,28 @@ pub enum QuantizeMode<'a, S: Sample = u8> {
     SingleColor { fg: [S; 3], levels: u16 },
 }
 
+impl<'a, S: Sample> QuantizeMode<'a, S> {
+    pub fn gray_levels(levels: u16) -> Result<Self> {
+        validate_levels(levels)?;
+        Ok(Self::GrayLevels(levels))
+    }
+
+    pub fn rgb_levels(levels: u16) -> Result<Self> {
+        validate_levels(levels)?;
+        Ok(Self::RgbLevels(levels))
+    }
+
+    #[must_use]
+    pub const fn palette(palette: &'a Palette<S>) -> Self {
+        Self::Palette(palette)
+    }
+
+    pub fn single_color(fg: [S; 3], levels: u16) -> Result<Self> {
+        validate_levels(levels)?;
+        Ok(Self::SingleColor { fg, levels })
+    }
+}
+
 impl<'a> QuantizeMode<'a, u8> {
     #[must_use]
     pub fn gray_bits(bits: u8) -> Self {

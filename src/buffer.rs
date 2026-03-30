@@ -148,6 +148,29 @@ impl<'a, S: Sample, L: PixelLayout> Buffer<'a, S, L> {
         Ok(buffer)
     }
 
+    pub fn new_packed(
+        data: &'a mut [S],
+        width: usize,
+        height: usize,
+        kind: BufferKind,
+    ) -> Result<Self, BufferError> {
+        let stride = width
+            .checked_mul(L::CHANNELS)
+            .ok_or(BufferError::OutOfBounds)?;
+        Self::new(data, width, height, stride, kind)
+    }
+
+    pub fn new_packed_typed(
+        data: &'a mut [S],
+        width: usize,
+        height: usize,
+    ) -> Result<Self, BufferError> {
+        let stride = width
+            .checked_mul(L::CHANNELS)
+            .ok_or(BufferError::OutOfBounds)?;
+        Self::new_typed(data, width, height, stride)
+    }
+
     pub fn kind(&self) -> BufferKind {
         kind_for::<S, L>()
     }
@@ -310,6 +333,14 @@ pub fn gray_u8<'a>(
     Buffer::new_typed(data, width, height, stride)
 }
 
+pub fn gray_u8_packed<'a>(
+    data: &'a mut [u8],
+    width: usize,
+    height: usize,
+) -> Result<GrayBuffer8<'a>, BufferError> {
+    Buffer::new_packed_typed(data, width, height)
+}
+
 pub fn rgb_u8<'a>(
     data: &'a mut [u8],
     width: usize,
@@ -317,6 +348,14 @@ pub fn rgb_u8<'a>(
     stride: usize,
 ) -> Result<RgbBuffer8<'a>, BufferError> {
     Buffer::new_typed(data, width, height, stride)
+}
+
+pub fn rgb_u8_packed<'a>(
+    data: &'a mut [u8],
+    width: usize,
+    height: usize,
+) -> Result<RgbBuffer8<'a>, BufferError> {
+    Buffer::new_packed_typed(data, width, height)
 }
 
 pub fn rgba_u8<'a>(
@@ -328,6 +367,14 @@ pub fn rgba_u8<'a>(
     Buffer::new_typed(data, width, height, stride)
 }
 
+pub fn rgba_u8_packed<'a>(
+    data: &'a mut [u8],
+    width: usize,
+    height: usize,
+) -> Result<RgbaBuffer8<'a>, BufferError> {
+    Buffer::new_packed_typed(data, width, height)
+}
+
 pub fn gray_u16<'a>(
     data: &'a mut [u16],
     width: usize,
@@ -335,6 +382,14 @@ pub fn gray_u16<'a>(
     stride: usize,
 ) -> Result<GrayBuffer16<'a>, BufferError> {
     Buffer::new_typed(data, width, height, stride)
+}
+
+pub fn gray_u16_packed<'a>(
+    data: &'a mut [u16],
+    width: usize,
+    height: usize,
+) -> Result<GrayBuffer16<'a>, BufferError> {
+    Buffer::new_packed_typed(data, width, height)
 }
 
 pub fn rgb_u16<'a>(
@@ -346,6 +401,14 @@ pub fn rgb_u16<'a>(
     Buffer::new_typed(data, width, height, stride)
 }
 
+pub fn rgb_u16_packed<'a>(
+    data: &'a mut [u16],
+    width: usize,
+    height: usize,
+) -> Result<RgbBuffer16<'a>, BufferError> {
+    Buffer::new_packed_typed(data, width, height)
+}
+
 pub fn rgba_u16<'a>(
     data: &'a mut [u16],
     width: usize,
@@ -355,7 +418,15 @@ pub fn rgba_u16<'a>(
     Buffer::new_typed(data, width, height, stride)
 }
 
-pub fn gray_f32<'a>(
+pub fn rgba_u16_packed<'a>(
+    data: &'a mut [u16],
+    width: usize,
+    height: usize,
+) -> Result<RgbaBuffer16<'a>, BufferError> {
+    Buffer::new_packed_typed(data, width, height)
+}
+
+pub fn gray_32f<'a>(
     data: &'a mut [f32],
     width: usize,
     height: usize,
@@ -364,7 +435,15 @@ pub fn gray_f32<'a>(
     Buffer::new_typed(data, width, height, stride)
 }
 
-pub fn rgb_f32<'a>(
+pub fn gray_32f_packed<'a>(
+    data: &'a mut [f32],
+    width: usize,
+    height: usize,
+) -> Result<GrayBuffer32F<'a>, BufferError> {
+    Buffer::new_packed_typed(data, width, height)
+}
+
+pub fn rgb_32f<'a>(
     data: &'a mut [f32],
     width: usize,
     height: usize,
@@ -373,11 +452,54 @@ pub fn rgb_f32<'a>(
     Buffer::new_typed(data, width, height, stride)
 }
 
-pub fn rgba_f32<'a>(
+pub fn rgb_32f_packed<'a>(
+    data: &'a mut [f32],
+    width: usize,
+    height: usize,
+) -> Result<RgbBuffer32F<'a>, BufferError> {
+    Buffer::new_packed_typed(data, width, height)
+}
+
+pub fn rgba_32f<'a>(
     data: &'a mut [f32],
     width: usize,
     height: usize,
     stride: usize,
 ) -> Result<RgbaBuffer32F<'a>, BufferError> {
     Buffer::new_typed(data, width, height, stride)
+}
+
+pub fn rgba_32f_packed<'a>(
+    data: &'a mut [f32],
+    width: usize,
+    height: usize,
+) -> Result<RgbaBuffer32F<'a>, BufferError> {
+    Buffer::new_packed_typed(data, width, height)
+}
+
+pub fn gray_f32<'a>(
+    data: &'a mut [f32],
+    width: usize,
+    height: usize,
+    stride: usize,
+) -> Result<GrayBuffer32F<'a>, BufferError> {
+    gray_32f(data, width, height, stride)
+}
+
+pub fn rgb_f32<'a>(
+    data: &'a mut [f32],
+    width: usize,
+    height: usize,
+    stride: usize,
+) -> Result<RgbBuffer32F<'a>, BufferError> {
+    rgb_32f(data, width, height, stride)
+}
+
+pub fn rgba_f32<'a>(
+    data: &'a mut [f32],
+    width: usize,
+    height: usize,
+    stride: usize,
+) -> Result<RgbaBuffer32F<'a>, BufferError> {
+    rgba_32f(data, width, height, stride)
 }

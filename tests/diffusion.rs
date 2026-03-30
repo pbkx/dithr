@@ -577,9 +577,11 @@ fn variable_diffusion_coeff_range_post_cleanup() {
     }
 
     let modulation = &dithr::data::ZHOU_FANG_MODULATION;
-    for &entry in modulation {
-        assert!((-8..=8).contains(&entry));
-    }
+    assert_eq!(modulation.len(), 256);
+    assert_eq!(modulation[0], 0);
+    assert!(modulation[128] >= modulation[96]);
+    assert!(modulation[128] >= modulation[160]);
+    assert!(modulation.iter().all(|&entry| entry <= 199));
 }
 
 #[test]

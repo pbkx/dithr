@@ -131,7 +131,7 @@ fn diffuse_gradient_gray<S: Sample, L: PixelLayout>(
 fn diffuse_variable_gray<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     mode: QuantizeMode<'_, S>,
-    modulation: Option<&[i16; 16]>,
+    modulation: Option<&[u8; 256]>,
 ) -> Result<()> {
     let width = buffer.width;
     let height = buffer.height;
@@ -153,7 +153,7 @@ fn diffuse_variable_gray<S: Sample, L: PixelLayout>(
                 ];
                 let adjusted = read_pixel_with_error::<S, L>(pixel, &err)[0];
                 let thresholded = if let Some(table) = modulation {
-                    (adjusted + scaled_modulation_unit(adjusted, table)).clamp(0.0, 1.0)
+                    zhou_fang_thresholded_unit(adjusted, x, y, table)
                 } else {
                     adjusted
                 };
@@ -207,7 +207,7 @@ fn diffuse_variable_gray<S: Sample, L: PixelLayout>(
                 ];
                 let adjusted = read_pixel_with_error::<S, L>(pixel, &err)[0];
                 let thresholded = if let Some(table) = modulation {
-                    (adjusted + scaled_modulation_unit(adjusted, table)).clamp(0.0, 1.0)
+                    zhou_fang_thresholded_unit(adjusted, x, y, table)
                 } else {
                     adjusted
                 };
@@ -267,13 +267,28 @@ fn coefficient_for_luma(luma: u8) -> (i16, i16, i16, i16) {
     OSTROMOUKHOV_COEFFS[usize::from(luma)]
 }
 
-fn modulation_for_luma(luma: u8, table: &[i16; 16]) -> i16 {
-    let idx = (usize::from(luma) * table.len()) / 256;
-    table[idx]
+fn modulation_for_luma(luma: u8, table: &[u8; 256]) -> u8 {
+    table[usize::from(luma)]
 }
 
-fn scaled_modulation_unit(value_unit: f32, table: &[i16; 16]) -> f32 {
-    f32::from(modulation_for_luma(luma_bucket_unit(value_unit), table)) / 255.0
+fn zhou_fang_thresholded_unit(value_unit: f32, x: usize, y: usize, table: &[u8; 256]) -> f32 {
+    let luma = luma_bucket_unit(value_unit);
+    let amplitude = f32::from(modulation_for_luma(luma, table)) / 255.0;
+    let noise = zhou_fang_noise_unit(x, y);
+    (value_unit + (noise - 0.5) * amplitude).clamp(0.0, 1.0)
+}
+
+fn zhou_fang_noise_unit(x: usize, y: usize) -> f32 {
+    let mut state = (x as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        ^ (y as u64).wrapping_mul(0xBF58_476D_1CE4_E5B9)
+        ^ 0x94D0_49BB_1331_11EB_u64;
+    state ^= state >> 30;
+    state = state.wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    state ^= state >> 27;
+    state = state.wrapping_mul(0x94D0_49BB_1331_11EB);
+    state ^= state >> 31;
+
+    (state >> 40) as f32 / 16_777_215.0
 }
 
 fn local_gradient_unit<S: Sample>(

@@ -353,7 +353,7 @@ fn golden_zhou_fang_gray_challenge_64x64() {
 
     zhou_fang_in_place(&mut buffer, QuantizeMode::gray_bits(2)).expect("zhou-fang should succeed");
 
-    assert_eq!(fnv1a64(&data), 4_494_267_880_590_439_003_u64);
+    assert_eq!(fnv1a64(&data), 7_849_691_978_693_962_618_u64);
 }
 
 #[test]

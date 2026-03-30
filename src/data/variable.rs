@@ -257,5 +257,62 @@ pub const OSTROMOUKHOV_COEFFS: [(i16, i16, i16, i16); 256] = [
     (13, 0, 5, 18),
 ];
 
-pub const ZHOU_FANG_MODULATION: [i16; 16] =
-    [-8, -7, -6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7, 8];
+const ZHOU_FANG_KEY_LEVELS: [u8; 10] = [0, 32, 64, 96, 112, 128, 144, 160, 192, 255];
+const ZHOU_FANG_KEY_AMPLITUDES: [u8; 10] = [0, 87, 133, 163, 184, 199, 184, 163, 133, 87];
+
+const fn zhou_fang_interp_u8(x: u16, x0: u16, y0: u16, x1: u16, y1: u16) -> u8 {
+    if x1 <= x0 {
+        return y0 as u8;
+    }
+
+    let dx = x1 - x0;
+    let tx = x - x0;
+    let dy = y1 as i32 - y0 as i32;
+    let num = dy * tx as i32;
+    let den = dx as i32;
+    let delta = if num >= 0 {
+        (num + den / 2) / den
+    } else {
+        (num - den / 2) / den
+    };
+
+    let value = y0 as i32 + delta;
+    if value < 0 {
+        0
+    } else if value > 255 {
+        255
+    } else {
+        value as u8
+    }
+}
+
+const fn generate_zhou_fang_modulation() -> [u8; 256] {
+    let mut out = [0_u8; 256];
+    let mut i = 0_usize;
+
+    while i < 256 {
+        let x = i as u16;
+        let mut seg = 0_usize;
+        while seg + 1 < ZHOU_FANG_KEY_LEVELS.len() {
+            let x0 = ZHOU_FANG_KEY_LEVELS[seg] as u16;
+            let x1 = ZHOU_FANG_KEY_LEVELS[seg + 1] as u16;
+            if x >= x0 && x <= x1 {
+                let y0 = ZHOU_FANG_KEY_AMPLITUDES[seg] as u16;
+                let y1 = ZHOU_FANG_KEY_AMPLITUDES[seg + 1] as u16;
+                out[i] = zhou_fang_interp_u8(x, x0, y0, x1, y1);
+                break;
+            }
+            seg += 1;
+        }
+
+        if seg + 1 == ZHOU_FANG_KEY_LEVELS.len() {
+            out[i] = ZHOU_FANG_KEY_AMPLITUDES[ZHOU_FANG_KEY_AMPLITUDES.len() - 1];
+        }
+
+        i += 1;
+    }
+
+    out
+}
+
+pub const ZHOU_FANG_MODULATION: [u8; 256] = generate_zhou_fang_modulation();

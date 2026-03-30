@@ -403,7 +403,7 @@ fn golden_knuth_dot_diffusion_gray_ramp_16x16() {
     knuth_dot_diffusion_in_place(&mut buffer, QuantizeMode::gray_bits(1))
         .expect("knuth dot diffusion should succeed");
 
-    assert_eq!(fnv1a64(&data), 14_706_985_719_462_917_693_u64);
+    assert_eq!(fnv1a64(&data), 15_732_809_179_121_461_487_u64);
 }
 
 #[test]

@@ -5,11 +5,19 @@ use crate::{
 };
 use std::mem::size_of;
 
-const CLASS_MATRIX_W: usize = 4;
-const CLASS_MATRIX_H: usize = 4;
+const CLASS_MATRIX_W: usize = 8;
+const CLASS_MATRIX_H: usize = 8;
 const CLASS_COUNT: usize = CLASS_MATRIX_W * CLASS_MATRIX_H;
-const CLASS_MATRIX: [[u8; CLASS_MATRIX_W]; CLASS_MATRIX_H] =
-    [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+const CLASS_MATRIX: [[u8; CLASS_MATRIX_W]; CLASS_MATRIX_H] = [
+    [34, 48, 40, 32, 29, 15, 23, 31],
+    [42, 58, 56, 53, 21, 5, 7, 10],
+    [50, 62, 61, 45, 13, 1, 2, 18],
+    [38, 46, 54, 37, 25, 17, 9, 26],
+    [28, 14, 22, 30, 35, 49, 41, 33],
+    [20, 4, 6, 11, 43, 59, 57, 52],
+    [12, 0, 3, 19, 51, 63, 60, 44],
+    [24, 16, 8, 27, 39, 47, 55, 36],
+];
 const DIFFUSION_WEIGHTS_3X3: [[i16; 3]; 3] = [[1, 2, 1], [2, 0, 2], [1, 2, 1]];
 
 #[derive(Clone, Copy)]

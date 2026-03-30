@@ -12,17 +12,21 @@ use dithr::{
 #[test]
 fn dot_diffusion_class_matrix_valid() {
     let matrix = [
-        [0_u8, 8, 2, 10],
-        [12, 4, 14, 6],
-        [3, 11, 1, 9],
-        [15, 7, 13, 5],
+        [34_u8, 48, 40, 32, 29, 15, 23, 31],
+        [42, 58, 56, 53, 21, 5, 7, 10],
+        [50, 62, 61, 45, 13, 1, 2, 18],
+        [38, 46, 54, 37, 25, 17, 9, 26],
+        [28, 14, 22, 30, 35, 49, 41, 33],
+        [20, 4, 6, 11, 43, 59, 57, 52],
+        [12, 0, 3, 19, 51, 63, 60, 44],
+        [24, 16, 8, 27, 39, 47, 55, 36],
     ];
-    let mut seen = [false; 16];
+    let mut seen = [false; 64];
 
     for row in matrix {
         for class in row {
             let idx = usize::from(class);
-            assert!(idx < 16);
+            assert!(idx < 64);
             assert!(!seen[idx]);
             seen[idx] = true;
         }

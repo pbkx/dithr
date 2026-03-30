@@ -228,6 +228,6 @@ golden tests use deterministic fixtures and fnv-1a hashes for stable u8 regressi
 | [8] | Zhou-Fang threshold modulation<br>https://history.siggraph.org/learning/improving-mid-tone-quality-of-variable-coefficient-error-diffusion-using-threshold-modulation-by-zhou-and-fang/ |
 | [9] | Riemersma dithering<br>https://www.compuphase.com/riemer.htm |
 | [10] | Knuth dot diffusion<br>https://dl.acm.org/doi/10.1145/35039.35040<br>https://doi.org/10.1109/TIP.2009.2023455<br>https://doi.org/10.2352/ISSN.2169-4451.1999.15.1.art00091_1 |
-| [11] | Direct binary search halftoning<br>https://www.spiedigitallibrary.org/conference-proceedings-of-spie/1666/1/Model-based-halftoning-using-direct-binary-search/10.1117/12.135959.full |
+| [11] | Direct binary search halftoning<br>https://www.spiedigitallibrary.org/conference-proceedings-of-spie/1666/1/Model-based-halftoning-using-direct-binary-search/10.1117/12.135959.full<br>https://doi.org/10.1117/12.135959<br>https://doi.org/10.1109/MSP.2003.1215228 |
 | [12] | Lattice-Boltzmann halftoning<br>https://www.mia.uni-saarland.de/Publications/hagenburg-isvc09.pdf |
 | [13] | Electrostatic halftoning<br>https://onlinelibrary.wiley.com/doi/10.1111/j.1467-8659.2010.01716.x |

@@ -413,7 +413,7 @@ fn golden_dbs_gray_ramp_8x8() {
 
     direct_binary_search_in_place(&mut buffer, 4).expect("direct binary search should succeed");
 
-    assert_eq!(fnv1a64(&data), 1_738_359_872_340_429_752_u64);
+    assert_eq!(fnv1a64(&data), 13_524_482_342_131_736_653_u64);
 }
 
 #[test]

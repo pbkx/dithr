@@ -5,7 +5,19 @@ use crate::{
 };
 use std::mem::size_of;
 
-const DBS_KERNEL: [[u32; 3]; 3] = [[1, 2, 1], [2, 4, 2], [1, 2, 1]];
+const DBS_HVS_RADIUS: usize = 3;
+const DBS_HVS_SIZE: usize = DBS_HVS_RADIUS * 2 + 1;
+const DBS_HVS_SIGMA: f64 = 1.0;
+const DBS_SWAP_NEIGHBORS: [(isize, isize); 8] = [
+    (-1, -1),
+    (0, -1),
+    (1, -1),
+    (-1, 0),
+    (1, 0),
+    (-1, 1),
+    (0, 1),
+    (1, 1),
+];
 const LBM_SCALE: i32 = 16_384;
 const LBM_HALF_SCALE: i32 = LBM_SCALE / 2;
 const LBM_WEIGHTS: [i32; 9] = [7_284, 1_820, 1_820, 1_820, 1_820, 455, 455, 455, 455];
@@ -62,12 +74,13 @@ pub fn direct_binary_search_in_place<S: Sample, L: PixelLayout>(
         for &value in row.iter().take(width) {
             let unit = value.to_unit_f32().clamp(0.0, 1.0);
             target_unit.push(unit);
-            binary.push(if unit >= 0.5 { max_value } else { 0 });
+            binary.push(if unit >= 0.5 { 1_u8 } else { 0_u8 });
         }
     }
 
-    let mut current_objective =
-        dbs_objective_unit(&target_unit, &binary, width, height, max_value)?;
+    let hvs = dbs_hvs_filter();
+    let mut filtered_error =
+        dbs_filtered_error_map(&target_unit, &binary, width, height, &hvs, DBS_HVS_RADIUS);
 
     for _ in 0..max_iters {
         let mut improved = false;
@@ -75,60 +88,82 @@ pub fn direct_binary_search_in_place<S: Sample, L: PixelLayout>(
         for y in 0..height {
             for x in 0..width {
                 let idx = y * width + x;
-                let mut best = current_objective;
+                let mut best_delta = 0.0_f64;
                 let mut best_move = CandidateMove::None;
 
-                if let Some(flip_objective) = candidate_flip_improves(
-                    &target_unit,
-                    &mut binary,
+                let toggle_delta = dbs_candidate_delta_energy(
                     width,
                     height,
-                    max_value,
-                    idx,
-                    current_objective,
-                )? {
-                    best = flip_objective;
-                    best_move = CandidateMove::Flip(idx);
+                    &hvs,
+                    DBS_HVS_RADIUS,
+                    &filtered_error,
+                    &[(x, y, toggle_delta_value(binary[idx]))],
+                );
+                if toggle_delta < best_delta {
+                    best_delta = toggle_delta;
+                    best_move = CandidateMove::Toggle(idx);
                 }
 
-                if x + 1 < width {
-                    let right = idx + 1;
-                    if binary[idx] != binary[right] {
-                        binary.swap(idx, right);
-                        let swap_right_objective =
-                            dbs_objective_unit(&target_unit, &binary, width, height, max_value)?;
-                        if swap_right_objective < best {
-                            best = swap_right_objective;
-                            best_move = CandidateMove::Swap(idx, right);
-                        }
-                        binary.swap(idx, right);
+                for (dx, dy) in DBS_SWAP_NEIGHBORS {
+                    let nx = x as isize + dx;
+                    let ny = y as isize + dy;
+                    if nx < 0 || ny < 0 || nx as usize >= width || ny as usize >= height {
+                        continue;
                     }
-                }
-
-                if y + 1 < height {
-                    let below = idx + width;
-                    if binary[idx] != binary[below] {
-                        binary.swap(idx, below);
-                        let swap_down_objective =
-                            dbs_objective_unit(&target_unit, &binary, width, height, max_value)?;
-                        if swap_down_objective < best {
-                            best = swap_down_objective;
-                            best_move = CandidateMove::Swap(idx, below);
-                        }
-                        binary.swap(idx, below);
+                    let nidx = ny as usize * width + nx as usize;
+                    if binary[idx] == binary[nidx] {
+                        continue;
+                    }
+                    let delta_primary = swap_primary_delta(binary[idx], binary[nidx]);
+                    let swap_delta = dbs_candidate_delta_energy(
+                        width,
+                        height,
+                        &hvs,
+                        DBS_HVS_RADIUS,
+                        &filtered_error,
+                        &[
+                            (x, y, delta_primary),
+                            (nx as usize, ny as usize, -delta_primary),
+                        ],
+                    );
+                    if swap_delta < best_delta {
+                        best_delta = swap_delta;
+                        best_move = CandidateMove::Swap(idx, nidx);
                     }
                 }
 
                 match best_move {
                     CandidateMove::None => {}
-                    CandidateMove::Flip(i) => {
-                        binary[i] = max_value - binary[i];
-                        current_objective = best;
+                    CandidateMove::Toggle(i) => {
+                        let px = i % width;
+                        let py = i / width;
+                        let delta = toggle_delta_value(binary[i]);
+                        binary[i] ^= 1;
+                        dbs_apply_delta_filtered_error(
+                            width,
+                            height,
+                            &hvs,
+                            DBS_HVS_RADIUS,
+                            &mut filtered_error,
+                            &[(px, py, delta)],
+                        );
                         improved = true;
                     }
                     CandidateMove::Swap(i, j) => {
+                        let ix = i % width;
+                        let iy = i / width;
+                        let jx = j % width;
+                        let jy = j / width;
+                        let delta_primary = swap_primary_delta(binary[i], binary[j]);
                         binary.swap(i, j);
-                        current_objective = best;
+                        dbs_apply_delta_filtered_error(
+                            width,
+                            height,
+                            &hvs,
+                            DBS_HVS_RADIUS,
+                            &mut filtered_error,
+                            &[(ix, iy, delta_primary), (jx, jy, -delta_primary)],
+                        );
                         improved = true;
                     }
                 }
@@ -144,7 +179,8 @@ pub fn direct_binary_search_in_place<S: Sample, L: PixelLayout>(
         let start = y * width;
         let row = buffer.try_row_mut(y)?;
         for (x, value) in row.iter_mut().take(width).enumerate() {
-            *value = domain_to_sample(binary[start + x], max_value);
+            let domain = if binary[start + x] == 0 { 0 } else { max_value };
+            *value = domain_to_sample(domain, max_value);
         }
     }
 
@@ -304,73 +340,186 @@ pub fn electrostatic_halftoning_in_place<S: Sample, L: PixelLayout>(
     Ok(())
 }
 
-fn dbs_objective_unit(
-    target_unit: &[f32],
-    binary: &[i32],
-    width: usize,
-    height: usize,
-    max_value: i32,
-) -> Result<u64> {
-    let mut total = 0_u64;
+fn dbs_hvs_filter() -> [f32; DBS_HVS_SIZE * DBS_HVS_SIZE] {
+    let mut kernel = [0.0_f32; DBS_HVS_SIZE * DBS_HVS_SIZE];
+    let mut sum = 0.0_f64;
 
-    for y in 0..height {
-        for x in 0..width {
-            let mut weighted_sum = 0_i64;
-            let mut weight_total = 0_i64;
-
-            let y0 = y.saturating_sub(1);
-            let y1 = (y + 1).min(height - 1);
-            let x0 = x.saturating_sub(1);
-            let x1 = (x + 1).min(width - 1);
-
-            for ny in y0..=y1 {
-                for nx in x0..=x1 {
-                    let ky = ny + 1 - y;
-                    let kx = nx + 1 - x;
-                    let weight = i64::from(DBS_KERNEL[ky][kx]);
-                    let idx = ny * width + nx;
-
-                    weighted_sum = weighted_sum
-                        .checked_add(i64::from(binary[idx]) * weight)
-                        .ok_or(Error::InvalidArgument("objective weighted sum overflow"))?;
-                    weight_total = weight_total
-                        .checked_add(weight)
-                        .ok_or(Error::InvalidArgument("objective weight overflow"))?;
-                }
-            }
-
-            let filtered = ((weighted_sum + (weight_total / 2)) / weight_total) as i32;
-            let idx = y * width + x;
-            let target = unit_to_domain(target_unit[idx], max_value);
-            let diff = target - filtered;
-            let sq = (i64::from(diff) * i64::from(diff)) as u64;
-            total = total
-                .checked_add(sq)
-                .ok_or(Error::InvalidArgument("objective overflow"))?;
+    for ky in 0..DBS_HVS_SIZE {
+        for kx in 0..DBS_HVS_SIZE {
+            let dx = kx as isize - DBS_HVS_RADIUS as isize;
+            let dy = ky as isize - DBS_HVS_RADIUS as isize;
+            let dist2 = (dx * dx + dy * dy) as f64;
+            let value = (-dist2 / (2.0 * DBS_HVS_SIGMA * DBS_HVS_SIGMA)).exp();
+            kernel[ky * DBS_HVS_SIZE + kx] = value as f32;
+            sum += value;
         }
     }
 
-    Ok(total)
+    if sum > 0.0 {
+        for value in &mut kernel {
+            *value = (*value as f64 / sum) as f32;
+        }
+    }
+
+    kernel
 }
 
-fn candidate_flip_improves(
+fn dbs_filtered_error_map(
     target_unit: &[f32],
-    binary: &mut [i32],
+    binary: &[u8],
     width: usize,
     height: usize,
-    max_value: i32,
-    idx: usize,
-    current_objective: u64,
-) -> Result<Option<u64>> {
-    let original = binary[idx];
-    binary[idx] = max_value - original;
-    let flip_objective = dbs_objective_unit(target_unit, binary, width, height, max_value)?;
-    binary[idx] = original;
+    kernel: &[f32; DBS_HVS_SIZE * DBS_HVS_SIZE],
+    radius: usize,
+) -> Vec<f32> {
+    let mut filtered = vec![0.0_f32; width * height];
 
-    if flip_objective < current_objective {
-        Ok(Some(flip_objective))
+    for y in 0..height {
+        for x in 0..width {
+            let mut acc = 0.0_f32;
+
+            for ky in 0..DBS_HVS_SIZE {
+                for kx in 0..DBS_HVS_SIZE {
+                    let sx = x as isize + kx as isize - radius as isize;
+                    let sy = y as isize + ky as isize - radius as isize;
+                    if sx < 0 || sy < 0 || sx as usize >= width || sy as usize >= height {
+                        continue;
+                    }
+
+                    let sidx = sy as usize * width + sx as usize;
+                    let halftone = if binary[sidx] == 0 { 0.0_f32 } else { 1.0_f32 };
+                    acc += kernel[ky * DBS_HVS_SIZE + kx] * (halftone - target_unit[sidx]);
+                }
+            }
+
+            filtered[y * width + x] = acc;
+        }
+    }
+
+    filtered
+}
+
+fn dbs_candidate_delta_energy(
+    width: usize,
+    height: usize,
+    kernel: &[f32; DBS_HVS_SIZE * DBS_HVS_SIZE],
+    radius: usize,
+    filtered_error: &[f32],
+    points: &[(usize, usize, f32)],
+) -> f64 {
+    if points.is_empty() {
+        return 0.0;
+    }
+
+    let (min_x, max_x, min_y, max_y) = dbs_affected_bounds(width, height, radius, points);
+    let mut delta_energy = 0.0_f64;
+
+    for y in min_y..=max_y {
+        for x in min_x..=max_x {
+            let mut delta = 0.0_f32;
+            for &(px, py, dv) in points {
+                let dx = x as isize - px as isize;
+                let dy = y as isize - py as isize;
+                if dx.unsigned_abs() > radius || dy.unsigned_abs() > radius {
+                    continue;
+                }
+
+                let fx = (dx + radius as isize) as usize;
+                let fy = (dy + radius as isize) as usize;
+                delta += kernel[fy * DBS_HVS_SIZE + fx] * dv;
+            }
+
+            if delta == 0.0 {
+                continue;
+            }
+
+            let idx = y * width + x;
+            let current = filtered_error[idx];
+            delta_energy +=
+                2.0 * f64::from(current) * f64::from(delta) + f64::from(delta) * f64::from(delta);
+        }
+    }
+
+    delta_energy
+}
+
+fn dbs_apply_delta_filtered_error(
+    width: usize,
+    height: usize,
+    kernel: &[f32; DBS_HVS_SIZE * DBS_HVS_SIZE],
+    radius: usize,
+    filtered_error: &mut [f32],
+    points: &[(usize, usize, f32)],
+) {
+    if points.is_empty() {
+        return;
+    }
+
+    let (min_x, max_x, min_y, max_y) = dbs_affected_bounds(width, height, radius, points);
+
+    for y in min_y..=max_y {
+        for x in min_x..=max_x {
+            let mut delta = 0.0_f32;
+            for &(px, py, dv) in points {
+                let dx = x as isize - px as isize;
+                let dy = y as isize - py as isize;
+                if dx.unsigned_abs() > radius || dy.unsigned_abs() > radius {
+                    continue;
+                }
+
+                let fx = (dx + radius as isize) as usize;
+                let fy = (dy + radius as isize) as usize;
+                delta += kernel[fy * DBS_HVS_SIZE + fx] * dv;
+            }
+
+            if delta != 0.0 {
+                let idx = y * width + x;
+                filtered_error[idx] += delta;
+            }
+        }
+    }
+}
+
+fn dbs_affected_bounds(
+    width: usize,
+    height: usize,
+    radius: usize,
+    points: &[(usize, usize, f32)],
+) -> (usize, usize, usize, usize) {
+    let mut min_x = width - 1;
+    let mut max_x = 0_usize;
+    let mut min_y = height - 1;
+    let mut max_y = 0_usize;
+
+    for &(px, py, _) in points {
+        let x0 = px.saturating_sub(radius);
+        let y0 = py.saturating_sub(radius);
+        let x1 = px.saturating_add(radius).min(width - 1);
+        let y1 = py.saturating_add(radius).min(height - 1);
+        min_x = min_x.min(x0);
+        max_x = max_x.max(x1);
+        min_y = min_y.min(y0);
+        max_y = max_y.max(y1);
+    }
+
+    (min_x, max_x, min_y, max_y)
+}
+
+fn toggle_delta_value(current: u8) -> f32 {
+    if current == 0 {
+        1.0
     } else {
-        Ok(None)
+        -1.0
+    }
+}
+
+fn swap_primary_delta(primary: u8, secondary: u8) -> f32 {
+    if primary == secondary {
+        0.0
+    } else if secondary == 1 {
+        1.0
+    } else {
+        -1.0
     }
 }
 
@@ -458,7 +607,7 @@ fn electrostatic_energy_unit(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CandidateMove {
     None,
-    Flip(usize),
+    Toggle(usize),
     Swap(usize, usize),
 }
 

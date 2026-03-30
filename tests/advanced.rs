@@ -224,53 +224,53 @@ fn dot_diffusion_f32_smoke() {
     assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
 }
 
-fn dbs_objective_for_test(target: &[u8], binary: &[u8], width: usize, height: usize) -> u64 {
-    const KERNEL: [[u32; 3]; 3] = [[1, 2, 1], [2, 4, 2], [1, 2, 1]];
-    let mut total = 0_u64;
+fn dbs_objective_for_test(target: &[u8], binary: &[u8], width: usize, height: usize) -> f64 {
+    const RADIUS: usize = 3;
+    const SIZE: usize = RADIUS * 2 + 1;
+    const SIGMA: f64 = 1.0;
 
+    let mut kernel = [0.0_f32; SIZE * SIZE];
+    let mut sum = 0.0_f64;
+    for ky in 0..SIZE {
+        for kx in 0..SIZE {
+            let dx = kx as isize - RADIUS as isize;
+            let dy = ky as isize - RADIUS as isize;
+            let dist2 = (dx * dx + dy * dy) as f64;
+            let value = (-dist2 / (2.0 * SIGMA * SIGMA)).exp();
+            kernel[ky * SIZE + kx] = value as f32;
+            sum += value;
+        }
+    }
+    for value in &mut kernel {
+        *value = (*value as f64 / sum) as f32;
+    }
+
+    let target_unit: Vec<f32> = target.iter().map(|&v| f32::from(v) / 255.0).collect();
+    let binary_unit: Vec<f32> = binary
+        .iter()
+        .map(|&v| if v == 0 { 0.0_f32 } else { 1.0_f32 })
+        .collect();
+
+    let mut energy = 0.0_f64;
     for y in 0..height {
         for x in 0..width {
-            let mut weighted_sum = 0_u32;
-            let mut weight_total = 0_u32;
-            let y0 = y.saturating_sub(1);
-            let y1 = (y + 1).min(height - 1);
-            let x0 = x.saturating_sub(1);
-            let x1 = (x + 1).min(width - 1);
-
-            for ny in y0..=y1 {
-                for nx in x0..=x1 {
-                    let ky = ny + 1 - y;
-                    let kx = nx + 1 - x;
-                    let weight = KERNEL[ky][kx];
-                    let idx = ny
-                        .checked_mul(width)
-                        .and_then(|base| base.checked_add(nx))
-                        .expect("neighbor index overflow");
-                    weighted_sum = weighted_sum
-                        .checked_add(
-                            u32::from(binary[idx])
-                                .checked_mul(weight)
-                                .expect("weighted sum overflow"),
-                        )
-                        .expect("weighted accumulation overflow");
-                    weight_total = weight_total
-                        .checked_add(weight)
-                        .expect("weight accumulation overflow");
+            let mut filtered = 0.0_f32;
+            for ky in 0..SIZE {
+                for kx in 0..SIZE {
+                    let sx = x as isize + kx as isize - RADIUS as isize;
+                    let sy = y as isize + ky as isize - RADIUS as isize;
+                    if sx < 0 || sy < 0 || sx as usize >= width || sy as usize >= height {
+                        continue;
+                    }
+                    let sidx = sy as usize * width + sx as usize;
+                    filtered += kernel[ky * SIZE + kx] * (binary_unit[sidx] - target_unit[sidx]);
                 }
             }
-
-            let filtered = ((weighted_sum + (weight_total / 2)) / weight_total) as i32;
-            let idx = y
-                .checked_mul(width)
-                .and_then(|base| base.checked_add(x))
-                .expect("target index overflow");
-            let diff = i32::from(target[idx]) - filtered;
-            let sq = i64::from(diff) * i64::from(diff);
-            total = total.checked_add(sq as u64).expect("objective overflow");
+            energy += f64::from(filtered) * f64::from(filtered);
         }
     }
 
-    total
+    energy
 }
 
 #[test]

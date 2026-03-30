@@ -434,7 +434,7 @@ fn golden_electrostatic_halftoning_gray_ramp_8x8() {
     electrostatic_halftoning_in_place(&mut buffer, 10)
         .expect("electrostatic halftoning should succeed");
 
-    assert_eq!(fnv1a64(&data), 1_985_050_605_501_357_403_u64);
+    assert_eq!(fnv1a64(&data), 17_642_593_173_974_510_369_u64);
 }
 
 #[test]

@@ -40,20 +40,12 @@ const LBM_T_WEIGHTS: [f64; 9] = [
     1.0 / 36.0,
 ];
 const LBM_CONVERGENCE_EPSILON: f64 = 1e-6;
-const ELECTRO_ATTRACT_WEIGHT: i64 = 16;
-const ELECTRO_REPEL_WEIGHT: i64 = 12;
-const ELECTRO_REPEL_SCALE: i64 = 256;
-const ELECTRO_NEIGHBORS: [(isize, isize); 9] = [
-    (0, 0),
-    (-1, 0),
-    (1, 0),
-    (0, -1),
-    (0, 1),
-    (-1, -1),
-    (1, -1),
-    (-1, 1),
-    (1, 1),
-];
+const ELECTRO_FORCE_EPSILON: f64 = 1e-6;
+const ELECTRO_REPULSION_WEIGHT: f64 = 1.0;
+const ELECTRO_ATTRACTION_WEIGHT: f64 = 1.0;
+const ELECTRO_STEP_SIZE: f64 = 0.2;
+const ELECTRO_SHAKE_BASE: f64 = 0.35;
+const ELECTRO_CONVERGENCE_EPSILON: f64 = 1e-3;
 
 pub fn direct_binary_search_in_place<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
@@ -318,76 +310,75 @@ pub fn electrostatic_halftoning_in_place<S: Sample, L: PixelLayout>(
         .checked_mul(height)
         .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
     let max_value = integer_sample_max::<S>()?;
-    let mut darkness_unit = Vec::with_capacity(pixel_count);
+    let mut darkness = Vec::with_capacity(pixel_count);
 
     for y in 0..height {
         let row = buffer.try_row(y)?;
         for &value in row.iter().take(width) {
-            darkness_unit.push(1.0 - value.to_unit_f32().clamp(0.0, 1.0));
+            darkness.push(1.0 - f64::from(value.to_unit_f32().clamp(0.0, 1.0)));
         }
     }
 
-    let darkness_rank = darkness_unit
-        .iter()
-        .map(|&value| unit_to_domain(value, 255).clamp(0, 255) as u8)
-        .collect::<Vec<_>>();
-    let darkness_sum: usize = darkness_rank.iter().map(|&value| usize::from(value)).sum();
-    let mut particle_count = (darkness_sum + 127) / 255;
+    let mut particle_count = darkness.iter().sum::<f64>().round() as usize;
     if particle_count > pixel_count {
         particle_count = pixel_count;
     }
-
-    let (mut occupied, mut particles) = initial_particles(&darkness_rank, particle_count);
-
-    for _ in 0..max_steps {
-        let mut moved = false;
-
-        for particle_index in 0..particles.len() {
-            let current = particles[particle_index];
-            let mut best = current;
-            let mut best_energy =
-                electrostatic_energy_unit(current, current, &particles, &darkness_unit, width);
-
-            let cx = current % width;
-            let cy = current / width;
-
-            for (dx, dy) in ELECTRO_NEIGHBORS {
-                let nx = cx as isize + dx;
-                let ny = cy as isize + dy;
-                if nx < 0 || ny < 0 || nx as usize >= width || ny as usize >= height {
-                    continue;
-                }
-
-                let candidate = ny as usize * width + nx as usize;
-                if candidate != current && occupied[candidate] {
-                    continue;
-                }
-
-                let energy = electrostatic_energy_unit(
-                    candidate,
-                    current,
-                    &particles,
-                    &darkness_unit,
-                    width,
-                );
-                if energy > best_energy {
-                    best_energy = energy;
-                    best = candidate;
-                }
-            }
-
-            if best != current {
-                occupied[current] = false;
-                occupied[best] = true;
-                particles[particle_index] = best;
-                moved = true;
+    if particle_count == 0 {
+        for y in 0..height {
+            let row = buffer.try_row_mut(y)?;
+            for value in row.iter_mut().take(width) {
+                *value = domain_to_sample(max_value, max_value);
             }
         }
+        return Ok(());
+    }
 
-        if !moved {
+    let forcefield = electrostatic_forcefield(&darkness, width, height);
+    let mut rng = 0x9E37_79B9_7F4A_7C15_u64;
+    let mut positions =
+        electrostatic_initial_positions(&darkness, width, height, particle_count, &mut rng);
+    let mut forces = vec![[0.0_f64; 2]; particle_count];
+
+    for step in 0..max_steps {
+        electrostatic_compute_forces(&positions, &forcefield, width, height, &mut forces);
+
+        let mut max_displacement = 0.0_f64;
+        let shake = if max_steps == 0 {
+            0.0
+        } else {
+            ELECTRO_SHAKE_BASE * (1.0 - step as f64 / max_steps as f64)
+        };
+        let apply_shake = step % 10 == 0 && shake > 0.0;
+
+        for i in 0..positions.len() {
+            let mut next_x = positions[i][0] + ELECTRO_STEP_SIZE * forces[i][0];
+            let mut next_y = positions[i][1] + ELECTRO_STEP_SIZE * forces[i][1];
+
+            if apply_shake {
+                next_x += shake * (electrostatic_rand_unit(&mut rng) * 2.0 - 1.0);
+                next_y += shake * (electrostatic_rand_unit(&mut rng) * 2.0 - 1.0);
+            }
+
+            next_x = next_x.clamp(0.0, (width - 1) as f64);
+            next_y = next_y.clamp(0.0, (height - 1) as f64);
+
+            let dx = next_x - positions[i][0];
+            let dy = next_y - positions[i][1];
+            let displacement = (dx * dx + dy * dy).sqrt();
+            if displacement > max_displacement {
+                max_displacement = displacement;
+            }
+
+            positions[i][0] = next_x;
+            positions[i][1] = next_y;
+        }
+
+        if max_displacement < ELECTRO_CONVERGENCE_EPSILON {
             break;
         }
     }
+
+    let occupied = electrostatic_project_to_grid(&positions, width, height);
 
     for y in 0..height {
         let row = buffer.try_row_mut(y)?;
@@ -680,38 +671,243 @@ fn lbm_reference_state_for_pixel(
     }
 }
 
-fn electrostatic_energy_unit(
-    candidate: usize,
-    self_position: usize,
-    particles: &[usize],
-    darkness_unit: &[f32],
-    width: usize,
-) -> i64 {
-    let cx = (candidate % width) as i64;
-    let cy = (candidate / width) as i64;
-    let mut repulsion = 0_i64;
+fn electrostatic_forcefield(darkness: &[f64], width: usize, height: usize) -> Vec<[f64; 2]> {
+    let mut field = vec![[0.0_f64; 2]; darkness.len()];
 
-    for &other in particles {
-        if other == self_position {
-            continue;
-        }
+    for py in 0..height {
+        for px in 0..width {
+            let pidx = py * width + px;
+            let mut fx = 0.0_f64;
+            let mut fy = 0.0_f64;
 
-        let ox = (other % width) as i64;
-        let oy = (other / width) as i64;
-        let dx = cx - ox;
-        let dy = cy - oy;
-        let dist2 = i128::from(dx) * i128::from(dx) + i128::from(dy) * i128::from(dy);
-        if dist2 == 0 {
-            continue;
+            for gy in 0..height {
+                for gx in 0..width {
+                    let gidx = gy * width + gx;
+                    if gidx == pidx {
+                        continue;
+                    }
+
+                    let charge = darkness[gidx].clamp(0.0, 1.0);
+                    if charge == 0.0 {
+                        continue;
+                    }
+
+                    let dx = gx as f64 - px as f64;
+                    let dy = gy as f64 - py as f64;
+                    let dist2 = dx * dx + dy * dy + ELECTRO_FORCE_EPSILON;
+                    let inv_r3 = charge / (dist2 * dist2.sqrt());
+                    fx += dx * inv_r3;
+                    fy += dy * inv_r3;
+                }
+            }
+
+            field[pidx] = [
+                fx * ELECTRO_ATTRACTION_WEIGHT,
+                fy * ELECTRO_ATTRACTION_WEIGHT,
+            ];
         }
-        repulsion += (i128::from(ELECTRO_REPEL_SCALE) / dist2) as i64;
     }
 
-    let attraction = i64::from(unit_to_domain(
-        darkness_unit[candidate].clamp(0.0, 1.0),
-        255,
-    )) * ELECTRO_ATTRACT_WEIGHT;
-    attraction - (repulsion * ELECTRO_REPEL_WEIGHT)
+    field
+}
+
+fn electrostatic_initial_positions(
+    darkness: &[f64],
+    width: usize,
+    height: usize,
+    particle_count: usize,
+    rng: &mut u64,
+) -> Vec<[f64; 2]> {
+    let pixel_count = width * height;
+    let mut occupied = vec![false; pixel_count];
+    let mut positions = Vec::with_capacity(particle_count);
+    let mut attempts = 0_usize;
+    let max_attempts = pixel_count.saturating_mul(64).max(1);
+
+    while positions.len() < particle_count && attempts < max_attempts {
+        let idx = electrostatic_rand_index(rng, pixel_count);
+        attempts += 1;
+        if occupied[idx] {
+            continue;
+        }
+
+        let prob = darkness[idx].clamp(0.0, 1.0);
+        if electrostatic_rand_unit(rng) <= prob {
+            occupied[idx] = true;
+            positions.push([(idx % width) as f64, (idx / width) as f64]);
+        }
+    }
+
+    if positions.len() < particle_count {
+        let mut ranking = darkness.iter().enumerate().collect::<Vec<(usize, &f64)>>();
+        ranking.sort_by(|(ia, va), (ib, vb)| vb.total_cmp(va).then_with(|| ia.cmp(ib)));
+
+        for (idx, _) in ranking {
+            if positions.len() >= particle_count {
+                break;
+            }
+            if occupied[idx] {
+                continue;
+            }
+            occupied[idx] = true;
+            positions.push([(idx % width) as f64, (idx / width) as f64]);
+        }
+    }
+
+    positions
+}
+
+fn electrostatic_compute_forces(
+    positions: &[[f64; 2]],
+    field: &[[f64; 2]],
+    width: usize,
+    height: usize,
+    forces: &mut [[f64; 2]],
+) {
+    for i in 0..positions.len() {
+        let pos = positions[i];
+        let mut force = electrostatic_bilinear(field, width, height, pos);
+
+        for (j, other) in positions.iter().enumerate() {
+            if i == j {
+                continue;
+            }
+
+            let dx = pos[0] - other[0];
+            let dy = pos[1] - other[1];
+            let dist2 = dx * dx + dy * dy + ELECTRO_FORCE_EPSILON;
+            let inv_r3 = ELECTRO_REPULSION_WEIGHT / (dist2 * dist2.sqrt());
+            force[0] += dx * inv_r3;
+            force[1] += dy * inv_r3;
+        }
+
+        forces[i] = force;
+    }
+}
+
+fn electrostatic_bilinear(
+    field: &[[f64; 2]],
+    width: usize,
+    height: usize,
+    position: [f64; 2],
+) -> [f64; 2] {
+    let x = position[0].clamp(0.0, (width - 1) as f64);
+    let y = position[1].clamp(0.0, (height - 1) as f64);
+
+    let x0 = x.floor() as usize;
+    let y0 = y.floor() as usize;
+    let x1 = (x0 + 1).min(width - 1);
+    let y1 = (y0 + 1).min(height - 1);
+    let tx = x - x0 as f64;
+    let ty = y - y0 as f64;
+
+    let f00 = field[y0 * width + x0];
+    let f10 = field[y0 * width + x1];
+    let f01 = field[y1 * width + x0];
+    let f11 = field[y1 * width + x1];
+
+    let fx0 = f00[0] * (1.0 - tx) + f10[0] * tx;
+    let fy0 = f00[1] * (1.0 - tx) + f10[1] * tx;
+    let fx1 = f01[0] * (1.0 - tx) + f11[0] * tx;
+    let fy1 = f01[1] * (1.0 - tx) + f11[1] * tx;
+
+    [fx0 * (1.0 - ty) + fx1 * ty, fy0 * (1.0 - ty) + fy1 * ty]
+}
+
+fn electrostatic_project_to_grid(positions: &[[f64; 2]], width: usize, height: usize) -> Vec<bool> {
+    let pixel_count = width * height;
+    let mut occupied = vec![false; pixel_count];
+
+    let mut ordering = positions
+        .iter()
+        .enumerate()
+        .collect::<Vec<(usize, &[f64; 2])>>();
+    ordering.sort_by(|(ia, pa), (ib, pb)| {
+        let da = pa[0] + pa[1] * width as f64;
+        let db = pb[0] + pb[1] * width as f64;
+        da.total_cmp(&db).then_with(|| ia.cmp(ib))
+    });
+
+    for (_, position) in ordering {
+        let idx = electrostatic_nearest_free_pixel(position, &occupied, width, height);
+        occupied[idx] = true;
+    }
+
+    occupied
+}
+
+fn electrostatic_nearest_free_pixel(
+    position: &[f64; 2],
+    occupied: &[bool],
+    width: usize,
+    height: usize,
+) -> usize {
+    let center_x = position[0].round().clamp(0.0, (width - 1) as f64) as usize;
+    let center_y = position[1].round().clamp(0.0, (height - 1) as f64) as usize;
+    let max_radius = width.max(height);
+
+    for radius in 0..=max_radius {
+        let mut best_idx = None;
+        let mut best_dist2 = f64::INFINITY;
+
+        let x_min = center_x.saturating_sub(radius);
+        let y_min = center_y.saturating_sub(radius);
+        let x_max = center_x.saturating_add(radius).min(width - 1);
+        let y_max = center_y.saturating_add(radius).min(height - 1);
+
+        for y in y_min..=y_max {
+            for x in x_min..=x_max {
+                if x.abs_diff(center_x).max(y.abs_diff(center_y)) != radius {
+                    continue;
+                }
+
+                let idx = y * width + x;
+                if occupied[idx] {
+                    continue;
+                }
+
+                let dx = position[0] - x as f64;
+                let dy = position[1] - y as f64;
+                let dist2 = dx * dx + dy * dy;
+                let tie_break = match best_idx {
+                    Some(best) => idx < best,
+                    None => true,
+                };
+                if dist2 < best_dist2 || (dist2 == best_dist2 && tie_break) {
+                    best_dist2 = dist2;
+                    best_idx = Some(idx);
+                }
+            }
+        }
+
+        if let Some(idx) = best_idx {
+            return idx;
+        }
+    }
+
+    0
+}
+
+fn electrostatic_rand_index(seed: &mut u64, len: usize) -> usize {
+    if len == 0 {
+        0
+    } else {
+        (electrostatic_next_u64(seed) as usize) % len
+    }
+}
+
+fn electrostatic_rand_unit(seed: &mut u64) -> f64 {
+    let value = electrostatic_next_u64(seed);
+    (value as f64) / (u64::MAX as f64)
+}
+
+fn electrostatic_next_u64(seed: &mut u64) -> u64 {
+    let mut x = *seed;
+    x ^= x >> 12;
+    x ^= x << 25;
+    x ^= x >> 27;
+    *seed = x;
+    x.wrapping_mul(0x2545_F491_4F6C_DD1D)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -719,21 +915,6 @@ enum CandidateMove {
     None,
     Toggle(usize),
     Swap(usize, usize),
-}
-
-fn initial_particles(darkness: &[u8], particle_count: usize) -> (Vec<bool>, Vec<usize>) {
-    let mut indices: Vec<usize> = (0..darkness.len()).collect();
-    indices.sort_by(|a, b| darkness[*b].cmp(&darkness[*a]).then(a.cmp(b)));
-
-    let mut occupied = vec![false; darkness.len()];
-    let mut particles = indices.into_iter().take(particle_count).collect::<Vec<_>>();
-    particles.sort_unstable();
-
-    for &idx in &particles {
-        occupied[idx] = true;
-    }
-
-    (occupied, particles)
 }
 
 fn ensure_grayscale_integer_format<S: Sample, L: PixelLayout>() -> Result<()> {
@@ -760,10 +941,6 @@ fn integer_sample_max<S: Sample>() -> Result<i32> {
             "unsupported integer sample width for research algorithms",
         )),
     }
-}
-
-fn unit_to_domain(unit: f32, max_value: i32) -> i32 {
-    (unit.clamp(0.0, 1.0) * max_value as f32).round() as i32
 }
 
 fn domain_to_sample<S: Sample>(value: i32, max_value: i32) -> S {

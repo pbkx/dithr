@@ -483,6 +483,126 @@ fn diffusion_f32_every_wrapper_smoke_gray() {
 }
 
 #[test]
+fn diffusion_u16_binary_output_for_gray_levels_2() {
+    let mut data: Vec<u16> = (0_u32..256)
+        .map(|value| ((value * 257) % 65_536) as u16)
+        .collect();
+    let mut buffer = dithr::gray_u16(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("floyd-steinberg should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+}
+
+#[test]
+fn diffusion_f32_binary_output_for_gray_levels_2() {
+    let mut data: Vec<f32> = (0_u32..256).map(|value| value as f32 / 255.0).collect();
+    let mut buffer = dithr::gray_f32(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    floyd_steinberg_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("floyd-steinberg should succeed");
+
+    assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
+}
+
+#[test]
+fn diffusion_alpha_preserved_all_sample_types() {
+    let mut rgba_u8: Vec<u8> = (0_u16..80)
+        .map(|value| ((value * 19 + 11) % 256) as u8)
+        .collect();
+    let before_u8: Vec<u8> = rgba_u8.iter().skip(3).step_by(4).copied().collect();
+    let mut buffer_u8 =
+        dithr::rgba_u8(&mut rgba_u8, 4, 5, 16).expect("valid buffer should construct");
+    floyd_steinberg_in_place(&mut buffer_u8, QuantizeMode::RgbLevels(2))
+        .expect("u8 diffusion should succeed");
+    let after_u8: Vec<u8> = rgba_u8.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_u8, after_u8);
+
+    let mut rgba_u16: Vec<u16> = (0_u32..80)
+        .map(|value| ((value * 977) % 65_536) as u16)
+        .collect();
+    let before_u16: Vec<u16> = rgba_u16.iter().skip(3).step_by(4).copied().collect();
+    let mut buffer_u16 =
+        dithr::rgba_u16(&mut rgba_u16, 4, 5, 16).expect("valid buffer should construct");
+    floyd_steinberg_in_place(&mut buffer_u16, QuantizeMode::RgbLevels(2))
+        .expect("u16 diffusion should succeed");
+    let after_u16: Vec<u16> = rgba_u16.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_u16, after_u16);
+
+    let mut rgba_f32: Vec<f32> = (0_u32..80).map(|value| value as f32 / 79.0).collect();
+    let before_f32: Vec<f32> = rgba_f32.iter().skip(3).step_by(4).copied().collect();
+    let mut buffer_f32 =
+        dithr::rgba_f32(&mut rgba_f32, 4, 5, 16).expect("valid buffer should construct");
+    floyd_steinberg_in_place(&mut buffer_f32, QuantizeMode::RgbLevels(2))
+        .expect("f32 diffusion should succeed");
+    let after_f32: Vec<f32> = rgba_f32.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_f32, after_f32);
+}
+
+#[test]
+fn diffusion_same_kernel_invariants_all_sample_types() {
+    let mut gray_u8 = gray_ramp_16x16();
+    let mut gray_u16: Vec<u16> = gray_u8.iter().map(|&v| u16::from(v) * 257).collect();
+    let mut gray_f32: Vec<f32> = gray_u8.iter().map(|&v| f32::from(v) / 255.0).collect();
+
+    let mut buffer_u8 =
+        dithr::gray_u8(&mut gray_u8, 16, 16, 16).expect("valid buffer should construct");
+    let mut buffer_u16 =
+        dithr::gray_u16(&mut gray_u16, 16, 16, 16).expect("valid buffer should construct");
+    let mut buffer_f32 =
+        dithr::gray_f32(&mut gray_f32, 16, 16, 16).expect("valid buffer should construct");
+
+    burkes_in_place(&mut buffer_u8, QuantizeMode::GrayLevels(2)).expect("u8 run should succeed");
+    burkes_in_place(&mut buffer_u16, QuantizeMode::GrayLevels(2)).expect("u16 run should succeed");
+    burkes_in_place(&mut buffer_f32, QuantizeMode::GrayLevels(2)).expect("f32 run should succeed");
+
+    assert!(gray_u8.iter().all(|&value| value == 0 || value == 255));
+    assert!(gray_u16.iter().all(|&value| value == 0 || value == 65_535));
+    assert!(gray_f32.iter().all(|&value| value == 0.0 || value == 1.0));
+}
+
+#[test]
+fn variable_diffusion_coeff_range_post_cleanup() {
+    let coeffs = &dithr::data::OSTROMOUKHOV_COEFFS;
+    assert_eq!(coeffs.len(), 256);
+    for &(forward, down_diag, down, den) in coeffs {
+        assert!(forward >= 0);
+        assert!(down_diag >= 0);
+        assert!(down >= 0);
+        assert!(den > 0);
+        assert!(i32::from(forward) <= i32::from(den));
+        assert!(i32::from(down_diag) <= i32::from(den));
+        assert!(i32::from(down) <= i32::from(den));
+    }
+
+    let modulation = &dithr::data::ZHOU_FANG_MODULATION;
+    for &entry in modulation {
+        assert!((-8..=8).contains(&entry));
+    }
+}
+
+#[test]
+fn classic_diffusion_no_separate_int_float_engine_smoke() {
+    let mut gray_u8 = gray_ramp_16x16();
+    let mut gray_f32: Vec<f32> = gray_u8.iter().map(|&v| f32::from(v) / 255.0).collect();
+
+    let mut buffer_u8 =
+        dithr::gray_u8(&mut gray_u8, 16, 16, 16).expect("valid buffer should construct");
+    let mut buffer_f32 =
+        dithr::gray_f32(&mut gray_f32, 16, 16, 16).expect("valid buffer should construct");
+
+    floyd_steinberg_in_place(&mut buffer_u8, QuantizeMode::GrayLevels(2))
+        .expect("u8 run should succeed");
+    floyd_steinberg_in_place(&mut buffer_f32, QuantizeMode::GrayLevels(2))
+        .expect("f32 run should succeed");
+
+    let mask_u8: Vec<u8> = gray_u8.iter().map(|&v| u8::from(v > 127)).collect();
+    let mask_f32: Vec<u8> = gray_f32.iter().map(|&v| u8::from(v > 0.5)).collect();
+    assert_eq!(mask_u8, mask_f32);
+}
+
+#[test]
 fn ostromoukhov_coeff_index_range_test() {
     for luma in 0_u16..=255 {
         let index = usize::from(luma as u8);

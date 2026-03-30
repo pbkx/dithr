@@ -423,7 +423,7 @@ fn golden_lattice_boltzmann_gray_ramp_8x8() {
 
     lattice_boltzmann_in_place(&mut buffer, 8).expect("lattice-boltzmann should succeed");
 
-    assert_eq!(fnv1a64(&data), 4_864_876_028_568_798_213_u64);
+    assert_eq!(fnv1a64(&data), 4_946_613_196_755_991_985_u64);
 }
 
 #[test]

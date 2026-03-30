@@ -1,6 +1,5 @@
 use crate::{
     core::{PixelLayout, Sample},
-    math::fixed::mul_div_i32,
     Buffer, Error, Result,
 };
 use std::mem::size_of;
@@ -18,25 +17,29 @@ const DBS_SWAP_NEIGHBORS: [(isize, isize); 8] = [
     (0, 1),
     (1, 1),
 ];
-const LBM_SCALE: i32 = 16_384;
-const LBM_HALF_SCALE: i32 = LBM_SCALE / 2;
-const LBM_WEIGHTS: [i32; 9] = [7_284, 1_820, 1_820, 1_820, 1_820, 455, 455, 455, 455];
 const LBM_DIRECTIONS: [(isize, isize); 9] = [
     (0, 0),
     (1, 0),
-    (0, 1),
     (-1, 0),
+    (0, 1),
     (0, -1),
     (1, 1),
     (-1, 1),
     (-1, -1),
     (1, -1),
 ];
-const LBM_OPPOSITE: [usize; 9] = [0, 3, 4, 1, 2, 7, 8, 5, 6];
-const LBM_OMEGA_NUM: i32 = 6;
-const LBM_OMEGA_DEN: i32 = 5;
-const LBM_FORCING_NUM: i32 = 1;
-const LBM_FORCING_DEN: i32 = 4;
+const LBM_T_WEIGHTS: [f64; 9] = [
+    4.0 / 9.0,
+    1.0 / 9.0,
+    1.0 / 9.0,
+    1.0 / 9.0,
+    1.0 / 9.0,
+    1.0 / 36.0,
+    1.0 / 36.0,
+    1.0 / 36.0,
+    1.0 / 36.0,
+];
+const LBM_CONVERGENCE_EPSILON: f64 = 1e-6;
 const ELECTRO_ATTRACT_WEIGHT: i64 = 16;
 const ELECTRO_REPEL_WEIGHT: i64 = 12;
 const ELECTRO_REPEL_SCALE: i64 = 256;
@@ -200,43 +203,101 @@ pub fn lattice_boltzmann_in_place<S: Sample, L: PixelLayout>(
         .checked_mul(height)
         .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
     let max_value = integer_sample_max::<S>()?;
+    let max_value_f64 = max_value as f64;
 
-    let mut target_unit = Vec::with_capacity(pixel_count);
+    let mut state = Vec::with_capacity(pixel_count);
     for y in 0..height {
         let row = buffer.try_row(y)?;
         for &value in row.iter().take(width) {
-            target_unit.push(value.to_unit_f32().clamp(0.0, 1.0));
+            state.push(f64::from(value.to_unit_f32().clamp(0.0, 1.0)) * max_value_f64);
         }
     }
 
-    let mut distributions = vec![[0_i32; 9]; pixel_count];
-    let mut post_collision = vec![[0_i32; 9]; pixel_count];
-    let mut streamed = vec![[0_i32; 9]; pixel_count];
-
-    for i in 0..pixel_count {
-        let target_scaled = unit_to_lbm(target_unit[i]);
-        for d in 0..9 {
-            distributions[i][d] = mul_div_i32(target_scaled, LBM_WEIGHTS[d], LBM_SCALE)?;
+    let total_gray = state.iter().sum::<f64>();
+    if total_gray > 0.0 {
+        let white_count_target =
+            ((total_gray / max_value_f64).round() as isize).clamp(0, pixel_count as isize) as usize;
+        let normalized_sum = white_count_target as f64 * max_value_f64;
+        let scale = normalized_sum / total_gray;
+        for value in &mut state {
+            *value *= scale;
         }
     }
+
+    let low_threshold = 1.0 / max_value_f64;
+    let convergence_limit = LBM_CONVERGENCE_EPSILON * max_value_f64 * (pixel_count as f64).sqrt();
+    let mut next = vec![0.0_f64; pixel_count];
+    let mut reference_state = [0.0_f64; 9];
 
     for _ in 0..max_steps {
-        lattice_state_step_unit(
-            &mut distributions,
-            &mut post_collision,
-            &mut streamed,
-            &target_unit,
-            width,
-            height,
-        )?;
+        next.fill(0.0);
+
+        for y in 0..height {
+            for x in 0..width {
+                let idx = y * width + x;
+                let center = state[idx];
+                lbm_reference_state_for_pixel(
+                    &state,
+                    (width, height),
+                    (x, y),
+                    center,
+                    max_value_f64,
+                    low_threshold,
+                    &mut reference_state,
+                );
+
+                for d in 0..9 {
+                    let contribution = reference_state[d];
+                    if contribution <= 0.0 {
+                        continue;
+                    }
+
+                    let (dx, dy) = LBM_DIRECTIONS[d];
+                    let nx = x as isize + dx;
+                    let ny = y as isize + dy;
+                    if nx < 0 || ny < 0 || nx as usize >= width || ny as usize >= height {
+                        continue;
+                    }
+
+                    let nidx = ny as usize * width + nx as usize;
+                    next[nidx] += contribution;
+                }
+            }
+        }
+
+        let mut l2 = 0.0_f64;
+        for i in 0..pixel_count {
+            let delta = next[i] - state[i];
+            l2 += delta * delta;
+        }
+        l2 = l2.sqrt();
+
+        state.copy_from_slice(&next);
+        if l2 < convergence_limit {
+            break;
+        }
+    }
+
+    let total_after = state.iter().sum::<f64>();
+    let white_count =
+        ((total_after / max_value_f64).round() as isize).clamp(0, pixel_count as isize) as usize;
+
+    let mut ranking = state.iter().enumerate().collect::<Vec<(usize, &f64)>>();
+    ranking.sort_by(|(ia, va), (ib, vb)| vb.total_cmp(va).then_with(|| ia.cmp(ib)));
+
+    let mut white = vec![false; pixel_count];
+    for (rank, (idx, _)) in ranking.into_iter().enumerate() {
+        if rank >= white_count {
+            break;
+        }
+        white[idx] = true;
     }
 
     for y in 0..height {
         let row = buffer.try_row_mut(y)?;
         for (x, value) in row.iter_mut().take(width).enumerate() {
             let idx = y * width + x;
-            let rho = distributions[idx].iter().sum::<i32>();
-            let domain = if rho >= LBM_HALF_SCALE { max_value } else { 0 };
+            let domain = if white[idx] { max_value } else { 0 };
             *value = domain_to_sample(domain, max_value);
         }
     }
@@ -523,51 +584,100 @@ fn swap_primary_delta(primary: u8, secondary: u8) -> f32 {
     }
 }
 
-fn lattice_state_step_unit(
-    distributions: &mut Vec<[i32; 9]>,
-    post_collision: &mut [[i32; 9]],
-    streamed: &mut Vec<[i32; 9]>,
-    target_unit: &[f32],
-    width: usize,
-    height: usize,
-) -> Result<()> {
-    for idx in 0..distributions.len() {
-        let rho = distributions[idx].iter().sum::<i32>();
-        let target_scaled = unit_to_lbm(target_unit[idx]);
-        let rho_for_eq = rho + mul_div_i32(target_scaled - rho, LBM_FORCING_NUM, LBM_FORCING_DEN)?;
+fn lbm_reference_state_for_pixel(
+    state: &[f64],
+    dims: (usize, usize),
+    xy: (usize, usize),
+    center: f64,
+    max_value: f64,
+    low_threshold: f64,
+    reference: &mut [f64; 9],
+) {
+    let (width, height) = dims;
+    let (x, y) = xy;
+    reference.fill(0.0);
+    let mut active_sum = 0.0_f64;
 
-        for d in 0..9 {
-            let feq = mul_div_i32(rho_for_eq, LBM_WEIGHTS[d], LBM_SCALE)?;
-            let delta = feq - distributions[idx][d];
-            post_collision[idx][d] =
-                distributions[idx][d] + mul_div_i32(delta, LBM_OMEGA_NUM, LBM_OMEGA_DEN)?;
-        }
-    }
-
-    streamed.fill([0_i32; 9]);
-
-    for y in 0..height {
-        for x in 0..width {
-            let idx = y * width + x;
-
-            for d in 0..9 {
-                let (dx, dy) = LBM_DIRECTIONS[d];
-                let nx = x as isize + dx;
-                let ny = y as isize + dy;
-
-                if nx >= 0 && ny >= 0 && (nx as usize) < width && (ny as usize) < height {
-                    let nidx = ny as usize * width + nx as usize;
-                    streamed[nidx][d] += post_collision[idx][d];
-                } else {
-                    let opp = LBM_OPPOSITE[d];
-                    streamed[idx][opp] += post_collision[idx][d];
-                }
+    if center < low_threshold {
+        for d in 1..9 {
+            let (dx, dy) = LBM_DIRECTIONS[d];
+            let nx = x as isize + dx;
+            let ny = y as isize + dy;
+            if nx < 0 || ny < 0 || nx as usize >= width || ny as usize >= height {
+                continue;
             }
+
+            reference[d] = LBM_T_WEIGHTS[d];
+            active_sum += reference[d];
+        }
+
+        if active_sum > 0.0 {
+            let scale = center / active_sum;
+            for value in reference.iter_mut().skip(1) {
+                *value *= scale;
+            }
+        } else {
+            reference[0] = center;
+        }
+
+        return;
+    }
+
+    if center > max_value {
+        reference[0] = max_value;
+        let extra = center - max_value;
+        for d in 1..9 {
+            let (dx, dy) = LBM_DIRECTIONS[d];
+            let nx = x as isize + dx;
+            let ny = y as isize + dy;
+            if nx < 0 || ny < 0 || nx as usize >= width || ny as usize >= height {
+                continue;
+            }
+
+            reference[d] = LBM_T_WEIGHTS[d];
+            active_sum += reference[d];
+        }
+
+        if active_sum > 0.0 {
+            let scale = extra / active_sum;
+            for value in reference.iter_mut().skip(1) {
+                *value *= scale;
+            }
+        } else {
+            reference[0] += extra;
+        }
+
+        return;
+    }
+
+    reference[0] = LBM_T_WEIGHTS[0];
+    active_sum += reference[0];
+
+    for d in 1..9 {
+        let (dx, dy) = LBM_DIRECTIONS[d];
+        let nx = x as isize + dx;
+        let ny = y as isize + dy;
+        if nx < 0 || ny < 0 || nx as usize >= width || ny as usize >= height {
+            continue;
+        }
+
+        let neighbor_idx = ny as usize * width + nx as usize;
+        let neighbor = state[neighbor_idx];
+        if neighbor > center && neighbor < max_value {
+            reference[d] = LBM_T_WEIGHTS[d];
+            active_sum += reference[d];
         }
     }
 
-    std::mem::swap(distributions, streamed);
-    Ok(())
+    if active_sum <= 0.0 {
+        reference[0] = center;
+        return;
+    }
+
+    let scale = center / active_sum;
+    for value in reference.iter_mut() {
+        *value *= scale;
+    }
 }
 
 fn electrostatic_energy_unit(
@@ -658,8 +768,4 @@ fn unit_to_domain(unit: f32, max_value: i32) -> i32 {
 
 fn domain_to_sample<S: Sample>(value: i32, max_value: i32) -> S {
     S::from_unit_f32(value.clamp(0, max_value) as f32 / max_value as f32)
-}
-
-fn unit_to_lbm(unit: f32) -> i32 {
-    (unit.clamp(0.0, 1.0) * LBM_SCALE as f32).round() as i32
 }

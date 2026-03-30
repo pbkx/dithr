@@ -36,7 +36,7 @@ fn knuth_dot_diffusion_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    knuth_dot_diffusion_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+    knuth_dot_diffusion_in_place(&mut buffer, QuantizeMode::gray_bits(1))
         .expect("knuth dot diffusion should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
@@ -159,7 +159,7 @@ fn riemersma_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    riemersma_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("riemersma should succeed");
+    riemersma_in_place(&mut buffer, QuantizeMode::gray_bits(1)).expect("riemersma should succeed");
 
     assert_eq!(data.len(), 256);
 }
@@ -169,7 +169,7 @@ fn riemersma_binary_only_for_graybits1() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    riemersma_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("riemersma should succeed");
+    riemersma_in_place(&mut buffer, QuantizeMode::gray_bits(1)).expect("riemersma should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -191,7 +191,7 @@ fn riemersma_f32_smoke() {
     let mut data: Vec<f32> = (0_u32..(16 * 16 * 3))
         .map(|value| (value % 256) as f32 / 255.0)
         .collect();
-    let mut buffer = dithr::rgb_f32(&mut data, 16, 16, 48).expect("valid buffer should construct");
+    let mut buffer = dithr::rgb_32f(&mut data, 16, 16, 48).expect("valid buffer should construct");
 
     riemersma_in_place(&mut buffer, QuantizeMode::GrayLevels(2)).expect("riemersma should succeed");
 
@@ -216,7 +216,7 @@ fn dot_diffusion_f32_smoke() {
     let mut data: Vec<f32> = (0_u32..(16 * 16 * 3))
         .map(|value| (value % 256) as f32 / 255.0)
         .collect();
-    let mut buffer = dithr::rgb_f32(&mut data, 16, 16, 48).expect("valid buffer should construct");
+    let mut buffer = dithr::rgb_32f(&mut data, 16, 16, 48).expect("valid buffer should construct");
 
     knuth_dot_diffusion_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
         .expect("knuth dot diffusion should succeed");

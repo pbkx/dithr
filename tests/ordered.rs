@@ -67,7 +67,7 @@ fn bayer_2x2_quantizes_only_to_allowed_values() {
     let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
-    bayer_2x2_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 2x2 should succeed");
+    bayer_2x2_in_place(&mut buffer, QuantizeMode::gray_bits(1)).expect("bayer 2x2 should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -77,7 +77,7 @@ fn bayer_4x4_periodicity_matches_4() {
     let mut data = vec![127_u8; 64];
     let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
-    bayer_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 4x4 should succeed");
+    bayer_4x4_in_place(&mut buffer, QuantizeMode::gray_bits(1)).expect("bayer 4x4 should succeed");
 
     for y in 0..8 {
         for x in 0..4 {
@@ -97,7 +97,7 @@ fn bayer_8x8_periodicity_matches_8() {
     let mut data = vec![127_u8; 256];
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1)).expect("bayer 8x8 should succeed");
+    bayer_8x8_in_place(&mut buffer, QuantizeMode::gray_bits(1)).expect("bayer 8x8 should succeed");
 
     for y in 0..16 {
         for x in 0..8 {
@@ -117,7 +117,7 @@ fn bayer_16x16_runs_on_16x16_without_panic() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    bayer_16x16_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+    bayer_16x16_in_place(&mut buffer, QuantizeMode::gray_bits(1))
         .expect("bayer 16x16 should succeed");
 
     assert_eq!(data.len(), 256);
@@ -129,7 +129,7 @@ fn cluster_dot_4x4_runs_and_quantizes() {
     let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
 
-    cluster_dot_4x4_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+    cluster_dot_4x4_in_place(&mut buffer, QuantizeMode::gray_bits(1))
         .expect("cluster-dot 4x4 should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
@@ -140,7 +140,7 @@ fn cluster_dot_8x8_runs_and_quantizes() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    cluster_dot_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1))
+    cluster_dot_8x8_in_place(&mut buffer, QuantizeMode::gray_bits(1))
         .expect("cluster-dot 8x8 should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
@@ -151,7 +151,7 @@ fn custom_ordered_rejects_empty_map() {
     let mut data = vec![0_u8; 4];
     let mut buffer = dithr::gray_u8(&mut data, 2, 2, 2).expect("valid buffer should construct");
 
-    let result = custom_ordered_in_place(&mut buffer, QuantizeMode::GrayBits(1), &[], 0, 0, 64);
+    let result = custom_ordered_in_place(&mut buffer, QuantizeMode::gray_bits(1), &[], 0, 0, 64);
 
     assert_eq!(result, Err(Error::Ordered(OrderedError::EmptyMap)));
 }
@@ -162,7 +162,7 @@ fn custom_ordered_rejects_bad_dimensions() {
     let mut buffer = dithr::gray_u8(&mut data, 2, 2, 2).expect("valid buffer should construct");
 
     let map = [0_u8, 1, 2];
-    let result = custom_ordered_in_place(&mut buffer, QuantizeMode::GrayBits(1), &map, 2, 2, 64);
+    let result = custom_ordered_in_place(&mut buffer, QuantizeMode::gray_bits(1), &map, 2, 2, 64);
 
     assert_eq!(result, Err(Error::Ordered(OrderedError::InvalidDimensions)));
 }
@@ -175,7 +175,7 @@ fn custom_ordered_rejects_out_of_range_map_values() {
 
     let result = custom_ordered_in_place(
         &mut buffer,
-        QuantizeMode::GrayBits(1),
+        QuantizeMode::gray_bits(1),
         &normalized_map,
         2,
         2,
@@ -194,14 +194,15 @@ fn custom_ordered_2x2_matches_manual_small_case() {
 
     custom_ordered_in_place(
         &mut buffer_a,
-        QuantizeMode::GrayBits(1),
+        QuantizeMode::gray_bits(1),
         &BAYER_2X2_FLAT,
         2,
         2,
         64,
     )
     .expect("custom ordered dither should succeed");
-    bayer_2x2_in_place(&mut buffer_b, QuantizeMode::GrayBits(1)).expect("bayer 2x2 should succeed");
+    bayer_2x2_in_place(&mut buffer_b, QuantizeMode::gray_bits(1))
+        .expect("bayer 2x2 should succeed");
 
     assert_eq!(data_a, data_b);
 }
@@ -362,7 +363,7 @@ fn yliluoma_f32_palette_member_invariant() {
     ])
     .expect("palette should be valid");
     let mut buffer =
-        dithr::rgb_f32(&mut data, width, height, width * 3).expect("valid buffer should construct");
+        dithr::rgb_32f(&mut data, width, height, width * 3).expect("valid buffer should construct");
 
     yliluoma_1_in_place(&mut buffer, &palette).expect("yliluoma 1 should succeed");
 
@@ -459,7 +460,7 @@ fn ordered_engine_gray_uses_only_quantized_values() {
 
     custom_ordered_in_place(
         &mut buffer,
-        QuantizeMode::GrayBits(1),
+        QuantizeMode::gray_bits(1),
         &BAYER_2X2_FLAT,
         2,
         2,
@@ -516,7 +517,7 @@ fn ordered_engine_is_deterministic() {
 
     custom_ordered_in_place(
         &mut buffer_a,
-        QuantizeMode::RgbBits(3),
+        QuantizeMode::rgb_bits(3),
         &BAYER_4X4_FLAT,
         4,
         4,
@@ -525,7 +526,7 @@ fn ordered_engine_is_deterministic() {
     .expect("custom ordered dither should succeed");
     custom_ordered_in_place(
         &mut buffer_b,
-        QuantizeMode::RgbBits(3),
+        QuantizeMode::rgb_bits(3),
         &BAYER_4X4_FLAT,
         4,
         4,
@@ -546,7 +547,7 @@ fn ordered_engine_preserves_alpha_channel() {
 
     custom_ordered_in_place(
         &mut buffer,
-        QuantizeMode::RgbBits(2),
+        QuantizeMode::rgb_bits(2),
         &BAYER_2X2_FLAT,
         2,
         2,
@@ -575,7 +576,7 @@ fn bayer_8x8_f32_runs_and_quantizes() {
     let mut data: Vec<f32> = (0_u32..(16 * 16 * 3))
         .map(|value| (value % 256) as f32 / 255.0)
         .collect();
-    let mut buffer = dithr::rgb_f32(&mut data, 16, 16, 48).expect("valid buffer should construct");
+    let mut buffer = dithr::rgb_32f(&mut data, 16, 16, 48).expect("valid buffer should construct");
 
     bayer_8x8_in_place(&mut buffer, QuantizeMode::RgbLevels(2)).expect("bayer 8x8 should succeed");
 
@@ -600,7 +601,7 @@ fn ordered_bayer_f32_runs_with_same_invariants() {
     let mut data: Vec<f32> = (0_u32..(16 * 16 * 3))
         .map(|value| (value % 256) as f32 / 255.0)
         .collect();
-    let mut buffer = dithr::rgb_f32(&mut data, 16, 16, 48).expect("valid buffer should construct");
+    let mut buffer = dithr::rgb_32f(&mut data, 16, 16, 48).expect("valid buffer should construct");
 
     bayer_8x8_in_place(&mut buffer, QuantizeMode::RgbLevels(2)).expect("bayer 8x8 should succeed");
 
@@ -616,7 +617,7 @@ fn ordered_engine_preserves_alpha_across_u8_u16_f32() {
     let before_u8: Vec<u8> = rgba_u8.iter().skip(3).step_by(4).copied().collect();
     let mut buffer_u8 =
         dithr::rgba_u8(&mut rgba_u8, 4, 4, 16).expect("valid buffer should construct");
-    custom_ordered_in_place(&mut buffer_u8, QuantizeMode::RgbBits(2), &map, 2, 2, 48)
+    custom_ordered_in_place(&mut buffer_u8, QuantizeMode::rgb_bits(2), &map, 2, 2, 48)
         .expect("u8 ordered dithering should succeed");
     let after_u8: Vec<u8> = rgba_u8.iter().skip(3).step_by(4).copied().collect();
     assert_eq!(before_u8, after_u8);
@@ -633,7 +634,7 @@ fn ordered_engine_preserves_alpha_across_u8_u16_f32() {
     let mut rgba_f32: Vec<f32> = (0_u32..64).map(|v| (v as f32) / 63.0).collect();
     let before_f32: Vec<f32> = rgba_f32.iter().skip(3).step_by(4).copied().collect();
     let mut buffer_f32 =
-        dithr::rgba_f32(&mut rgba_f32, 4, 4, 16).expect("valid buffer should construct");
+        dithr::rgba_32f(&mut rgba_f32, 4, 4, 16).expect("valid buffer should construct");
     custom_ordered_in_place(&mut buffer_f32, QuantizeMode::RgbLevels(4), &map, 2, 2, 48)
         .expect("f32 ordered dithering should succeed");
     let after_f32: Vec<f32> = rgba_f32.iter().skip(3).step_by(4).copied().collect();
@@ -665,7 +666,7 @@ fn ordered_alpha_preserved_all_sample_types() {
     let mut rgba_f32: Vec<f32> = (0_u32..64).map(|v| (v as f32) / 63.0).collect();
     let before_f32: Vec<f32> = rgba_f32.iter().skip(3).step_by(4).copied().collect();
     let mut buffer_f32 =
-        dithr::rgba_f32(&mut rgba_f32, 4, 4, 16).expect("valid buffer should construct");
+        dithr::rgba_32f(&mut rgba_f32, 4, 4, 16).expect("valid buffer should construct");
     custom_ordered_in_place(&mut buffer_f32, QuantizeMode::GrayLevels(2), &map, 2, 2, 48)
         .expect("f32 ordered dithering should succeed");
     let after_f32: Vec<f32> = rgba_f32.iter().skip(3).step_by(4).copied().collect();
@@ -680,7 +681,7 @@ fn ordered_core_no_duplicate_integer_float_paths_smoke() {
     let mut buffer_u8 =
         dithr::gray_u8(&mut gray_u8, 16, 16, 16).expect("valid buffer should construct");
     let mut buffer_f32 =
-        dithr::gray_f32(&mut gray_f32, 16, 16, 16).expect("valid buffer should construct");
+        dithr::gray_32f(&mut gray_f32, 16, 16, 16).expect("valid buffer should construct");
 
     bayer_8x8_in_place(&mut buffer_u8, QuantizeMode::GrayLevels(2)).expect("u8 run should succeed");
     bayer_8x8_in_place(&mut buffer_f32, QuantizeMode::GrayLevels(2))
@@ -705,7 +706,7 @@ fn ordered_threshold_tile_logic_matches_u8_u16_f32() {
         dithr::gray_u8(&mut data_u8, width, height, width).expect("valid buffer should construct");
     let mut buffer_u16 = dithr::gray_u16(&mut data_u16, width, height, width)
         .expect("valid buffer should construct");
-    let mut buffer_f32 = dithr::gray_f32(&mut data_f32, width, height, width)
+    let mut buffer_f32 = dithr::gray_32f(&mut data_f32, width, height, width)
         .expect("valid buffer should construct");
 
     custom_ordered_in_place(&mut buffer_u8, QuantizeMode::GrayLevels(2), &map, 2, 2, 64)
@@ -730,7 +731,7 @@ fn custom_ordered_map_tiling_is_consistent() {
 
     custom_ordered_in_place(
         &mut buffer,
-        QuantizeMode::GrayBits(1),
+        QuantizeMode::gray_bits(1),
         &BAYER_2X2_FLAT,
         2,
         2,
@@ -807,9 +808,9 @@ fn bayer_8x8_parallel_matches_sequential() {
     let mut par_buffer =
         dithr::gray_u8(&mut par, 16, 16, 16).expect("valid buffer should construct");
 
-    bayer_8x8_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1))
+    bayer_8x8_in_place(&mut seq_buffer, QuantizeMode::gray_bits(1))
         .expect("sequential should succeed");
-    bayer_8x8_in_place_par(&mut par_buffer, QuantizeMode::GrayBits(1))
+    bayer_8x8_in_place_par(&mut par_buffer, QuantizeMode::gray_bits(1))
         .expect("parallel should succeed");
 
     assert_eq!(seq, par);
@@ -827,9 +828,9 @@ fn cluster_dot_8x8_parallel_matches_sequential() {
     let mut par_buffer =
         dithr::gray_u8(&mut par, 16, 16, 16).expect("valid buffer should construct");
 
-    cluster_dot_8x8_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1))
+    cluster_dot_8x8_in_place(&mut seq_buffer, QuantizeMode::gray_bits(1))
         .expect("sequential should succeed");
-    cluster_dot_8x8_in_place_par(&mut par_buffer, QuantizeMode::GrayBits(1))
+    cluster_dot_8x8_in_place_par(&mut par_buffer, QuantizeMode::gray_bits(1))
         .expect("parallel should succeed");
 
     assert_eq!(seq, par);
@@ -848,9 +849,9 @@ fn custom_ordered_parallel_matches_sequential() {
     let mut par_buffer =
         dithr::gray_u8(&mut par, 16, 16, 16).expect("valid buffer should construct");
 
-    custom_ordered_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1), &map, 2, 2, 64)
+    custom_ordered_in_place(&mut seq_buffer, QuantizeMode::gray_bits(1), &map, 2, 2, 64)
         .expect("sequential should succeed");
-    custom_ordered_in_place_par(&mut par_buffer, QuantizeMode::GrayBits(1), &map, 2, 2, 64)
+    custom_ordered_in_place_par(&mut par_buffer, QuantizeMode::gray_bits(1), &map, 2, 2, 64)
         .expect("parallel should succeed");
 
     assert_eq!(seq, par);

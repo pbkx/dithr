@@ -284,11 +284,11 @@ pub fn palette_16_gray() -> Palette {
 }
 
 pub fn mode_gray_1() -> QuantizeMode<'static> {
-    QuantizeMode::GrayBits(1)
+    QuantizeMode::gray_bits(1)
 }
 
 pub fn mode_gray_2() -> QuantizeMode<'static> {
-    QuantizeMode::GrayBits(2)
+    QuantizeMode::gray_bits(2)
 }
 
 #[allow(dead_code)]
@@ -297,7 +297,7 @@ pub fn mode_gray_levels2_u16() -> QuantizeMode<'static, u16> {
 }
 
 pub fn mode_rgb_bits3() -> QuantizeMode<'static> {
-    QuantizeMode::RgbBits(3)
+    QuantizeMode::rgb_bits(3)
 }
 
 pub fn mode_palette_bw() -> QuantizeMode<'static> {

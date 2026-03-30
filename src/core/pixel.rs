@@ -1,11 +1,7 @@
-use super::{
-    layout::{Gray, PixelLayout},
-    sample::Sample,
-};
-use std::any::TypeId;
+use super::{layout::PixelLayout, sample::Sample};
 
 pub fn read_unit_pixel<S: Sample, L: PixelLayout>(pixel: &[S]) -> [f32; 4] {
-    if TypeId::of::<L>() == TypeId::of::<Gray>() {
+    if L::IS_GRAY {
         let gray = pixel.first().copied().map(S::to_unit_f32).unwrap_or(0.0);
         return [gray, gray, gray, 1.0];
     }
@@ -30,7 +26,7 @@ pub fn read_unit_pixel<S: Sample, L: PixelLayout>(pixel: &[S]) -> [f32; 4] {
 }
 
 pub fn write_unit_pixel<S: Sample, L: PixelLayout>(pixel: &mut [S], rgba: [f32; 4]) {
-    if TypeId::of::<L>() == TypeId::of::<Gray>() {
+    if L::IS_GRAY {
         let gray = 0.299_f32 * rgba[0] + 0.587_f32 * rgba[1] + 0.114_f32 * rgba[2];
         if let Some(slot) = pixel.first_mut() {
             *slot = S::from_unit_f32(gray);

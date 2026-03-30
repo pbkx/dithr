@@ -133,8 +133,8 @@ fn buffer_try_row_mut_rejects_y_out_of_bounds() {
 #[test]
 fn buffer_try_pixel_offset_rejects_x_out_of_bounds() {
     let mut data = vec![0_u8; 36];
-    let buffer: RgbaBuffer8<'_> = Buffer::new(&mut data, 3, 3, 12, PixelFormat::Rgba8)
-        .expect("valid buffer should construct");
+    let buffer: RgbaBuffer8<'_> =
+        Buffer::new_typed(&mut data, 3, 3, 12).expect("valid buffer should construct");
 
     assert_eq!(
         buffer.try_pixel_offset(3, 1),
@@ -145,8 +145,8 @@ fn buffer_try_pixel_offset_rejects_x_out_of_bounds() {
 #[test]
 fn buffer_try_pixel_offset_rejects_y_out_of_bounds() {
     let mut data = vec![0_u8; 36];
-    let buffer: RgbaBuffer8<'_> = Buffer::new(&mut data, 3, 3, 12, PixelFormat::Rgba8)
-        .expect("valid buffer should construct");
+    let buffer: RgbaBuffer8<'_> =
+        Buffer::new_typed(&mut data, 3, 3, 12).expect("valid buffer should construct");
 
     assert_eq!(
         buffer.try_pixel_offset(1, 3),
@@ -166,8 +166,8 @@ fn buffer_validate_gray16_ok() {
 #[test]
 fn buffer_validate_rgb32f_ok() {
     let mut data = vec![0.0_f32; 5 * 3 * 2];
-    let buffer: RgbBuffer32F<'_> = Buffer::new(&mut data, 5, 2, 15, PixelFormat::Rgb32F)
-        .expect("valid rgb f32 buffer should construct");
+    let buffer: RgbBuffer32F<'_> =
+        Buffer::new_typed(&mut data, 5, 2, 15).expect("valid rgb f32 buffer should construct");
 
     assert_eq!(buffer.validate(), Ok(()));
 }
@@ -190,7 +190,7 @@ fn buffer_kind_matches_rgb_u16() {
 fn buffer_kind_matches_rgba_f32() {
     let mut data = vec![0.0_f32; 4 * 4 * 4];
     let buffer =
-        dithr::rgba_f32(&mut data, 4, 4, 16).expect("valid rgba f32 buffer should construct");
+        dithr::rgba_32f(&mut data, 4, 4, 16).expect("valid rgba f32 buffer should construct");
     assert_eq!(buffer.kind(), PixelFormat::Rgba32F);
 }
 
@@ -491,7 +491,7 @@ fn rgb_bits_8_maps_to_rgb_levels_256() {
 
 #[test]
 fn quantize_mode_gray_levels_is_canonical() {
-    let mode = QuantizeMode::GrayBits(4);
+    let mode = QuantizeMode::gray_bits(4);
     assert!(matches!(mode, QuantizeMode::GrayLevels(_)));
 }
 
@@ -707,7 +707,7 @@ fn quantize_error_sign_and_magnitude_correct() {
 
 #[test]
 fn quantize_pixel_rejects_short_slice_for_format() {
-    let result = quantize_pixel::<u8, dithr::core::Rgb>(&[10, 20], QuantizeMode::RgbBits(2));
+    let result = quantize_pixel::<u8, dithr::core::Rgb>(&[10, 20], QuantizeMode::rgb_bits(2));
     assert_eq!(
         result,
         Err(Error::InvalidArgument(
@@ -772,7 +772,7 @@ fn threshold_binary_gray_threshold_127_splits_expected() {
     let mut data = vec![0_u8, 64, 127, 128, 200, 255];
     let mut buffer = dithr::gray_u8(&mut data, 6, 1, 6).expect("valid buffer should construct");
 
-    threshold_binary_in_place(&mut buffer, QuantizeMode::GrayBits(1), 127)
+    threshold_binary_in_place(&mut buffer, QuantizeMode::gray_bits(1), 127)
         .expect("threshold binary should succeed");
 
     assert_eq!(data, vec![0, 0, 0, 255, 255, 255]);
@@ -783,7 +783,7 @@ fn threshold_binary_rgb_uses_luma() {
     let mut data = vec![255_u8, 0, 0, 0, 255, 0, 0, 0, 255];
     let mut buffer = dithr::rgb_u8(&mut data, 3, 1, 9).expect("valid buffer should construct");
 
-    threshold_binary_in_place(&mut buffer, QuantizeMode::RgbBits(1), 127)
+    threshold_binary_in_place(&mut buffer, QuantizeMode::rgb_bits(1), 127)
         .expect("threshold binary should succeed");
 
     assert_eq!(data, vec![0, 0, 0, 255, 255, 255, 0, 0, 0]);
@@ -798,9 +798,9 @@ fn random_binary_same_seed_same_output() {
     let mut buffer_a = dithr::gray_u8(&mut data_a, 8, 8, 8).expect("valid buffer should construct");
     let mut buffer_b = dithr::gray_u8(&mut data_b, 8, 8, 8).expect("valid buffer should construct");
 
-    random_binary_in_place(&mut buffer_a, QuantizeMode::GrayBits(1), 42, 64)
+    random_binary_in_place(&mut buffer_a, QuantizeMode::gray_bits(1), 42, 64)
         .expect("random binary should succeed");
-    random_binary_in_place(&mut buffer_b, QuantizeMode::GrayBits(1), 42, 64)
+    random_binary_in_place(&mut buffer_b, QuantizeMode::gray_bits(1), 42, 64)
         .expect("random binary should succeed");
 
     assert_eq!(data_a, data_b);
@@ -814,9 +814,9 @@ fn random_binary_different_seed_different_output() {
     let mut buffer_a = dithr::gray_u8(&mut data_a, 8, 8, 8).expect("valid buffer should construct");
     let mut buffer_b = dithr::gray_u8(&mut data_b, 8, 8, 8).expect("valid buffer should construct");
 
-    random_binary_in_place(&mut buffer_a, QuantizeMode::GrayBits(1), 1, 127)
+    random_binary_in_place(&mut buffer_a, QuantizeMode::gray_bits(1), 1, 127)
         .expect("random binary should succeed");
-    random_binary_in_place(&mut buffer_b, QuantizeMode::GrayBits(1), 2, 127)
+    random_binary_in_place(&mut buffer_b, QuantizeMode::gray_bits(1), 2, 127)
         .expect("random binary should succeed");
 
     assert_ne!(data_a, data_b);
@@ -834,9 +834,9 @@ fn threshold_binary_parallel_matches_sequential() {
     let mut par_buffer =
         dithr::gray_u8(&mut par, 16, 16, 16).expect("valid buffer should construct");
 
-    threshold_binary_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1), 127)
+    threshold_binary_in_place(&mut seq_buffer, QuantizeMode::gray_bits(1), 127)
         .expect("sequential threshold should succeed");
-    threshold_binary_in_place_par(&mut par_buffer, QuantizeMode::GrayBits(1), 127)
+    threshold_binary_in_place_par(&mut par_buffer, QuantizeMode::gray_bits(1), 127)
         .expect("parallel threshold should succeed");
 
     assert_eq!(seq, par);
@@ -854,9 +854,9 @@ fn random_binary_parallel_matches_sequential_fixed_seed() {
     let mut par_buffer =
         dithr::gray_u8(&mut par, 16, 16, 16).expect("valid buffer should construct");
 
-    random_binary_in_place(&mut seq_buffer, QuantizeMode::GrayBits(1), 42, 64)
+    random_binary_in_place(&mut seq_buffer, QuantizeMode::gray_bits(1), 42, 64)
         .expect("sequential random should succeed");
-    random_binary_in_place_par(&mut par_buffer, QuantizeMode::GrayBits(1), 42, 64)
+    random_binary_in_place_par(&mut par_buffer, QuantizeMode::gray_bits(1), 42, 64)
         .expect("parallel random should succeed");
 
     assert_eq!(seq, par);
@@ -935,8 +935,7 @@ fn rgb32f_example_style_smoke() {
     }
 
     let mut buffer: RgbBuffer32F<'_> =
-        Buffer::new(&mut data, width, height, width * 3, PixelFormat::Rgb32F)
-            .expect("valid rgb32f buffer");
+        Buffer::new_typed(&mut data, width, height, width * 3).expect("valid rgb32f buffer");
     floyd_steinberg_in_place(&mut buffer, QuantizeMode::RgbLevels(2))
         .expect("floyd-steinberg should succeed");
 

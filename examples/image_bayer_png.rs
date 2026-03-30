@@ -13,13 +13,13 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut image = image::open(&input)?;
     match dynamic_image_as_buffer(&mut image)? {
         DynamicImageBuffer::Gray8(mut buffer) => {
-            bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1))?;
+            bayer_8x8_in_place(&mut buffer, QuantizeMode::gray_bits(1))?;
         }
         DynamicImageBuffer::Rgb8(mut buffer) => {
-            bayer_8x8_in_place(&mut buffer, QuantizeMode::RgbBits(1))?;
+            bayer_8x8_in_place(&mut buffer, QuantizeMode::rgb_bits(1))?;
         }
         DynamicImageBuffer::Rgba8(mut buffer) => {
-            bayer_8x8_in_place(&mut buffer, QuantizeMode::RgbBits(1))?;
+            bayer_8x8_in_place(&mut buffer, QuantizeMode::rgb_bits(1))?;
         }
         DynamicImageBuffer::Gray16(mut buffer) => {
             bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayLevels(2))?;

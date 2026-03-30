@@ -46,18 +46,6 @@ impl<'a> QuantizeMode<'a, u8> {
     pub fn rgb_bits(bits: u8) -> Self {
         Self::RgbLevels(bits_to_levels_compat(bits))
     }
-
-    #[allow(non_snake_case)]
-    #[must_use]
-    pub fn GrayBits(bits: u8) -> Self {
-        Self::gray_bits(bits)
-    }
-
-    #[allow(non_snake_case)]
-    #[must_use]
-    pub fn RgbBits(bits: u8) -> Self {
-        Self::rgb_bits(bits)
-    }
 }
 
 pub fn levels_from_bits(bits: u8) -> std::result::Result<u16, QuantizeError> {
@@ -212,10 +200,10 @@ fn validate_levels(levels: u16) -> Result<()> {
 }
 
 const fn bits_to_levels_compat(bits: u8) -> u16 {
-    if bits == 0 {
-        0
-    } else if bits >= 16 {
-        u16::MAX
+    if bits <= 1 {
+        2
+    } else if bits >= 8 {
+        256
     } else {
         1_u16 << bits
     }

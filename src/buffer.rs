@@ -125,7 +125,7 @@ impl<'a, S: Sample, L: PixelLayout> Buffer<'a, S, L> {
         kind: BufferKind,
     ) -> Result<Self, BufferError> {
         let buffer = Self::new_typed(data, width, height, stride)?;
-        if buffer.kind() != kind {
+        if buffer.kind()? != kind {
             return Err(BufferError::KindMismatch);
         }
         Ok(buffer)
@@ -171,7 +171,7 @@ impl<'a, S: Sample, L: PixelLayout> Buffer<'a, S, L> {
         Self::new_typed(data, width, height, stride)
     }
 
-    pub fn kind(&self) -> BufferKind {
+    pub fn kind(&self) -> Result<BufferKind, BufferError> {
         kind_for::<S, L>()
     }
 
@@ -309,18 +309,18 @@ impl<'a, S: Sample, L: PixelLayout> Buffer<'a, S, L> {
     }
 }
 
-fn kind_for<S: Sample, L: PixelLayout>() -> BufferKind {
+fn kind_for<S: Sample, L: PixelLayout>() -> Result<BufferKind, BufferError> {
     match (L::CHANNELS, L::HAS_ALPHA, S::IS_FLOAT, size_of::<S>()) {
-        (1, false, false, 1) => BufferKind::Gray8,
-        (3, false, false, 1) => BufferKind::Rgb8,
-        (4, true, false, 1) => BufferKind::Rgba8,
-        (1, false, false, 2) => BufferKind::Gray16,
-        (3, false, false, 2) => BufferKind::Rgb16,
-        (4, true, false, 2) => BufferKind::Rgba16,
-        (1, false, true, 4) => BufferKind::Gray32F,
-        (3, false, true, 4) => BufferKind::Rgb32F,
-        (4, true, true, 4) => BufferKind::Rgba32F,
-        _ => panic!("unsupported buffer kind for sample/layout combination"),
+        (1, false, false, 1) => Ok(BufferKind::Gray8),
+        (3, false, false, 1) => Ok(BufferKind::Rgb8),
+        (4, true, false, 1) => Ok(BufferKind::Rgba8),
+        (1, false, false, 2) => Ok(BufferKind::Gray16),
+        (3, false, false, 2) => Ok(BufferKind::Rgb16),
+        (4, true, false, 2) => Ok(BufferKind::Rgba16),
+        (1, false, true, 4) => Ok(BufferKind::Gray32F),
+        (3, false, true, 4) => Ok(BufferKind::Rgb32F),
+        (4, true, true, 4) => Ok(BufferKind::Rgba32F),
+        _ => Err(BufferError::KindMismatch),
     }
 }
 

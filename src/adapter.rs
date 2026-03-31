@@ -150,7 +150,10 @@ mod tests {
         assert_eq!(buffer.width, 4);
         assert_eq!(buffer.height, 3);
         assert_eq!(buffer.stride, 4);
-        assert_eq!(buffer.kind(), BufferKind::Gray8);
+        assert_eq!(
+            buffer.kind().expect("kind should resolve"),
+            BufferKind::Gray8
+        );
     }
 
     #[test]
@@ -161,7 +164,10 @@ mod tests {
         assert_eq!(buffer.width, 4);
         assert_eq!(buffer.height, 3);
         assert_eq!(buffer.stride, 4);
-        assert_eq!(buffer.kind(), BufferKind::Gray16);
+        assert_eq!(
+            buffer.kind().expect("kind should resolve"),
+            BufferKind::Gray16
+        );
     }
 
     #[test]
@@ -189,7 +195,10 @@ mod tests {
                 assert_eq!(buffer.width, 2);
                 assert_eq!(buffer.height, 2);
                 assert_eq!(buffer.stride, 6);
-                assert_eq!(buffer.kind(), BufferKind::Rgb8);
+                assert_eq!(
+                    buffer.kind().expect("kind should resolve"),
+                    BufferKind::Rgb8
+                );
             }
             _ => panic!("expected rgb8 buffer"),
         }
@@ -205,7 +214,10 @@ mod tests {
                 assert_eq!(buffer.width, 2);
                 assert_eq!(buffer.height, 2);
                 assert_eq!(buffer.stride, 2);
-                assert_eq!(buffer.kind(), BufferKind::Gray16);
+                assert_eq!(
+                    buffer.kind().expect("kind should resolve"),
+                    BufferKind::Gray16
+                );
             }
             _ => panic!("expected gray16 buffer"),
         }
@@ -221,7 +233,10 @@ mod tests {
                 assert_eq!(buffer.width, 2);
                 assert_eq!(buffer.height, 2);
                 assert_eq!(buffer.stride, 6);
-                assert_eq!(buffer.kind(), BufferKind::Rgb16);
+                assert_eq!(
+                    buffer.kind().expect("kind should resolve"),
+                    BufferKind::Rgb16
+                );
             }
             _ => panic!("expected rgb16 buffer"),
         }
@@ -237,7 +252,10 @@ mod tests {
                 assert_eq!(buffer.width, 2);
                 assert_eq!(buffer.height, 2);
                 assert_eq!(buffer.stride, 8);
-                assert_eq!(buffer.kind(), BufferKind::Rgba16);
+                assert_eq!(
+                    buffer.kind().expect("kind should resolve"),
+                    BufferKind::Rgba16
+                );
             }
             _ => panic!("expected rgba16 buffer"),
         }
@@ -253,7 +271,10 @@ mod tests {
                 assert_eq!(buffer.width, 2);
                 assert_eq!(buffer.height, 2);
                 assert_eq!(buffer.stride, 6);
-                assert_eq!(buffer.kind(), BufferKind::Rgb32F);
+                assert_eq!(
+                    buffer.kind().expect("kind should resolve"),
+                    BufferKind::Rgb32F
+                );
             }
             _ => panic!("expected rgb32f buffer"),
         }
@@ -269,7 +290,10 @@ mod tests {
                 assert_eq!(buffer.width, 2);
                 assert_eq!(buffer.height, 2);
                 assert_eq!(buffer.stride, 8);
-                assert_eq!(buffer.kind(), BufferKind::Rgba32F);
+                assert_eq!(
+                    buffer.kind().expect("kind should resolve"),
+                    BufferKind::Rgba32F
+                );
             }
             _ => panic!("expected rgba32f buffer"),
         }

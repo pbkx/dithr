@@ -176,14 +176,20 @@ fn buffer_validate_rgb32f_ok() {
 fn buffer_kind_matches_gray_u8() {
     let mut data = vec![0_u8; 16];
     let buffer = gray_u8(&mut data, 4, 4, 4).expect("valid gray u8 buffer should construct");
-    assert_eq!(buffer.kind(), PixelFormat::Gray8);
+    assert_eq!(
+        buffer.kind().expect("kind should resolve"),
+        PixelFormat::Gray8
+    );
 }
 
 #[test]
 fn buffer_kind_matches_rgb_u16() {
     let mut data = vec![0_u16; 4 * 4 * 3];
     let buffer = rgb_u16(&mut data, 4, 4, 12).expect("valid rgb u16 buffer should construct");
-    assert_eq!(buffer.kind(), PixelFormat::Rgb16);
+    assert_eq!(
+        buffer.kind().expect("kind should resolve"),
+        PixelFormat::Rgb16
+    );
 }
 
 #[test]
@@ -191,7 +197,10 @@ fn buffer_kind_matches_rgba_f32() {
     let mut data = vec![0.0_f32; 4 * 4 * 4];
     let buffer =
         dithr::rgba_32f(&mut data, 4, 4, 16).expect("valid rgba f32 buffer should construct");
-    assert_eq!(buffer.kind(), PixelFormat::Rgba32F);
+    assert_eq!(
+        buffer.kind().expect("kind should resolve"),
+        PixelFormat::Rgba32F
+    );
 }
 
 #[test]

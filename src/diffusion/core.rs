@@ -32,8 +32,8 @@ pub(crate) fn error_diffuse_in_place<S: Sample, L: PixelLayout>(
 pub(crate) fn read_pixel_with_error<S: Sample, L: PixelLayout>(
     pixel: &[S],
     err: &[f32; 4],
-) -> [f32; 4] {
-    let mut rgba = read_unit_pixel::<S, L>(pixel);
+) -> Result<[f32; 4]> {
+    let mut rgba = read_unit_pixel::<S, L>(pixel)?;
 
     for channel in 0..L::COLOR_CHANNELS {
         rgba[channel] = (rgba[channel] + err[channel]).clamp(0.0, 1.0);
@@ -44,7 +44,7 @@ pub(crate) fn read_pixel_with_error<S: Sample, L: PixelLayout>(
         rgba[2] = rgba[0];
     }
 
-    rgba
+    Ok(rgba)
 }
 
 pub(crate) fn write_quantized_pixel<S: Sample, L: PixelLayout>(pixel: &mut [S], quantized: [S; 4]) {
@@ -145,7 +145,7 @@ fn diffuse_row_major<S: Sample, L: PixelLayout>(
                 errors[err_idx + 2],
                 errors[err_idx + 3],
             ];
-            let adjusted_unit = read_pixel_with_error::<S, L>(pixel, &err);
+            let adjusted_unit = read_pixel_with_error::<S, L>(pixel, &err)?;
             let adjusted = [
                 S::from_unit_f32(adjusted_unit[0]),
                 S::from_unit_f32(adjusted_unit[1]),
@@ -153,7 +153,7 @@ fn diffuse_row_major<S: Sample, L: PixelLayout>(
                 S::from_unit_f32(adjusted_unit[3]),
             ];
             let quantized = quantize_pixel::<S, L>(&adjusted[..sample_channels], mode)?;
-            let quantized_unit = read_unit_pixel::<S, L>(&quantized[..sample_channels]);
+            let quantized_unit = read_unit_pixel::<S, L>(&quantized[..sample_channels])?;
             write_quantized_pixel::<S, L>(pixel, quantized);
 
             let residual = [

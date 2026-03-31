@@ -26,15 +26,15 @@ fn buffer_validate_gray_ok() {
 fn buffer_packed_constructors_match_expected_stride() {
     let mut gray = vec![0_u8; 4 * 3];
     let gray_buf = dithr::gray_u8_packed(&mut gray, 4, 3).expect("valid gray packed buffer");
-    assert_eq!(gray_buf.stride, 4);
+    assert_eq!(gray_buf.stride(), 4);
 
     let mut rgb = vec![0_u16; 4 * 3 * 3];
     let rgb_buf = dithr::rgb_u16_packed(&mut rgb, 4, 3).expect("valid rgb packed buffer");
-    assert_eq!(rgb_buf.stride, 12);
+    assert_eq!(rgb_buf.stride(), 12);
 
     let mut rgba = vec![0.0_f32; 4 * 3 * 4];
     let rgba_buf = dithr::rgba_32f_packed(&mut rgba, 4, 3).expect("valid rgba packed buffer");
-    assert_eq!(rgba_buf.stride, 16);
+    assert_eq!(rgba_buf.stride(), 16);
 }
 
 #[test]
@@ -369,61 +369,45 @@ fn palette_contains_true_for_member() {
 fn indexed_image8_stores_palette8() {
     let palette =
         Palette::<u8>::new(vec![[0, 0, 0], [255, 255, 255]]).expect("palette should be valid");
-    let image: IndexedImage8 = IndexedImage {
-        indices: vec![0, 1, 1, 0],
-        width: 2,
-        height: 2,
-        palette: palette.clone(),
-    };
+    let image: IndexedImage8 =
+        IndexedImage::new(vec![0, 1, 1, 0], 2, 2, palette.clone()).expect("valid indexed image");
 
-    assert_eq!(image.indices, vec![0, 1, 1, 0]);
-    assert_eq!(image.width, 2);
-    assert_eq!(image.height, 2);
-    assert_eq!(image.palette, palette);
+    assert_eq!(image.indices(), &[0, 1, 1, 0]);
+    assert_eq!(image.width(), 2);
+    assert_eq!(image.height(), 2);
+    assert_eq!(image.palette(), &palette);
 }
 
 #[test]
 fn indexed_image16_stores_palette16() {
     let palette = Palette::<u16>::new(vec![[0, 0, 0], [65_535, 65_535, 65_535]])
         .expect("palette should be valid");
-    let image: IndexedImage16 = IndexedImage {
-        indices: vec![0, 1, 1, 0],
-        width: 2,
-        height: 2,
-        palette: palette.clone(),
-    };
+    let image: IndexedImage16 =
+        IndexedImage::new(vec![0, 1, 1, 0], 2, 2, palette.clone()).expect("valid indexed image");
 
     assert_eq!(image.len(), 4);
     assert!(!image.is_empty());
-    assert_eq!(image.palette, palette);
+    assert_eq!(image.palette(), &palette);
 }
 
 #[test]
 fn indexed_image32f_stores_palette32f() {
     let palette =
         Palette::<f32>::new(vec![[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]).expect("valid palette");
-    let image: IndexedImage32F = IndexedImage {
-        indices: vec![0, 1, 1, 0],
-        width: 2,
-        height: 2,
-        palette: palette.clone(),
-    };
+    let image: IndexedImage32F =
+        IndexedImage::new(vec![0, 1, 1, 0], 2, 2, palette.clone()).expect("valid indexed image");
 
     assert_eq!(image.len(), 4);
     assert!(!image.is_empty());
-    assert_eq!(image.palette, palette);
+    assert_eq!(image.palette(), &palette);
 }
 
 #[test]
 fn indexed_image_color_at_returns_palette_color() {
     let palette = Palette::<u16>::new(vec![[0, 0, 0], [65_535, 0, 0], [0, 65_535, 0]])
         .expect("palette should be valid");
-    let image: IndexedImage16 = IndexedImage {
-        indices: vec![0, 1, 2, 1],
-        width: 2,
-        height: 2,
-        palette,
-    };
+    let image: IndexedImage16 =
+        IndexedImage::new(vec![0, 1, 2, 1], 2, 2, palette).expect("valid indexed image");
 
     assert_eq!(image.color_at(0, 0), Some([0, 0, 0]));
     assert_eq!(image.color_at(1, 0), Some([65_535, 0, 0]));
@@ -463,12 +447,8 @@ fn palette_length_256_still_allows_u8_indices() {
         })
         .collect();
     let palette = Palette::<u8>::new(colors).expect("palette should be valid");
-    let image: IndexedImage8 = IndexedImage {
-        indices: vec![0, 127, 255],
-        width: 3,
-        height: 1,
-        palette,
-    };
+    let image: IndexedImage8 =
+        IndexedImage::new(vec![0, 127, 255], 3, 1, palette).expect("valid indexed image");
 
     assert_eq!(image.color_at(0, 0), Some([0, 0, 0]));
     assert_eq!(image.color_at(1, 0), Some([127, 127, 127]));
@@ -489,18 +469,48 @@ fn quantize_gray_1bit_binary_only() {
 #[test]
 fn gray_bits_1_maps_to_gray_levels_2() {
     assert_eq!(levels_from_bits(1), Ok(2));
-    assert_eq!(QuantizeMode::gray_bits(1), QuantizeMode::GrayLevels(2));
+    assert_eq!(
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+        QuantizeMode::GrayLevels(2)
+    );
 }
 
 #[test]
 fn rgb_bits_8_maps_to_rgb_levels_256() {
     assert_eq!(levels_from_bits(8), Ok(256));
-    assert_eq!(QuantizeMode::rgb_bits(8), QuantizeMode::RgbLevels(256));
+    assert_eq!(
+        QuantizeMode::rgb_bits(8).expect("valid bit depth"),
+        QuantizeMode::RgbLevels(256)
+    );
+}
+
+#[test]
+fn gray_bits_rejects_out_of_range_values() {
+    assert_eq!(
+        QuantizeMode::gray_bits(0),
+        Err(Error::InvalidArgument("quantization bits must be in 1..=8"))
+    );
+    assert_eq!(
+        QuantizeMode::gray_bits(9),
+        Err(Error::InvalidArgument("quantization bits must be in 1..=8"))
+    );
+}
+
+#[test]
+fn rgb_bits_rejects_out_of_range_values() {
+    assert_eq!(
+        QuantizeMode::rgb_bits(0),
+        Err(Error::InvalidArgument("quantization bits must be in 1..=8"))
+    );
+    assert_eq!(
+        QuantizeMode::rgb_bits(9),
+        Err(Error::InvalidArgument("quantization bits must be in 1..=8"))
+    );
 }
 
 #[test]
 fn quantize_mode_gray_levels_is_canonical() {
-    let mode = QuantizeMode::gray_bits(4);
+    let mode = QuantizeMode::gray_bits(4).expect("valid bit depth");
     assert!(matches!(mode, QuantizeMode::GrayLevels(_)));
 }
 
@@ -716,7 +726,10 @@ fn quantize_error_sign_and_magnitude_correct() {
 
 #[test]
 fn quantize_pixel_rejects_short_slice_for_format() {
-    let result = quantize_pixel::<u8, dithr::core::Rgb>(&[10, 20], QuantizeMode::rgb_bits(2));
+    let result = quantize_pixel::<u8, dithr::core::Rgb>(
+        &[10, 20],
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    );
     assert_eq!(
         result,
         Err(Error::InvalidArgument(
@@ -781,8 +794,12 @@ fn threshold_binary_gray_threshold_127_splits_expected() {
     let mut data = vec![0_u8, 64, 127, 128, 200, 255];
     let mut buffer = dithr::gray_u8(&mut data, 6, 1, 6).expect("valid buffer should construct");
 
-    threshold_binary_in_place(&mut buffer, QuantizeMode::gray_bits(1), 127)
-        .expect("threshold binary should succeed");
+    threshold_binary_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+        127,
+    )
+    .expect("threshold binary should succeed");
 
     assert_eq!(data, vec![0, 0, 0, 255, 255, 255]);
 }
@@ -792,8 +809,12 @@ fn threshold_binary_rgb_uses_luma() {
     let mut data = vec![255_u8, 0, 0, 0, 255, 0, 0, 0, 255];
     let mut buffer = dithr::rgb_u8(&mut data, 3, 1, 9).expect("valid buffer should construct");
 
-    threshold_binary_in_place(&mut buffer, QuantizeMode::rgb_bits(1), 127)
-        .expect("threshold binary should succeed");
+    threshold_binary_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(1).expect("valid bit depth"),
+        127,
+    )
+    .expect("threshold binary should succeed");
 
     assert_eq!(data, vec![0, 0, 0, 255, 255, 255, 0, 0, 0]);
 }
@@ -807,10 +828,20 @@ fn random_binary_same_seed_same_output() {
     let mut buffer_a = dithr::gray_u8(&mut data_a, 8, 8, 8).expect("valid buffer should construct");
     let mut buffer_b = dithr::gray_u8(&mut data_b, 8, 8, 8).expect("valid buffer should construct");
 
-    random_binary_in_place(&mut buffer_a, QuantizeMode::gray_bits(1), 42, 64)
-        .expect("random binary should succeed");
-    random_binary_in_place(&mut buffer_b, QuantizeMode::gray_bits(1), 42, 64)
-        .expect("random binary should succeed");
+    random_binary_in_place(
+        &mut buffer_a,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+        42,
+        64,
+    )
+    .expect("random binary should succeed");
+    random_binary_in_place(
+        &mut buffer_b,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+        42,
+        64,
+    )
+    .expect("random binary should succeed");
 
     assert_eq!(data_a, data_b);
 }
@@ -823,10 +854,20 @@ fn random_binary_different_seed_different_output() {
     let mut buffer_a = dithr::gray_u8(&mut data_a, 8, 8, 8).expect("valid buffer should construct");
     let mut buffer_b = dithr::gray_u8(&mut data_b, 8, 8, 8).expect("valid buffer should construct");
 
-    random_binary_in_place(&mut buffer_a, QuantizeMode::gray_bits(1), 1, 127)
-        .expect("random binary should succeed");
-    random_binary_in_place(&mut buffer_b, QuantizeMode::gray_bits(1), 2, 127)
-        .expect("random binary should succeed");
+    random_binary_in_place(
+        &mut buffer_a,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+        1,
+        127,
+    )
+    .expect("random binary should succeed");
+    random_binary_in_place(
+        &mut buffer_b,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+        2,
+        127,
+    )
+    .expect("random binary should succeed");
 
     assert_ne!(data_a, data_b);
 }
@@ -843,10 +884,18 @@ fn threshold_binary_parallel_matches_sequential() {
     let mut par_buffer =
         dithr::gray_u8(&mut par, 16, 16, 16).expect("valid buffer should construct");
 
-    threshold_binary_in_place(&mut seq_buffer, QuantizeMode::gray_bits(1), 127)
-        .expect("sequential threshold should succeed");
-    threshold_binary_in_place_par(&mut par_buffer, QuantizeMode::gray_bits(1), 127)
-        .expect("parallel threshold should succeed");
+    threshold_binary_in_place(
+        &mut seq_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+        127,
+    )
+    .expect("sequential threshold should succeed");
+    threshold_binary_in_place_par(
+        &mut par_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+        127,
+    )
+    .expect("parallel threshold should succeed");
 
     assert_eq!(seq, par);
 }
@@ -863,10 +912,20 @@ fn random_binary_parallel_matches_sequential_fixed_seed() {
     let mut par_buffer =
         dithr::gray_u8(&mut par, 16, 16, 16).expect("valid buffer should construct");
 
-    random_binary_in_place(&mut seq_buffer, QuantizeMode::gray_bits(1), 42, 64)
-        .expect("sequential random should succeed");
-    random_binary_in_place_par(&mut par_buffer, QuantizeMode::gray_bits(1), 42, 64)
-        .expect("parallel random should succeed");
+    random_binary_in_place(
+        &mut seq_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+        42,
+        64,
+    )
+    .expect("sequential random should succeed");
+    random_binary_in_place_par(
+        &mut par_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+        42,
+        64,
+    )
+    .expect("parallel random should succeed");
 
     assert_eq!(seq, par);
 }

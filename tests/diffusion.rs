@@ -21,8 +21,11 @@ fn diffusion_engine_gray_binary_output_for_graybits1() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    floyd_steinberg_in_place(&mut buffer, QuantizeMode::gray_bits(1))
-        .expect("floyd-steinberg should succeed");
+    floyd_steinberg_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("floyd-steinberg should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -32,8 +35,11 @@ fn floyd_steinberg_gray_bits1_binary_only() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    floyd_steinberg_in_place(&mut buffer, QuantizeMode::gray_bits(1))
-        .expect("floyd-steinberg should succeed");
+    floyd_steinberg_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("floyd-steinberg should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -43,8 +49,11 @@ fn false_floyd_steinberg_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    false_floyd_steinberg_in_place(&mut buffer, QuantizeMode::gray_bits(1))
-        .expect("false floyd-steinberg should succeed");
+    false_floyd_steinberg_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("false floyd-steinberg should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -54,8 +63,11 @@ fn jarvis_judice_ninke_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    jarvis_judice_ninke_in_place(&mut buffer, QuantizeMode::gray_bits(1))
-        .expect("jarvis-judice-ninke should succeed");
+    jarvis_judice_ninke_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("jarvis-judice-ninke should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -65,7 +77,11 @@ fn stucki_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    stucki_in_place(&mut buffer, QuantizeMode::gray_bits(1)).expect("stucki should succeed");
+    stucki_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("stucki should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -75,7 +91,11 @@ fn burkes_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    burkes_in_place(&mut buffer, QuantizeMode::gray_bits(1)).expect("burkes should succeed");
+    burkes_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("burkes should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -85,7 +105,11 @@ fn sierra_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    sierra_in_place(&mut buffer, QuantizeMode::gray_bits(1)).expect("sierra should succeed");
+    sierra_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("sierra should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -95,8 +119,11 @@ fn two_row_sierra_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    two_row_sierra_in_place(&mut buffer, QuantizeMode::gray_bits(1))
-        .expect("two-row sierra should succeed");
+    two_row_sierra_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("two-row sierra should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -106,8 +133,11 @@ fn sierra_lite_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    sierra_lite_in_place(&mut buffer, QuantizeMode::gray_bits(1))
-        .expect("sierra lite should succeed");
+    sierra_lite_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("sierra lite should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -117,8 +147,11 @@ fn stevenson_arce_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    stevenson_arce_in_place(&mut buffer, QuantizeMode::gray_bits(1))
-        .expect("stevenson-arce should succeed");
+    stevenson_arce_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("stevenson-arce should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -128,7 +161,11 @@ fn atkinson_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    atkinson_in_place(&mut buffer, QuantizeMode::gray_bits(1)).expect("atkinson should succeed");
+    atkinson_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("atkinson should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -138,7 +175,11 @@ fn fan_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    fan_in_place(&mut buffer, QuantizeMode::gray_bits(1)).expect("fan should succeed");
+    fan_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("fan should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -148,7 +189,11 @@ fn shiau_fan_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    shiau_fan_in_place(&mut buffer, QuantizeMode::gray_bits(1)).expect("shiau-fan should succeed");
+    shiau_fan_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("shiau-fan should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -158,8 +203,11 @@ fn shiau_fan_2_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    shiau_fan_2_in_place(&mut buffer, QuantizeMode::gray_bits(1))
-        .expect("shiau-fan-2 should succeed");
+    shiau_fan_2_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("shiau-fan-2 should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -169,8 +217,11 @@ fn ostromoukhov_runs_gray() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    ostromoukhov_in_place(&mut buffer, QuantizeMode::gray_bits(1))
-        .expect("ostromoukhov should succeed");
+    ostromoukhov_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("ostromoukhov should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -180,8 +231,11 @@ fn ostromoukhov_coeff_index_in_range() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    ostromoukhov_in_place(&mut buffer, QuantizeMode::gray_bits(1))
-        .expect("ostromoukhov should succeed");
+    ostromoukhov_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("ostromoukhov should succeed");
 
     assert_eq!(data.len(), 256);
 }
@@ -191,7 +245,11 @@ fn zhou_fang_runs_gray() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    zhou_fang_in_place(&mut buffer, QuantizeMode::gray_bits(1)).expect("zhou-fang should succeed");
+    zhou_fang_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("zhou-fang should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -201,7 +259,11 @@ fn zhou_fang_modulation_in_range() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    zhou_fang_in_place(&mut buffer, QuantizeMode::gray_bits(1)).expect("zhou-fang should succeed");
+    zhou_fang_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("zhou-fang should succeed");
 
     assert_eq!(data.len(), 256);
 }
@@ -211,8 +273,11 @@ fn gradient_based_error_diffusion_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
 
-    gradient_based_error_diffusion_in_place(&mut buffer, QuantizeMode::gray_bits(1))
-        .expect("gradient-based diffusion should succeed");
+    gradient_based_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("gradient-based diffusion should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -221,7 +286,10 @@ fn gradient_based_error_diffusion_runs() {
 fn ostromoukhov_rejects_non_gray_formats() {
     let mut rgb = vec![128_u8; 4 * 4 * 3];
     let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
-    let rgb_result = ostromoukhov_in_place(&mut rgb_buffer, QuantizeMode::gray_bits(1));
+    let rgb_result = ostromoukhov_in_place(
+        &mut rgb_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
     assert!(matches!(
         rgb_result,
         Err(Error::UnsupportedFormat(
@@ -232,7 +300,10 @@ fn ostromoukhov_rejects_non_gray_formats() {
     let mut rgba = vec![128_u8; 4 * 4 * 4];
     let mut rgba_buffer =
         dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
-    let rgba_result = ostromoukhov_in_place(&mut rgba_buffer, QuantizeMode::gray_bits(1));
+    let rgba_result = ostromoukhov_in_place(
+        &mut rgba_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
     assert!(matches!(
         rgba_result,
         Err(Error::UnsupportedFormat(
@@ -245,7 +316,10 @@ fn ostromoukhov_rejects_non_gray_formats() {
 fn zhou_fang_rejects_non_gray_formats() {
     let mut rgb = vec![128_u8; 4 * 4 * 3];
     let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
-    let rgb_result = zhou_fang_in_place(&mut rgb_buffer, QuantizeMode::gray_bits(1));
+    let rgb_result = zhou_fang_in_place(
+        &mut rgb_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
     assert!(matches!(
         rgb_result,
         Err(Error::UnsupportedFormat(
@@ -256,7 +330,10 @@ fn zhou_fang_rejects_non_gray_formats() {
     let mut rgba = vec![128_u8; 4 * 4 * 4];
     let mut rgba_buffer =
         dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
-    let rgba_result = zhou_fang_in_place(&mut rgba_buffer, QuantizeMode::gray_bits(1));
+    let rgba_result = zhou_fang_in_place(
+        &mut rgba_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
     assert!(matches!(
         rgba_result,
         Err(Error::UnsupportedFormat(
@@ -269,8 +346,10 @@ fn zhou_fang_rejects_non_gray_formats() {
 fn gradient_based_error_diffusion_rejects_non_gray_formats() {
     let mut rgb = vec![128_u8; 4 * 4 * 3];
     let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
-    let rgb_result =
-        gradient_based_error_diffusion_in_place(&mut rgb_buffer, QuantizeMode::gray_bits(1));
+    let rgb_result = gradient_based_error_diffusion_in_place(
+        &mut rgb_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
     assert!(matches!(
         rgb_result,
         Err(Error::UnsupportedFormat(
@@ -281,8 +360,10 @@ fn gradient_based_error_diffusion_rejects_non_gray_formats() {
     let mut rgba = vec![128_u8; 4 * 4 * 4];
     let mut rgba_buffer =
         dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
-    let rgba_result =
-        gradient_based_error_diffusion_in_place(&mut rgba_buffer, QuantizeMode::gray_bits(1));
+    let rgba_result = gradient_based_error_diffusion_in_place(
+        &mut rgba_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
     assert!(matches!(
         rgba_result,
         Err(Error::UnsupportedFormat(
@@ -325,8 +406,11 @@ fn diffusion_engine_preserves_alpha() {
     let before_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
     let mut buffer = dithr::rgba_u8(&mut data, 6, 5, 24).expect("valid buffer should construct");
 
-    floyd_steinberg_in_place(&mut buffer, QuantizeMode::rgb_bits(2))
-        .expect("floyd-steinberg should succeed");
+    floyd_steinberg_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("floyd-steinberg should succeed");
 
     let after_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
     assert_eq!(before_alpha, after_alpha);
@@ -337,8 +421,11 @@ fn diffusion_engine_does_not_panic_on_1x1() {
     let mut data = vec![128_u8];
     let mut buffer = dithr::gray_u8(&mut data, 1, 1, 1).expect("valid buffer should construct");
 
-    floyd_steinberg_in_place(&mut buffer, QuantizeMode::gray_bits(1))
-        .expect("floyd-steinberg should succeed");
+    floyd_steinberg_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("floyd-steinberg should succeed");
 
     assert_eq!(data.len(), 1);
 }
@@ -354,10 +441,16 @@ fn diffusion_engine_is_deterministic() {
     let mut buffer_a = dithr::rgb_u8(&mut a, 8, 6, 24).expect("valid buffer should construct");
     let mut buffer_b = dithr::rgb_u8(&mut b, 8, 6, 24).expect("valid buffer should construct");
 
-    floyd_steinberg_in_place(&mut buffer_a, QuantizeMode::rgb_bits(3))
-        .expect("floyd-steinberg should succeed");
-    floyd_steinberg_in_place(&mut buffer_b, QuantizeMode::rgb_bits(3))
-        .expect("floyd-steinberg should succeed");
+    floyd_steinberg_in_place(
+        &mut buffer_a,
+        QuantizeMode::rgb_bits(3).expect("valid bit depth"),
+    )
+    .expect("floyd-steinberg should succeed");
+    floyd_steinberg_in_place(
+        &mut buffer_b,
+        QuantizeMode::rgb_bits(3).expect("valid bit depth"),
+    )
+    .expect("floyd-steinberg should succeed");
 
     assert_eq!(a, b);
 }

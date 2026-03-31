@@ -30,10 +30,10 @@ impl std::error::Error for PaletteError {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IndexedImage<S: Sample = u8> {
-    pub indices: Vec<u8>,
-    pub width: usize,
-    pub height: usize,
-    pub palette: Palette<S>,
+    pub(crate) indices: Vec<u8>,
+    pub(crate) width: usize,
+    pub(crate) height: usize,
+    pub(crate) palette: Palette<S>,
 }
 
 impl<S: Sample + Eq> Eq for IndexedImage<S> {}
@@ -165,6 +165,26 @@ impl<S: Sample> IndexedImage<S> {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.indices.is_empty()
+    }
+
+    #[must_use]
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    #[must_use]
+    pub fn height(&self) -> usize {
+        self.height
+    }
+
+    #[must_use]
+    pub fn indices(&self) -> &[u8] {
+        &self.indices
+    }
+
+    #[must_use]
+    pub fn palette(&self) -> &Palette<S> {
+        &self.palette
     }
 
     #[must_use]

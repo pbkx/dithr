@@ -93,10 +93,10 @@ impl std::fmt::Display for BufferError {
 impl std::error::Error for BufferError {}
 
 pub struct Buffer<'a, S: Sample, L: PixelLayout> {
-    pub data: &'a mut [S],
-    pub width: usize,
-    pub height: usize,
-    pub stride: usize,
+    pub(crate) data: &'a mut [S],
+    pub(crate) width: usize,
+    pub(crate) height: usize,
+    pub(crate) stride: usize,
     _layout: PhantomData<L>,
 }
 
@@ -173,6 +173,30 @@ impl<'a, S: Sample, L: PixelLayout> Buffer<'a, S, L> {
 
     pub fn kind(&self) -> Result<BufferKind, BufferError> {
         kind_for::<S, L>()
+    }
+
+    #[must_use]
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    #[must_use]
+    pub fn height(&self) -> usize {
+        self.height
+    }
+
+    #[must_use]
+    pub fn stride(&self) -> usize {
+        self.stride
+    }
+
+    #[must_use]
+    pub fn data(&self) -> &[S] {
+        self.data
+    }
+
+    pub fn data_mut(&mut self) -> &mut [S] {
+        self.data
     }
 
     pub fn width_bytes(&self) -> Result<usize, BufferError> {

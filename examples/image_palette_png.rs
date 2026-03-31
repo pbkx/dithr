@@ -53,7 +53,10 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     match dynamic_image_as_buffer(&mut image)? {
         DynamicImageBuffer::Gray8(mut buffer) => {
-            floyd_steinberg_in_place(&mut buffer, QuantizeMode::gray_bits(1))?;
+            floyd_steinberg_in_place(
+                &mut buffer,
+                QuantizeMode::gray_bits(1).expect("valid bit depth"),
+            )?;
         }
         DynamicImageBuffer::Rgb8(mut buffer) => {
             yliluoma_2_in_place(&mut buffer, &palette8)?;

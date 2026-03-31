@@ -88,7 +88,7 @@ fn ordered_dither_row<S: Sample, L: PixelLayout>(
     mode: QuantizeMode<'_, S>,
 ) -> Result<()> {
     for x in 0..width {
-        let threshold = ordered_threshold_for_xy(x, y, ctx.map, ctx.map_w, ctx.map_h);
+        let threshold = ordered_threshold_for_xy(x, y, ctx.map, ctx.map_w, ctx.map_h)?;
         let threshold_rank = threshold.saturating_sub(ctx.map_min);
         let offset = x.checked_mul(L::CHANNELS).ok_or(BufferError::OutOfBounds)?;
         let end = offset
@@ -140,7 +140,7 @@ fn ordered_apply_pixel_with_strength<S: Sample, L: PixelLayout>(
     }
 
     let preserved_alpha = alpha_index::<L>().and_then(|idx| pixel.get(idx).copied());
-    let mut rgba = read_unit_pixel::<S, L>(pixel);
+    let mut rgba = read_unit_pixel::<S, L>(pixel)?;
     let threshold = ordered_threshold_unit(threshold_rank, threshold_den, strength);
     for channel in rgba.iter_mut().take(3) {
         *channel = (*channel + threshold).clamp(0.0, 1.0);
@@ -178,14 +178,29 @@ pub(crate) fn ordered_threshold_for_xy(
     map: &[u16],
     map_w: usize,
     map_h: usize,
-) -> u16 {
-    debug_assert!(map_w > 0);
-    debug_assert!(map_h > 0);
-    debug_assert_eq!(map.len(), map_w * map_h);
-
+) -> Result<u16> {
+    if map_w == 0 || map_h == 0 {
+        return Err(Error::InvalidArgument(
+            "ordered map dimensions must be positive",
+        ));
+    }
+    let expected_len = map_w
+        .checked_mul(map_h)
+        .ok_or(Error::InvalidArgument("ordered map dimensions overflow"))?;
+    if map.len() != expected_len {
+        return Err(Error::InvalidArgument(
+            "ordered map length must match dimensions",
+        ));
+    }
     let map_x = x % map_w;
     let map_y = y % map_h;
-    map[map_y * map_w + map_x]
+    let idx = map_y
+        .checked_mul(map_w)
+        .and_then(|base| base.checked_add(map_x))
+        .ok_or(Error::InvalidArgument("ordered map indexing overflow"))?;
+    map.get(idx)
+        .copied()
+        .ok_or(Error::InvalidArgument("ordered map index out of bounds"))
 }
 
 fn validate_map(map: &[u16], map_w: usize, map_h: usize) -> Result<(u16, u16)> {
@@ -219,4 +234,32 @@ fn validate_map(map: &[u16], map_w: usize, map_h: usize) -> Result<(u16, u16)> {
 
 const fn ordered_layout_supported<L: PixelLayout>() -> bool {
     (L::HAS_ALPHA && L::CHANNELS == 4) || (!L::HAS_ALPHA && (L::CHANNELS == 1 || L::CHANNELS == 3))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ordered_threshold_for_xy;
+    use crate::Error;
+
+    #[test]
+    fn ordered_threshold_rejects_zero_dimensions() {
+        let map = [0_u16, 1, 2, 3];
+        assert_eq!(
+            ordered_threshold_for_xy(0, 0, &map, 0, 2),
+            Err(Error::InvalidArgument(
+                "ordered map dimensions must be positive"
+            ))
+        );
+    }
+
+    #[test]
+    fn ordered_threshold_rejects_mismatched_map_length() {
+        let map = [0_u16, 1, 2];
+        assert_eq!(
+            ordered_threshold_for_xy(0, 0, &map, 2, 2),
+            Err(Error::InvalidArgument(
+                "ordered map length must match dimensions"
+            ))
+        );
+    }
 }

@@ -164,7 +164,7 @@ fn stochastic_apply_pixel<S: Sample, L: PixelLayout>(
     }
 
     let threshold = threshold.clamp(0.0, 1.0);
-    let rgba = read_unit_pixel::<S, L>(pixel);
+    let rgba = read_unit_pixel::<S, L>(pixel)?;
     let luma = if L::COLOR_CHANNELS == 1 {
         rgba[0]
     } else {

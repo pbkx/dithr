@@ -77,7 +77,7 @@ fn diffuse_gradient_gray<S: Sample, L: PixelLayout>(
                 errors[err_idx + 2],
                 errors[err_idx + 3],
             ];
-            let adjusted = read_pixel_with_error::<S, L>(pixel, &err)[0];
+            let adjusted = read_pixel_with_error::<S, L>(pixel, &err)?[0];
             let quantized =
                 quantize_pixel::<S, crate::core::Gray>(&[S::from_unit_f32(adjusted)], mode)?;
             write_quantized_pixel::<S, L>(pixel, quantized);
@@ -151,7 +151,7 @@ fn diffuse_variable_gray<S: Sample, L: PixelLayout>(
                     errors[err_idx + 2],
                     errors[err_idx + 3],
                 ];
-                let adjusted = read_pixel_with_error::<S, L>(pixel, &err)[0];
+                let adjusted = read_pixel_with_error::<S, L>(pixel, &err)?[0];
                 let thresholded = if let Some(table) = modulation {
                     zhou_fang_thresholded_unit(adjusted, x, y, table)
                 } else {
@@ -205,7 +205,7 @@ fn diffuse_variable_gray<S: Sample, L: PixelLayout>(
                     errors[err_idx + 2],
                     errors[err_idx + 3],
                 ];
-                let adjusted = read_pixel_with_error::<S, L>(pixel, &err)[0];
+                let adjusted = read_pixel_with_error::<S, L>(pixel, &err)?[0];
                 let thresholded = if let Some(table) = modulation {
                     zhou_fang_thresholded_unit(adjusted, x, y, table)
                 } else {

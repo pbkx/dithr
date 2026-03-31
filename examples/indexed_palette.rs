@@ -32,14 +32,9 @@ fn main() -> Result<()> {
         indices.push(palette.nearest_rgb_index(rgb) as u8);
     }
 
-    let indexed = IndexedImage {
-        indices,
-        width,
-        height,
-        palette: palette.clone(),
-    };
+    let indexed = IndexedImage::new(indices, width, height, palette.clone())?;
     let used = indexed
-        .indices
+        .indices()
         .iter()
         .copied()
         .collect::<BTreeSet<_>>()
@@ -47,8 +42,8 @@ fn main() -> Result<()> {
 
     println!(
         "pixels={} palette_entries={} used_indices={}",
-        indexed.indices.len(),
-        indexed.palette.len(),
+        indexed.indices().len(),
+        indexed.palette().len(),
         used
     );
     Ok(())

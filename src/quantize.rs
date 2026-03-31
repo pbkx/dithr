@@ -37,14 +37,12 @@ impl<'a, S: Sample> QuantizeMode<'a, S> {
 }
 
 impl<'a> QuantizeMode<'a, u8> {
-    #[must_use]
-    pub fn gray_bits(bits: u8) -> Self {
-        Self::GrayLevels(bits_to_levels_compat(bits))
+    pub fn gray_bits(bits: u8) -> Result<Self> {
+        Ok(Self::GrayLevels(levels_from_bits(bits)?))
     }
 
-    #[must_use]
-    pub fn rgb_bits(bits: u8) -> Self {
-        Self::RgbLevels(bits_to_levels_compat(bits))
+    pub fn rgb_bits(bits: u8) -> Result<Self> {
+        Ok(Self::RgbLevels(levels_from_bits(bits)?))
     }
 }
 
@@ -85,7 +83,7 @@ pub fn quantize_pixel<S: Sample, L: PixelLayout>(
         ));
     }
 
-    let rgba = read_unit_pixel::<S, L>(pixel);
+    let rgba = read_unit_pixel::<S, L>(pixel)?;
     let rgb = [rgba[0], rgba[1], rgba[2]];
 
     let out = match mode {
@@ -196,15 +194,5 @@ fn validate_levels(levels: u16) -> Result<()> {
         Err(Error::InvalidArgument(
             "quantization levels must be in 2..=65535",
         ))
-    }
-}
-
-const fn bits_to_levels_compat(bits: u8) -> u16 {
-    if bits <= 1 {
-        2
-    } else if bits >= 8 {
-        256
-    } else {
-        1_u16 << bits
     }
 }

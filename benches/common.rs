@@ -284,11 +284,11 @@ pub fn palette_16_gray() -> Palette {
 }
 
 pub fn mode_gray_1() -> QuantizeMode<'static> {
-    QuantizeMode::gray_bits(1)
+    QuantizeMode::gray_bits(1).expect("valid bit depth")
 }
 
 pub fn mode_gray_2() -> QuantizeMode<'static> {
-    QuantizeMode::gray_bits(2)
+    QuantizeMode::gray_bits(2).expect("valid bit depth")
 }
 
 #[allow(dead_code)]
@@ -297,7 +297,7 @@ pub fn mode_gray_levels2_u16() -> QuantizeMode<'static, u16> {
 }
 
 pub fn mode_rgb_bits3() -> QuantizeMode<'static> {
-    QuantizeMode::rgb_bits(3)
+    QuantizeMode::rgb_bits(3).expect("valid bit depth")
 }
 
 pub fn mode_palette_bw() -> QuantizeMode<'static> {

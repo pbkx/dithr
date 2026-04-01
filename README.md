@@ -1,232 +1,319 @@
-# dithr
+dithr
+crates.io
 
-[![crates.io](https://img.shields.io/crates/v/dithr.svg)](https://crates.io/crates/dithr)
-
+<!-- image placeholder --> <!-- ![Before/after dithering](before_after_dither.png) --> <!-- _Before (top) and after (bottom) dithering._ -->
 buffer-first rust dithering and halftoning library.
 
-core crate provides in-memory pixel transforms:
+Quantizing grayscale/RGB/RGBA buffers without dithering creates visible banding and contouring. dithr provides deterministic ordered dithering, diffusion, stochastic binary methods, palette-constrained workflows, and advanced halftoning methods over typed mutable slices.
 
-- generic core over sample/layout abstractions
-- concrete ergonomic APIs for `u8`, `u16`, and `f32`
-- deterministic ordered dithering, error diffusion, stochastic dithering, and advanced halftoning
-- optional `rayon` parallel paths for ordered and binary stochastic families
-- optional `image` adapters for zero-copy conversion from `DynamicImage` variants
-
-# install instructions
-
-for crates.io:
-```cargo add dithr```
-
-from git:
-```cargo add dithr --git https://github.com/pbkx/dithr```
-
-# build instructions
-
-dependencies are: rust>=1.75.0
-
-```
-git clone https://github.com/pbkx/dithr
-cd dithr
-cargo build --release
-cargo test --all-features
-```
-
-# usage
-
-```rust
-use dithr::{bayer_8x8_in_place, Buffer, PixelFormat, QuantizeMode, Result};
+Overview
+Buffer-first API: Works directly on mutable pixel slices with explicit width, height, and stride.
+Typed formats: Supports u8, u16, and f32 sample types across Gray, Rgb, and Rgba layouts.
+Quantization control: Uses QuantizeMode for grayscale levels, RGB levels, palette mapping, or single-color workflows.
+Broad algorithm coverage: Includes stochastic, ordered, palette-oriented ordered, diffusion, variable diffusion, and advanced halftoning families.
+Palette workflow: Includes Palette<S> and IndexedImage<S> for constrained output and indexed results.
+Optional integrations: image adapters for DynamicImage workflows and rayon parallel wrappers for selected families.
+Installation
+[dependencies]
+dithr = "0.1"
+[dependencies]
+dithr = { git = "https://github.com/pbkx/dithr" }
+Quick Start
+use dithr::{bayer_8x8_in_place, gray_u8, QuantizeMode, Result};
 
 fn main() -> Result<()> {
-    let width = 16;
-    let height = 16;
-    let mut data = (0_u16..256).map(|v| v as u8).collect::<Vec<_>>();
+    let width = 64_usize;
+    let height = 64_usize;
+    let mut data = Vec::with_capacity(width * height);
 
-    let mut buffer = Buffer::new(&mut data, width, height, width, PixelFormat::Gray8)?;
-    bayer_8x8_in_place(&mut buffer, QuantizeMode::GrayBits(1))?;
+    for y in 0..height {
+        for x in 0..width {
+            let value = ((x + y * width) * 255 / (width * height - 1)) as u8;
+            data.push(value);
+        }
+    }
 
+    let mut buffer = gray_u8(&mut data, width, height, width)?;
+    bayer_8x8_in_place(&mut buffer, QuantizeMode::gray_bits(1)?)?;
+
+    assert!(data.iter().all(|&v| v == 0 || v == 255));
     Ok(())
 }
-```
+Core Data Model
+dithr is organized around a small set of types that are shared across algorithm families.
 
-core types:
+Buffer<'a, S, L>: Mutable typed view of image data (S = sample type, L = layout).
+BufferKind / PixelFormat: Runtime format metadata (PixelFormat is an alias of BufferKind).
+Palette<S>: Palette storage for fixed-color workflows (1 to 256 entries).
+IndexedImage<S>: Indexed output (Vec<u8> indices) paired with a typed palette.
+QuantizeMode<'a, S>: Common quantization target model used by ordered/diffusion/stochastic/dot/Riemersma families.
+Error / Result<T>: Crate-level error and result surface.
+Typed Buffers, Sample Types, and Layouts
+Supported runtime kinds:
 
-- `Buffer`
-- `PixelFormat`
-- `Palette`
-- `IndexedImage`
-- `QuantizeMode`
-- `Error`
-- `Result`
+Gray8, Rgb8, Rgba8
+Gray16, Rgb16, Rgba16
+Gray32F, Rgb32F, Rgba32F
+Typed buffer aliases:
 
-pixel formats:
+GrayBuffer8, RgbBuffer8, RgbaBuffer8
+GrayBuffer16, RgbBuffer16, RgbaBuffer16
+GrayBuffer32F, RgbBuffer32F, RgbaBuffer32F
+Constructor helpers:
 
-- `Gray8`, `Rgb8`, `Rgba8`
-- `Gray16`, `Rgb16`, `Rgba16`
-- `Rgb32F`, `Rgba32F`
+Gray: gray_u8, gray_u16, gray_32f
+Rgb: rgb_u8, rgb_u16, rgb_32f
+Rgba: rgba_u8, rgba_u16, rgba_32f
+Packed variants: gray_u8_packed, rgb_u16_packed, rgba_32f_packed, etc.
+Generic constructors remain available on Buffer:
 
-quantize modes:
+Buffer::new_typed(...)
+Buffer::new_packed_typed(...)
+Compatibility constructors with runtime kind checking:
+Buffer::new(...)
+Buffer::new_packed(...)
+Choosing a Quantization Mode
+QuantizeMode<'a, S> is the canonical quantization model:
 
-- `GrayBits(bits)` / `GrayLevels(levels)`
-- `RgbBits(bits)` / `RgbLevels(levels)`
-- `Palette(&Palette<_>)`
-- `SingleColor { fg, levels }`
+GrayLevels(u16)
+RgbLevels(u16)
+Palette(&Palette<S>)
+SingleColor { fg: [S; 3], levels: u16 }
+Convenience constructors:
 
-algorithm families:
+Generic:
+QuantizeMode::gray_levels(levels)
+QuantizeMode::rgb_levels(levels)
+QuantizeMode::palette(&palette)
+QuantizeMode::single_color(fg, levels)
+u8 compatibility helpers:
+QuantizeMode::gray_bits(bits)
+QuantizeMode::rgb_bits(bits)
+Shared conversion helper:
+levels_from_bits(bits)
+Use GrayLevels/gray_bits when output should be grayscale levels, RgbLevels/rgb_bits for uniform per-channel color quantization, Palette for strict membership in a fixed color set, and SingleColor for foreground-scaled tonal output.
 
-- stochastic: `threshold_binary_in_place`, `random_binary_in_place`
-- ordered: Bayer, cluster-dot, custom ordered, Yliluoma 1/2/3
-- classic diffusion: Floyd-Steinberg, JJN, Stucki, Burkes, Sierra variants, Stevenson-Arce, Atkinson
-- extended diffusion: Fan, Shiau-Fan, Shiau-Fan-2
-- variable diffusion: Ostromoukhov, Zhou-Fang, gradient-based diffusion
-- other families: Riemersma, Knuth dot diffusion, DBS, lattice-Boltzmann, electrostatic
+Dithering and Halftoning Method Families
+Binary stochastic
+Fast binary dithering with fixed or randomized threshold behavior.
 
-format support notes:
+threshold_binary_in_place
+random_binary_in_place
+compatibility aliases: threshold_in_place, random_in_place
+Parallel variants (rayon feature):
 
-- `ostromoukhov_in_place`, `zhou_fang_in_place`, and `gradient_based_error_diffusion_in_place` are grayscale-only
-- `direct_binary_search_in_place`, `lattice_boltzmann_in_place`, and `electrostatic_halftoning_in_place` are grayscale-first research-grade methods
+threshold_binary_in_place_par
+random_binary_in_place_par
+Ordered methods
+Deterministic threshold-map methods with predictable structure and straightforward benchmarking.
 
-optional image adapters:
+Bayer:
 
-- `GrayImage`, `RgbImage`, `RgbaImage`
-- `ImageLuma16`, `ImageRgb16`, `ImageRgba16`
-- `ImageRgb32F`, `ImageRgba32F`
+bayer_2x2_in_place
+bayer_4x4_in_place
+bayer_8x8_in_place
+bayer_16x16_in_place
+Cluster-dot:
 
-# basic example usage
+cluster_dot_4x4_in_place
+cluster_dot_8x8_in_place
+Custom map:
 
-```
-$ cargo run --example gray_buffer
-pixels=256 black=128 white=128
+custom_ordered_in_place
+Parallel variants (rayon feature):
 
-$ cargo run --example rgb_buffer
-pixels=4096 binary_channels=true
+bayer_2x2_in_place_par
+bayer_4x4_in_place_par
+bayer_8x8_in_place_par
+bayer_16x16_in_place_par
+cluster_dot_4x4_in_place_par
+cluster_dot_8x8_in_place_par
+custom_ordered_in_place_par
+Palette-oriented ordered (Yliluoma)
+Ordered methods designed for fixed-palette workflows.
 
-$ cargo run --example indexed_palette
-pixels=1024 palette_entries=4 used_indices=4
+yliluoma_1_in_place
+yliluoma_2_in_place
+yliluoma_3_in_place
+Classic diffusion
+Scanline error diffusion kernels for higher local tonal quality.
 
-$ cargo run --example image_bayer_png --features image -- input.png output.png
-wrote output.png
+floyd_steinberg_in_place
+false_floyd_steinberg_in_place
+jarvis_judice_ninke_in_place
+stucki_in_place
+burkes_in_place
+sierra_in_place
+two_row_sierra_in_place
+sierra_lite_in_place
+stevenson_arce_in_place
+atkinson_in_place
+Extended diffusion
+Additional diffusion kernels with different spread patterns.
 
-$ cargo run --example image_palette_png --features image -- input.png output.png
-wrote output.png
-```
+fan_in_place
+shiau_fan_in_place
+shiau_fan_2_in_place
+Variable diffusion
+Tone-dependent coefficient families.
 
-# more advanced usage
+ostromoukhov_in_place
+zhou_fang_in_place
+gradient_based_error_diffusion_in_place
+Scope note: variable diffusion methods are grayscale-only.
 
-```rust
-use dithr::{
-    floyd_steinberg_in_place, random_binary_in_place, Buffer, Palette, PixelFormat, QuantizeMode,
-    Result,
-};
+Advanced halftoning
+Specialized methods with narrower scope than the ordered/diffusion baseline.
+
+riemersma_in_place
+knuth_dot_diffusion_in_place
+direct_binary_search_in_place
+lattice_boltzmann_in_place
+electrostatic_halftoning_in_place
+Scope notes:
+
+direct_binary_search_in_place, lattice_boltzmann_in_place, and electrostatic_halftoning_in_place require integer grayscale buffers.
+riemersma_in_place and knuth_dot_diffusion_in_place support Gray/Rgb/Rgba layouts, with alpha preserved for Rgba paths.
+Palette Workflow
+dithr keeps palette workflows explicit: define a palette, dither into it, and optionally build indexed output.
+
+use dithr::{rgb_u8, yliluoma_1_in_place, IndexedImage, Palette, Result};
 
 fn main() -> Result<()> {
-    let width = 128;
-    let height = 128;
-    let mut rgb = vec![0_u8; width * height * 3];
+    let width = 32_usize;
+    let height = 32_usize;
+    let mut data = vec![0_u8; width * height * 3];
 
     for y in 0..height {
         for x in 0..width {
             let i = (y * width + x) * 3;
-            rgb[i] = (x * 255 / (width - 1)) as u8;
-            rgb[i + 1] = (y * 255 / (height - 1)) as u8;
-            rgb[i + 2] = ((x + y) * 255 / (width + height - 2)) as u8;
+            data[i] = (x * 255 / (width - 1)) as u8;
+            data[i + 1] = (y * 255 / (height - 1)) as u8;
+            data[i + 2] = ((x + y) * 255 / (width + height - 2)) as u8;
         }
     }
 
     let palette = Palette::new(vec![
         [0, 0, 0],
         [255, 255, 255],
-        [255, 85, 85],
-        [85, 170, 255],
+        [255, 0, 0],
+        [0, 0, 255],
     ])?;
 
-    let mut rgb_buffer = Buffer::new(&mut rgb, width, height, width * 3, PixelFormat::Rgb8)?;
-    floyd_steinberg_in_place(&mut rgb_buffer, QuantizeMode::Palette(&palette))?;
+    let mut buffer = rgb_u8(&mut data, width, height, width * 3)?;
+    yliluoma_1_in_place(&mut buffer, &palette)?;
 
-    let mut gray = (0..(width * height))
-        .map(|i| (i * 255 / (width * height - 1)) as u8)
-        .collect::<Vec<_>>();
-    let mut gray_buffer = Buffer::new(&mut gray, width, height, width, PixelFormat::Gray8)?;
-    random_binary_in_place(&mut gray_buffer, QuantizeMode::GrayBits(1), 42, 64)?;
+    let mut indices = Vec::with_capacity(width * height);
+    for px in data.chunks_exact(3) {
+        indices.push(palette.nearest_rgb_index([px[0], px[1], px[2]]) as u8);
+    }
+
+    let indexed = IndexedImage::new(indices, width, height, palette)?;
+    assert_eq!(indexed.len(), width * height);
 
     Ok(())
 }
-```
+Built-in palette helpers are also exported:
 
-# examples
+cga_palette()
+grayscale_2()
+grayscale_4()
+grayscale_16()
+Optional image Integration
+Enable image to adapt image crate buffers into dithr buffers.
 
-raw buffer examples:
+Typed adapters:
 
-```
+gray8_image_as_buffer
+rgb8_image_as_buffer
+rgba8_image_as_buffer
+gray16_image_as_buffer
+rgb16_image_as_buffer
+rgba16_image_as_buffer
+rgb32f_image_as_buffer
+rgba32f_image_as_buffer
+Dynamic adapter:
+
+dynamic_image_as_buffer(&mut image::DynamicImage) -> Result<DynamicImageBuffer<'_>>
+Dynamic variants:
+
+DynamicImageBuffer::Gray8
+DynamicImageBuffer::Rgb8
+DynamicImageBuffer::Rgba8
+DynamicImageBuffer::Gray16
+DynamicImageBuffer::Rgb16
+DynamicImageBuffer::Rgba16
+DynamicImageBuffer::Rgb32F
+DynamicImageBuffer::Rgba32F
+Current manifest configuration enables PNG and JPEG codecs for the optional image dependency.
+
+Optional rayon Integration
+Enable rayon for parallel wrappers where available.
+
+Parallelized families:
+
+Ordered: all *_in_place_par ordered wrappers
+Binary stochastic: threshold_binary_in_place_par, random_binary_in_place_par
+Current serial-only families:
+
+Yliluoma
+Diffusion (classic/extended/variable)
+Advanced halftoning
+Example Programs
+Raw buffer workflows:
+
 cargo run --example gray_buffer
 cargo run --example rgb_buffer
 cargo run --example indexed_palette
-```
+Image workflows (image feature):
 
-image workflow examples:
-
-```
 cargo run --example image_bayer_png --features image -- input.png output.png
 cargo run --example image_palette_png --features image -- input.png output.png
-```
+Benchmarks and Development
+Bench families (criterion):
 
-# benchmarks
-
-criterion benches are split by family:
-
-- stochastic
-- ordered
-- yliluoma
-- diffusion
-- advanced
-
-commands:
-
-```
+stochastic
+ordered
+yliluoma
+diffusion
+advanced
 cargo bench --no-run
 cargo bench --bench stochastic
 cargo bench --bench ordered
 cargo bench --bench yliluoma
 cargo bench --bench diffusion
 cargo bench --bench advanced
-```
+Development checks:
 
-with rayon:
-
-```
-cargo bench --features rayon --no-run
-```
-
-# tests
-
-```
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace --all-targets --all-features
-```
-
-test layout:
-
-- `tests/basic.rs`
-- `tests/ordered.rs`
-- `tests/diffusion.rs`
-- `tests/advanced.rs`
-- `tests/golden.rs`
-
-golden tests use deterministic fixtures and fnv-1a hashes for stable u8 regression locking.
-
-# references
-
-|     | source |
-| --- | --- |
-| [1] | Dither<br>https://en.wikipedia.org/wiki/Dither |
-| [2] | Ordered dithering<br>https://en.wikipedia.org/wiki/Ordered_dithering |
-| [3] | Error diffusion<br>https://en.wikipedia.org/wiki/Error_diffusion |
-| [4] | Yliluoma positional dithering<br>https://bisqwit.iki.fi/story/howto/dither/jy/ |
-| [5] | Dithering eleven algorithms<br>https://tannerhelland.com/2012/12/28/dithering-eleven-algorithms-source-code.html |
-| [7] | Ostromoukhov variable-coefficient error diffusion<br>https://www.iro.umontreal.ca/~ostrom/publications/pdf/SIGGRAPH01_varcoeffED.pdf<br>https://doi.org/10.1145/383259.383326 |
-| [8] | Zhou-Fang threshold modulation<br>https://history.siggraph.org/learning/improving-mid-tone-quality-of-variable-coefficient-error-diffusion-using-threshold-modulation-by-zhou-and-fang/ |
-| [9] | Riemersma dithering<br>https://www.compuphase.com/riemer.htm |
-| [10] | Knuth dot diffusion<br>https://dl.acm.org/doi/10.1145/35039.35040<br>https://doi.org/10.2352/ISSN.2169-4451.1999.15.1.art00091_1 |
-| [11] | Direct binary search halftoning<br>https://www.spiedigitallibrary.org/conference-proceedings-of-spie/1666/1/Model-based-halftoning-using-direct-binary-search/10.1117/12.135959.full<br>https://doi.org/10.1117/12.135959<br>https://doi.org/10.1109/MSP.2003.1215228 |
-| [12] | Lattice-Boltzmann halftoning<br>https://www.mia.uni-saarland.de/Publications/hagenburg-isvc09.pdf<br>https://dblp.org/rec/conf/isvc/HagenburgBVWW09 |
-| [13] | Electrostatic halftoning<br>https://onlinelibrary.wiley.com/doi/10.1111/j.1467-8659.2010.01716.x<br>https://www.mia.uni-saarland.de/Research/Electrostatic_Halftoning/model.shtml<br>https://www.mia.uni-saarland.de/Research/Electrostatic_Halftoning/algorithm.shtml |
+cargo check --all-features
+cargo test --workspace --all-features --lib --tests --examples
+cargo test --doc --all-features
+Limitations and Scope
+Core processing is in-memory and buffer-first; it does not provide general image editing workflows.
+Not every algorithm supports every format/layout/sample combination.
+Variable diffusion methods are grayscale-only.
+direct_binary_search_in_place, lattice_boltzmann_in_place, and electrostatic_halftoning_in_place are integer grayscale-only.
+dynamic_image_as_buffer does not support DynamicImage LumaA variants.
+Parallel wrappers are currently provided for ordered and binary stochastic families.
+References
+Dither: https://en.wikipedia.org/wiki/Dither
+Ordered dithering: https://en.wikipedia.org/wiki/Ordered_dithering
+Error diffusion: https://en.wikipedia.org/wiki/Error_diffusion
+Yliluoma positional dithering: http://bisqwit.iki.fi/story/howto/dither/jy/
+Dithering eleven algorithms:
+https://tannerhelland.com/2012/12/28/dithering-eleven-algorithms-source-code.html
+Ostromoukhov variable-coefficient diffusion:
+https://www.iro.umontreal.ca/~ostrom/publications/pdf/SIGGRAPH01_varcoeffED.pdf
+Zhou-Fang threshold modulation:
+https://history.siggraph.org/learning/improving-mid-tone-quality-of-variable-coefficient-error-diffusion-using-threshold-modulation-by-zhou-and-fang/
+Riemersma dithering: https://www.compuphase.com/riemer.htm
+Knuth dot diffusion: https://dl.acm.org/doi/10.1145/35039.35040
+Direct binary search halftoning: https://doi.org/10.1117/12.135959
+Lattice-Boltzmann halftoning:
+https://www.mia.uni-saarland.de/Publications/hagenburg-isvc09.pdf
+Electrostatic halftoning:
+https://onlinelibrary.wiley.com/doi/10.1111/j.1467-8659.2010.01716.x
+License
+MIT. See LICENSE.

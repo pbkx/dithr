@@ -6,7 +6,7 @@
 <!-- ![Before/after dithering](before_after_dither.png) -->
 <!-- _Before (top) and after (bottom) dithering._ -->
 
-buffer-first rust dithering and halftoning library.
+Buffer-first rust dithering and halftoning library.
 
 Quantizing grayscale/RGB/RGBA buffers without dithering creates visible
 banding and contouring. `dithr` provides deterministic ordered dithering,

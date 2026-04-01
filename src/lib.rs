@@ -1,4 +1,4 @@
-//! buffer-first rust dithering and halftoning library.
+//! Buffer-first rust dithering and halftoning library.
 //!
 //! Quantizing grayscale/RGB/RGBA buffers without dithering creates visible
 //! banding and contouring. `dithr` provides deterministic ordered dithering,

@@ -3,9 +3,15 @@ name = "dithr"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
-autobenches = false
+keywords = ["graphics", "dithering", "halftoning", "image", "quantization"]
+categories = ["graphics", "multimedia::images", "algorithms"]
 license = "MIT"
-description = "Buffer-first dithering and halftoning algorithms."
+description = "Buffer-first rust dithering and halftoning library."
+exclude = [".github/**/*", "crates/**/*", "examples/**/*"]
+readme = "README.md"
+documentation = "https://docs.rs/dithr"
+repository = "https://github.com/pbkx/dithr"
+autobenches = false
 
 [features]
 default = ["std"]

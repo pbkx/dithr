@@ -1,11 +1,11 @@
-//! Buffer-first rust dithering and halftoning library.
+//! buffer-first rust dithering and halftoning library.
 //!
 //! Quantizing grayscale/RGB/RGBA buffers without dithering creates visible
 //! banding and contouring. `dithr` provides deterministic ordered dithering,
 //! diffusion, stochastic binary methods, palette-constrained workflows, and
 //! advanced halftoning methods over typed mutable slices.
 //!
-//! ### Overview
+//! ## Overview
 //!
 //! - **Buffer-first API**: Operates on mutable pixel slices with explicit
 //!   width/height/stride.
@@ -16,7 +16,7 @@
 //!   diffusion, variable diffusion, and advanced halftoning.
 //! - **Optional integrations**: `image` adapters and `rayon` parallel wrappers.
 //!
-//! ### Quick Start
+//! ## Quick Start
 //!
 //! ```rust
 //! use dithr::{bayer_8x8_in_place, gray_u8, QuantizeMode, Result};
@@ -41,7 +41,7 @@
 //! }
 //! ```
 //!
-//! ### Core Types and Buffer Model
+//! ## Core Types and Buffer Model
 //!
 //! Buffer and format types:
 //!
@@ -72,7 +72,7 @@
 //! - `Gray16`, `Rgb16`, `Rgba16`
 //! - `Gray32F`, `Rgb32F`, `Rgba32F`
 //!
-//! ### Quantization API
+//! ## Quantization API
 //!
 //! Quantization mode enum:
 //!
@@ -104,7 +104,7 @@
 //!
 //! - [`QuantizeError`] (alias of crate [`Error`])
 //!
-//! ### Palette and Indexed Output API
+//! ## Palette and Indexed Output API
 //!
 //! Palette types:
 //!
@@ -124,7 +124,7 @@
 //! - [`grayscale_4`]
 //! - [`grayscale_16`]
 //!
-//! ### Algorithm Families
+//! ## Algorithm Families
 //!
 //! Binary stochastic:
 //!
@@ -185,7 +185,7 @@
 //! - [`direct_binary_search_in_place`], [`lattice_boltzmann_in_place`], and
 //!   [`electrostatic_halftoning_in_place`] are integer grayscale-only.
 //!
-//! ### Parallel API (`rayon` feature)
+//! ## Parallel API (`rayon` feature)
 //!
 //! Parallel ordered wrappers:
 //!
@@ -202,7 +202,7 @@
 //! - `threshold_binary_in_place_par`
 //! - `random_binary_in_place_par`
 //!
-//! ### Image Adapter API (`image` feature)
+//! ## Image Adapter API (`image` feature)
 //!
 //! Adapter enum:
 //!
@@ -232,7 +232,7 @@
 //!
 //! - `dynamic_image_as_buffer`
 //!
-//! ### Errors and Result Types
+//! ## Errors and Result Types
 //!
 //! Crate-level error/result:
 //!
@@ -245,15 +245,14 @@
 //! - [`PaletteError`]
 //! - [`BufferError`]
 //!
-//! ### Convenience Wrappers
+//! ## Convenience Wrappers
 //!
 //! - [`floyd_steinberg_gray_u16_in_place`]
 //! - [`bayer_8x8_rgb16_in_place`]
 //!
 //! For complete workflows and runnable examples, see `examples/` and the
 //! repository README.
-//!
-#[cfg(feature = "image")]
+//!#[cfg(feature = "image")]
 pub mod adapter;
 pub mod buffer;
 pub mod core;

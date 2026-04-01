@@ -252,7 +252,7 @@
 //!
 //! For complete workflows and runnable examples, see `examples/` and the
 //! repository README.
-//!#[cfg(feature = "image")]
+#[cfg(feature = "image")]
 pub mod adapter;
 pub mod buffer;
 pub mod core;

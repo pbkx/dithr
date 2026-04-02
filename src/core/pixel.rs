@@ -7,6 +7,7 @@ pub fn read_unit_pixel<S: Sample, L: PixelLayout>(pixel: &[S]) -> Result<[f32; 4
             "pixel slice length does not match layout",
         ));
     }
+    validate_layout_shape::<L>()?;
 
     if L::IS_GRAY {
         let gray = pixel[0].to_unit_f32();
@@ -32,6 +33,7 @@ pub fn write_unit_pixel<S: Sample, L: PixelLayout>(pixel: &mut [S], rgba: [f32; 
             "pixel slice length does not match layout",
         ));
     }
+    validate_layout_shape::<L>()?;
 
     if L::IS_GRAY {
         let gray = 0.299_f32 * rgba[0] + 0.587_f32 * rgba[1] + 0.114_f32 * rgba[2];
@@ -58,10 +60,58 @@ pub fn alpha_index<L: PixelLayout>() -> Option<usize> {
     }
 }
 
+fn validate_layout_shape<L: PixelLayout>() -> Result<()> {
+    if L::IS_GRAY {
+        if L::CHANNELS == 0 {
+            return Err(Error::UnsupportedFormat(
+                "gray pixel layout must define at least one channel",
+            ));
+        }
+        return Ok(());
+    }
+
+    if L::CHANNELS < 3 {
+        return Err(Error::UnsupportedFormat(
+            "color pixel layout must define at least three channels",
+        ));
+    }
+
+    if L::HAS_ALPHA && L::CHANNELS < 4 {
+        return Err(Error::UnsupportedFormat(
+            "alpha pixel layout must define at least four channels",
+        ));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{read_unit_pixel, write_unit_pixel};
-    use crate::core::layout::{Gray, Rgb, Rgba};
+    use crate::{
+        core::layout::{Gray, PixelLayout, Rgb, Rgba},
+        Error,
+    };
+
+    #[derive(Clone, Copy)]
+    struct GrayZero;
+
+    impl PixelLayout for GrayZero {
+        const CHANNELS: usize = 0;
+        const COLOR_CHANNELS: usize = 1;
+        const HAS_ALPHA: bool = false;
+        const IS_GRAY: bool = true;
+    }
+
+    #[derive(Clone, Copy)]
+    struct RgbTwo;
+
+    impl PixelLayout for RgbTwo {
+        const CHANNELS: usize = 2;
+        const COLOR_CHANNELS: usize = 2;
+        const HAS_ALPHA: bool = false;
+        const IS_GRAY: bool = false;
+    }
 
     #[test]
     fn sample_f32_clamps_on_write() {
@@ -93,5 +143,27 @@ mod tests {
         write_unit_pixel::<u8, Rgba>(&mut px, [0.25, 0.5, 0.75, 0.8])
             .expect("pixel write should succeed");
         assert_eq!(px[3], 204);
+    }
+
+    #[test]
+    fn read_unit_pixel_rejects_gray_layout_without_channels() {
+        let px: [u8; 0] = [];
+        assert_eq!(
+            read_unit_pixel::<u8, GrayZero>(&px),
+            Err(Error::UnsupportedFormat(
+                "gray pixel layout must define at least one channel",
+            ))
+        );
+    }
+
+    #[test]
+    fn write_unit_pixel_rejects_color_layout_with_too_few_channels() {
+        let mut px = [0_u8, 0_u8];
+        assert_eq!(
+            write_unit_pixel::<u8, RgbTwo>(&mut px, [0.1, 0.2, 0.3, 1.0]),
+            Err(Error::UnsupportedFormat(
+                "color pixel layout must define at least three channels",
+            ))
+        );
     }
 }

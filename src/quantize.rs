@@ -153,6 +153,11 @@ pub fn quantize_error<S: Sample, L: PixelLayout>(
     original: &[S],
     quantized: &[S],
 ) -> Result<[f32; 4]> {
+    if L::CHANNELS > 4 {
+        return Err(Error::UnsupportedFormat(
+            "quantize error supports layouts with up to 4 channels",
+        ));
+    }
     if original.len() != quantized.len() {
         return Err(Error::InvalidArgument(
             "original and quantized pixel lengths must match",

@@ -4,6 +4,7 @@ use common::{
     checker_8x8, fnv1a64, gray_ramp_16x16, gray_ramp_16x16_u8, gray_ramp_8x8, gray_ramp_8x8_u16,
     rgb_cube_strip, rgb_gradient_8x8, rgb_gradient_8x8_f32, rgb_gradient_8x8_u16,
 };
+use dithr::core::PixelLayout;
 use dithr::{
     bayer_8x8_rgb16_in_place, cga_palette, floyd_steinberg_in_place, gray_u16, gray_u8,
     grayscale_16, grayscale_2, grayscale_4, levels_from_bits, quantize_error, quantize_gray_u8,
@@ -756,6 +757,27 @@ fn quantize_error_rejects_empty_slice() {
         result,
         Err(Error::InvalidArgument(
             "pixel slice length does not match layout"
+        ))
+    );
+}
+
+#[test]
+fn quantize_error_rejects_layouts_wider_than_four_channels() {
+    #[derive(Clone, Copy)]
+    struct FiveChannel;
+
+    impl PixelLayout for FiveChannel {
+        const CHANNELS: usize = 5;
+        const COLOR_CHANNELS: usize = 5;
+        const HAS_ALPHA: bool = false;
+        const IS_GRAY: bool = false;
+    }
+
+    let result = quantize_error::<u8, FiveChannel>(&[0, 1, 2, 3, 4], &[0, 1, 2, 3, 4]);
+    assert_eq!(
+        result,
+        Err(Error::UnsupportedFormat(
+            "quantize error supports layouts with up to 4 channels"
         ))
     );
 }

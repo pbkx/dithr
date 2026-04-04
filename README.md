@@ -2,9 +2,11 @@
 
 [![crates.io](https://img.shields.io/crates/v/dithr.svg)](https://crates.io/crates/dithr)
 
-<!-- image placeholder -->
-<!-- ![Before/after dithering](before_after_dither.png) -->
-<!-- _Before (top) and after (bottom) dithering._ -->
+| Original | Dithered |
+| --- | --- |
+| ![Before dithering](before_dither.png) | ![After dithering](after_dither.png) |
+
+_Before (left) and after (right) using `yliluoma_2_in_place`._
 
 Buffer-first rust dithering and halftoning library.
 

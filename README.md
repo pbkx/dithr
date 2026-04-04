@@ -33,14 +33,18 @@ advanced halftoning methods over typed mutable slices.
 
 ### Installation
 
-```toml
-[dependencies]
-dithr = "0.1"
+```bash
+cargo add dithr
 ```
 
 ```toml
 [dependencies]
-dithr = { git = "https://github.com/pbkx/dithr" }
+dithr = "0.1.0"
+```
+
+```bash
+cargo add dithr --features image
+cargo add dithr --features rayon
 ```
 
 ### Quick Start

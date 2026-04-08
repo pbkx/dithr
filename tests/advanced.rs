@@ -4,10 +4,12 @@ use common::{
     checker_8x8, fnv1a64, gray_ramp_16x16, gray_ramp_8x8, gray_ramp_8x8_u16, rgb_cube_strip,
     rgb_gradient_8x8, rgb_gradient_8x8_f32, rgb_gradient_8x8_u16,
 };
-use dithr::{
-    direct_binary_search_in_place, electrostatic_halftoning_in_place, knuth_dot_diffusion_in_place,
-    lattice_boltzmann_in_place, riemersma_in_place, QuantizeMode,
+use dithr::dbs::{
+    direct_binary_search_in_place, electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
 };
+use dithr::dot_diffusion::knuth_dot_diffusion_in_place;
+use dithr::riemersma::riemersma_in_place;
+use dithr::QuantizeMode;
 
 #[test]
 fn dot_diffusion_class_matrix_valid() {

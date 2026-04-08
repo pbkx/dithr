@@ -1,9 +1,9 @@
 #[cfg(feature = "image")]
 use dithr::core::{Gray, PixelLayout, Sample};
 #[cfg(feature = "image")]
-use dithr::{
-    bayer_8x8_in_place, dynamic_image_as_buffer, Buffer, DynamicImageBuffer, QuantizeMode,
-};
+use dithr::ordered::bayer_8x8_in_place;
+#[cfg(feature = "image")]
+use dithr::{dynamic_image_as_buffer, Buffer, DynamicImageBuffer, QuantizeMode};
 #[cfg(feature = "image")]
 use std::path::PathBuf;
 

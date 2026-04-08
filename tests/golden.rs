@@ -4,18 +4,25 @@ use common::{
     checker_8x8, fnv1a64, gray_ramp_16x16, gray_ramp_8x8, gray_ramp_8x8_u16, rgb_cube_strip,
     rgb_gradient_8x8, rgb_gradient_8x8_f32,
 };
-use dithr::{
-    atkinson_in_place, bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place,
-    bayer_8x8_in_place, burkes_in_place, cluster_dot_4x4_in_place, cluster_dot_8x8_in_place,
-    custom_ordered_in_place, direct_binary_search_in_place, electrostatic_halftoning_in_place,
-    false_floyd_steinberg_in_place, fan_in_place, floyd_steinberg_in_place,
-    gradient_based_error_diffusion_in_place, jarvis_judice_ninke_in_place,
-    knuth_dot_diffusion_in_place, lattice_boltzmann_in_place, ostromoukhov_in_place,
-    random_binary_in_place, riemersma_in_place, shiau_fan_2_in_place, shiau_fan_in_place,
-    sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place,
-    threshold_binary_in_place, two_row_sierra_in_place, yliluoma_1_in_place, yliluoma_2_in_place,
-    yliluoma_3_in_place, zhou_fang_in_place, Palette, QuantizeMode,
+use dithr::dbs::{
+    direct_binary_search_in_place, electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
 };
+use dithr::diffusion::{
+    atkinson_in_place, burkes_in_place, false_floyd_steinberg_in_place, fan_in_place,
+    floyd_steinberg_in_place, gradient_based_error_diffusion_in_place,
+    jarvis_judice_ninke_in_place, ostromoukhov_in_place, shiau_fan_2_in_place, shiau_fan_in_place,
+    sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place,
+    two_row_sierra_in_place, zhou_fang_in_place,
+};
+use dithr::dot_diffusion::knuth_dot_diffusion_in_place;
+use dithr::ordered::{
+    bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
+    cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
+    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
+};
+use dithr::riemersma::riemersma_in_place;
+use dithr::stochastic::{random_binary_in_place, threshold_binary_in_place};
+use dithr::{Palette, QuantizeMode};
 
 fn variable_gray_challenge_64x64() -> Vec<u8> {
     let mut out = Vec::with_capacity(64 * 64);

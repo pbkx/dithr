@@ -1,4 +1,5 @@
-use dithr::{rgb_u8, yliluoma_1_in_place, IndexedImage, Palette, Result};
+use dithr::ordered::yliluoma_1_in_place;
+use dithr::{rgb_u8, IndexedImage, Palette, Result};
 use std::collections::BTreeSet;
 
 fn main() -> Result<()> {

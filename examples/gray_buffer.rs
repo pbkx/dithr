@@ -1,4 +1,5 @@
-use dithr::{floyd_steinberg_in_place, gray_u8, QuantizeMode, Result};
+use dithr::diffusion::floyd_steinberg_in_place;
+use dithr::{gray_u8, QuantizeMode, Result};
 
 fn main() -> Result<()> {
     let width = 128_usize;

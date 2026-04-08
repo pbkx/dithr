@@ -5,13 +5,15 @@ use common::{
     rgb_cube_strip, rgb_gradient_8x8, rgb_gradient_8x8_f32, rgb_gradient_8x8_u16,
 };
 use dithr::core::PixelLayout;
+use dithr::diffusion::floyd_steinberg_in_place;
+use dithr::ordered::bayer_8x8_in_place;
+use dithr::stochastic::{random_binary_in_place, threshold_binary_in_place};
 use dithr::{
-    bayer_8x8_rgb16_in_place, cga_palette, floyd_steinberg_in_place, gray_u16, gray_u8,
-    grayscale_16, grayscale_2, grayscale_4, levels_from_bits, quantize_error, quantize_gray_u8,
-    quantize_pixel, quantize_rgb_u8, random_binary_in_place, rgb_u16, rgb_u8, rgba_u8,
-    threshold_binary_in_place, Buffer, BufferError, Error, GrayBuffer16, GrayBuffer8, IndexedImage,
-    IndexedImage16, IndexedImage32F, IndexedImage8, Palette, PaletteError, PixelFormat,
-    QuantizeMode, RgbBuffer32F, RgbBuffer8, RgbaBuffer8,
+    cga_palette, gray_u16, gray_u8, grayscale_16, grayscale_2, grayscale_4, levels_from_bits,
+    quantize_error, quantize_gray_u8, quantize_pixel, quantize_rgb_u8, rgb_u16, rgb_u8, rgba_u8,
+    Buffer, BufferError, Error, GrayBuffer16, GrayBuffer8, IndexedImage, IndexedImage16,
+    IndexedImage32F, IndexedImage8, Palette, PaletteError, PixelFormat, QuantizeMode, RgbBuffer32F,
+    RgbBuffer8, RgbaBuffer8,
 };
 
 #[test]
@@ -897,7 +899,7 @@ fn random_binary_different_seed_different_output() {
 #[cfg(feature = "rayon")]
 #[test]
 fn threshold_binary_parallel_matches_sequential() {
-    use dithr::threshold_binary_in_place_par;
+    use dithr::stochastic::threshold_binary_in_place_par;
 
     let mut seq = gray_ramp_16x16();
     let mut par = seq.clone();
@@ -925,7 +927,7 @@ fn threshold_binary_parallel_matches_sequential() {
 #[cfg(feature = "rayon")]
 #[test]
 fn random_binary_parallel_matches_sequential_fixed_seed() {
-    use dithr::random_binary_in_place_par;
+    use dithr::stochastic::random_binary_in_place_par;
 
     let mut seq = gray_ramp_16x16();
     let mut par = seq.clone();
@@ -1004,7 +1006,8 @@ fn rgb16_example_style_smoke() {
     }
 
     let mut buffer = rgb_u16(&mut data, width, height, width * 3).expect("valid rgb16 buffer");
-    bayer_8x8_rgb16_in_place(&mut buffer, 2).expect("bayer rgb16 should succeed");
+    bayer_8x8_in_place(&mut buffer, QuantizeMode::RgbLevels(2))
+        .expect("bayer rgb16 should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 65_535));
 }

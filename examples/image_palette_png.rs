@@ -1,8 +1,11 @@
 #[cfg(feature = "image")]
+use dithr::diffusion::floyd_steinberg_in_place;
+#[cfg(feature = "image")]
+use dithr::ordered::yliluoma_2_in_place;
+#[cfg(feature = "image")]
 use dithr::{
     core::{PixelLayout, Sample},
-    dynamic_image_as_buffer, floyd_steinberg_in_place, yliluoma_2_in_place, Buffer,
-    DynamicImageBuffer, Palette, QuantizeMode,
+    dynamic_image_as_buffer, Buffer, DynamicImageBuffer, Palette, QuantizeMode,
 };
 #[cfg(feature = "image")]
 use std::path::PathBuf;

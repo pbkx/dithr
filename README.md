@@ -50,7 +50,8 @@ cargo add dithr --features rayon
 ### Quick Start
 
 ```rust
-use dithr::{bayer_8x8_in_place, gray_u8, QuantizeMode, Result};
+use dithr::{gray_u8, QuantizeMode, Result};
+use dithr::ordered::bayer_8x8_in_place;
 
 fn main() -> Result<()> {
     let width = 64_usize;
@@ -255,7 +256,8 @@ Scope notes:
 optionally build indexed output.
 
 ```rust
-use dithr::{rgb_u8, yliluoma_1_in_place, IndexedImage, Palette, Result};
+use dithr::{rgb_u8, IndexedImage, Palette, Result};
+use dithr::ordered::yliluoma_1_in_place;
 
 fn main() -> Result<()> {
     let width = 32_usize;

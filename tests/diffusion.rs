@@ -4,14 +4,14 @@ use common::{
     checker_8x8, fnv1a64, gray_ramp_16x16, gray_ramp_8x8, gray_ramp_8x8_u16, rgb_cube_strip,
     rgb_gradient_8x8, rgb_gradient_8x8_f32, rgb_gradient_8x8_u16,
 };
-use dithr::{
+use dithr::diffusion::{
     atkinson_in_place, burkes_in_place, false_floyd_steinberg_in_place, fan_in_place,
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place,
     jarvis_judice_ninke_in_place, ostromoukhov_in_place, shiau_fan_2_in_place, shiau_fan_in_place,
     sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place,
-    two_row_sierra_in_place, zhou_fang_in_place, Error, GrayBuffer16, Palette, QuantizeMode,
-    RgbBuffer32F,
+    two_row_sierra_in_place, zhou_fang_in_place,
 };
+use dithr::{Error, GrayBuffer16, Palette, QuantizeMode, RgbBuffer32F};
 
 type DiffusionWrapperU16 = fn(&mut GrayBuffer16<'_>, QuantizeMode<'_, u16>) -> dithr::Result<()>;
 type DiffusionWrapperF32 = fn(&mut RgbBuffer32F<'_>, QuantizeMode<'_, f32>) -> dithr::Result<()>;

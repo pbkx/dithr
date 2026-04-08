@@ -7,12 +7,12 @@ use common::{
 use dithr::data::{
     generate_bayer_16x16, BAYER_2X2, BAYER_4X4, BAYER_8X8, CLUSTER_DOT_4X4, CLUSTER_DOT_8X8,
 };
-use dithr::{
+use dithr::ordered::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
     cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
-    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place, Error, IndexedImage,
-    IndexedImage16, OrderedError, Palette, QuantizeMode,
+    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
 };
+use dithr::{Error, IndexedImage, IndexedImage16, OrderedError, Palette, QuantizeMode};
 
 const BAYER_2X2_FLAT: [u8; 4] = [0, 2, 3, 1];
 const BAYER_4X4_FLAT: [u8; 16] = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
@@ -840,7 +840,7 @@ fn ordered_public_api_packed_constructor_smoke() {
 #[cfg(feature = "rayon")]
 #[test]
 fn bayer_8x8_parallel_matches_sequential() {
-    use dithr::bayer_8x8_in_place_par;
+    use dithr::ordered::bayer_8x8_in_place_par;
 
     let mut seq = gray_ramp_16x16();
     let mut par = seq.clone();
@@ -866,7 +866,7 @@ fn bayer_8x8_parallel_matches_sequential() {
 #[cfg(feature = "rayon")]
 #[test]
 fn cluster_dot_8x8_parallel_matches_sequential() {
-    use dithr::cluster_dot_8x8_in_place_par;
+    use dithr::ordered::cluster_dot_8x8_in_place_par;
 
     let mut seq = gray_ramp_16x16();
     let mut par = seq.clone();
@@ -892,7 +892,7 @@ fn cluster_dot_8x8_parallel_matches_sequential() {
 #[cfg(feature = "rayon")]
 #[test]
 fn custom_ordered_parallel_matches_sequential() {
-    use dithr::custom_ordered_in_place_par;
+    use dithr::ordered::custom_ordered_in_place_par;
 
     let map = [0_u8, 2, 3, 1];
     let mut seq = gray_ramp_16x16();

@@ -32,6 +32,7 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo clippy --workspace --all-targets --no-default-features -- -D warnings
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   test:
@@ -46,6 +47,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --lib --tests --examples
+        env:
+          RUST_BACKTRACE: 1
+      - run: cargo test --workspace --lib --tests --examples --no-default-features
         env:
           RUST_BACKTRACE: 1
       - run: cargo test --workspace --all-features --lib --tests --examples

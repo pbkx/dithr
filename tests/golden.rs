@@ -550,6 +550,33 @@ fn golden_electrostatic_halftoning_gray_ramp_8x8() {
 }
 
 #[test]
+fn golden_advanced_search_methods_distinguish_outputs_gray_ramp_8x8() {
+    let mut dbs_data = gray_ramp_8x8();
+    let mut lbm_data = dbs_data.clone();
+    let mut electrostatic_data = dbs_data.clone();
+
+    let mut dbs_buffer =
+        dithr::gray_u8(&mut dbs_data, 8, 8, 8).expect("valid buffer should construct");
+    let mut lbm_buffer =
+        dithr::gray_u8(&mut lbm_data, 8, 8, 8).expect("valid buffer should construct");
+    let mut electrostatic_buffer =
+        dithr::gray_u8(&mut electrostatic_data, 8, 8, 8).expect("valid buffer should construct");
+
+    direct_binary_search_in_place(&mut dbs_buffer, 4).expect("direct binary search should succeed");
+    lattice_boltzmann_in_place(&mut lbm_buffer, 8).expect("lattice-boltzmann should succeed");
+    electrostatic_halftoning_in_place(&mut electrostatic_buffer, 10)
+        .expect("electrostatic halftoning should succeed");
+
+    let dbs_hash = fnv1a64(&dbs_data);
+    let lbm_hash = fnv1a64(&lbm_data);
+    let electrostatic_hash = fnv1a64(&electrostatic_data);
+
+    assert_ne!(dbs_hash, lbm_hash);
+    assert_ne!(dbs_hash, electrostatic_hash);
+    assert_ne!(lbm_hash, electrostatic_hash);
+}
+
+#[test]
 fn golden_bayer_8x8_gray_ramp_8x8_u16_binary_invariant() {
     let mut data = gray_ramp_8x8_u16();
     let mut buffer = dithr::gray_u16(&mut data, 8, 8, 8).expect("valid buffer should construct");

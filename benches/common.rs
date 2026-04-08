@@ -2,8 +2,9 @@ use std::sync::OnceLock;
 
 use criterion::{black_box, measurement::WallTime, BatchSize, BenchmarkGroup, Throughput};
 use dithr::{
-    cga_palette, gray_u16, gray_u8, grayscale_16, grayscale_2, grayscale_4, rgb_u8, GrayBuffer16,
-    GrayBuffer8, Palette, QuantizeMode, Result as DithrResult, RgbBuffer8,
+    cga_palette, gray_32f, gray_u16, gray_u8, grayscale_16, grayscale_2, grayscale_4, rgb_u8,
+    GrayBuffer16, GrayBuffer32F, GrayBuffer8, Palette, QuantizeMode, Result as DithrResult,
+    RgbBuffer8,
 };
 
 pub const CUSTOM_2X2_MAP: [u8; 4] = [0, 2, 3, 1];
@@ -71,6 +72,7 @@ pub fn coverage_count() -> usize {
 pub fn touch_common() {
     let _ = gray_ramp(2, 2);
     let _ = gray_ramp_u16(2, 2);
+    let _ = gray_ramp_f32(2, 2);
     let _ = gray_checker(2, 2, 1);
     let _ = gray_noise(2, 2, 1);
     let _ = rgb_gradient(2, 2);
@@ -78,9 +80,11 @@ pub fn touch_common() {
 
     let mut gray = vec![0_u8; 4];
     let mut gray16 = vec![0_u16; 4];
+    let mut gray32f = vec![0.0_f32; 4];
     let mut rgb = vec![0_u8; 12];
     let _ = gray_buffer(&mut gray, 2, 2);
     let _ = gray_buffer_u16(&mut gray16, 2, 2);
+    let _ = gray_buffer_f32(&mut gray32f, 2, 2);
     let _ = rgb_buffer(&mut rgb, 2, 2);
 
     let _ = palette_bw();
@@ -202,6 +206,20 @@ pub fn gray_ramp_u16(width: usize, height: usize) -> Vec<u16> {
         .collect()
 }
 
+pub fn gray_ramp_f32(width: usize, height: usize) -> Vec<f32> {
+    let len = width.saturating_mul(height);
+    if len == 0 {
+        return Vec::new();
+    }
+    if len == 1 {
+        return vec![0.0];
+    }
+
+    (0..len)
+        .map(|index| (index as f32) / ((len - 1) as f32))
+        .collect()
+}
+
 pub fn gray_checker(width: usize, height: usize, block: usize) -> Vec<u8> {
     let block = block.max(1);
     let mut out = vec![0_u8; width.saturating_mul(height)];
@@ -261,6 +279,10 @@ pub fn gray_buffer<'a>(data: &'a mut [u8], width: usize, height: usize) -> GrayB
 
 pub fn gray_buffer_u16<'a>(data: &'a mut [u16], width: usize, height: usize) -> GrayBuffer16<'a> {
     gray_u16(data, width, height, width).expect("valid Gray16 benchmark buffer")
+}
+
+pub fn gray_buffer_f32<'a>(data: &'a mut [f32], width: usize, height: usize) -> GrayBuffer32F<'a> {
+    gray_32f(data, width, height, width).expect("valid Gray32F benchmark buffer")
 }
 
 pub fn rgb_buffer<'a>(data: &'a mut [u8], width: usize, height: usize) -> RgbBuffer8<'a> {
@@ -343,6 +365,30 @@ pub fn bench_gray_case_u16<F>(
             || fixture.to_vec(),
             |mut data| {
                 let mut buffer = gray_buffer_u16(&mut data, width, height);
+                run(&mut buffer).expect("benchmark case failed");
+                black_box(data);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+#[allow(dead_code)]
+pub fn bench_gray_case_f32<F>(
+    group: &mut BenchmarkGroup<'_, WallTime>,
+    name: &str,
+    fixture: &[f32],
+    width: usize,
+    height: usize,
+    mut run: F,
+) where
+    F: FnMut(&mut GrayBuffer32F<'_>) -> DithrResult<()>,
+{
+    group.bench_function(name, |b| {
+        b.iter_batched(
+            || fixture.to_vec(),
+            |mut data| {
+                let mut buffer = gray_buffer_f32(&mut data, width, height);
                 run(&mut buffer).expect("benchmark case failed");
                 black_box(data);
             },

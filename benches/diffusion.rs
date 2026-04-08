@@ -1,9 +1,9 @@
 mod common;
 
 use common::{
-    bench_gray_case, bench_gray_case_u16, bench_rgb_case, gray_ramp, gray_ramp_u16, mode_gray_1,
-    mode_gray_levels2_u16, mode_palette_cga, rgb_gradient, set_gray_throughput, set_rgb_throughput,
-    touch_common,
+    bench_gray_case, bench_gray_case_f32, bench_gray_case_u16, bench_rgb_case, gray_ramp,
+    gray_ramp_f32, gray_ramp_u16, mode_gray_1, mode_gray_levels2_u16, mode_palette_cga,
+    rgb_gradient, set_gray_throughput, set_rgb_throughput, touch_common,
 };
 use criterion::{criterion_group, criterion_main, Criterion};
 use dithr::{
@@ -11,7 +11,7 @@ use dithr::{
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place,
     jarvis_judice_ninke_in_place, ostromoukhov_in_place, shiau_fan_2_in_place, shiau_fan_in_place,
     sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place,
-    two_row_sierra_in_place, zhou_fang_in_place,
+    two_row_sierra_in_place, zhou_fang_in_place, QuantizeMode,
 };
 
 fn bench_diffusion(c: &mut Criterion) {
@@ -244,6 +244,28 @@ fn bench_diffusion(c: &mut Criterion) {
         width,
         height,
         |buffer| burkes_in_place(buffer, mode_gray_levels2_u16()),
+    );
+    group.finish();
+
+    let fixture_f32 = gray_ramp_f32(width, height);
+    let mut group = c.benchmark_group("diffusion_gray_f32_256");
+    group.sample_size(16);
+    set_gray_throughput(&mut group, width, height);
+    bench_gray_case_f32(
+        &mut group,
+        "floyd_steinberg_gray_f32_levels2_256",
+        &fixture_f32,
+        width,
+        height,
+        |buffer| floyd_steinberg_in_place(buffer, QuantizeMode::GrayLevels(2)),
+    );
+    bench_gray_case_f32(
+        &mut group,
+        "burkes_gray_f32_levels2_256",
+        &fixture_f32,
+        width,
+        height,
+        |buffer| burkes_in_place(buffer, QuantizeMode::GrayLevels(2)),
     );
     group.finish();
 }

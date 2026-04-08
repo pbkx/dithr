@@ -39,7 +39,7 @@ cargo add dithr
 
 ```toml
 [dependencies]
-dithr = "0.1.0"
+dithr = "0.2.0"
 ```
 
 ```bash

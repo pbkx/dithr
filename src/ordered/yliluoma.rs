@@ -4,6 +4,8 @@ use crate::{
     math::color::rgb_distance_sq,
     Buffer, BufferError, Error, Palette, Result,
 };
+#[cfg(feature = "rayon")]
+use rayon::prelude::*;
 use std::collections::HashMap;
 
 const DITHER_LEVELS: u8 = 64;
@@ -128,6 +130,86 @@ pub(crate) fn yliluoma_1_in_place<S: Sample, L: PixelLayout>(
     Ok(())
 }
 
+#[cfg(feature = "rayon")]
+pub(crate) fn yliluoma_1_in_place_par<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    palette: &Palette<S>,
+) -> Result<()> {
+    buffer.validate()?;
+
+    let view = PaletteView::new(palette);
+    let width = buffer.width;
+    let height = buffer.height;
+    let stride = buffer.stride;
+    if (L::CHANNELS != 3 || L::HAS_ALPHA) && (L::CHANNELS != 4 || !L::HAS_ALPHA) {
+        return Err(Error::UnsupportedFormat(
+            "yliluoma ordered dithering supports Rgb and Rgba formats only",
+        ));
+    }
+    let channels = L::CHANNELS;
+    let is_rgba = L::HAS_ALPHA;
+
+    buffer
+        .data
+        .par_chunks_mut(stride)
+        .take(height)
+        .enumerate()
+        .try_for_each(|(y, row)| -> Result<()> {
+            yliluoma_1_row::<S>(row, y, width, channels, is_rgba, &view)
+        })?;
+
+    Ok(())
+}
+
+#[cfg(feature = "rayon")]
+fn yliluoma_1_row<S: Sample>(
+    row: &mut [S],
+    y: usize,
+    width: usize,
+    channels: usize,
+    is_rgba: bool,
+    view: &PaletteView<'_, S>,
+) -> Result<()> {
+    let mut cache = HashMap::<u32, MixingPlan>::new();
+
+    for x in 0..width {
+        let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
+        let source_rgb = [
+            sample_to_byte(row[offset]),
+            sample_to_byte(row[offset + 1]),
+            sample_to_byte(row[offset + 2]),
+        ];
+        let key = pack_rgb(source_rgb);
+        let plan = if let Some(&cached) = cache.get(&key) {
+            cached
+        } else {
+            let computed = devise_best_mixing_plan(source_rgb, &view.colors_u8);
+            cache.insert(key, computed);
+            computed
+        };
+        let threshold = BAYER_8X8[y % 8][x % 8];
+        let chosen = if threshold < plan.ratio {
+            view.colors[plan.second_index]
+        } else {
+            view.colors[plan.first_index]
+        };
+
+        if is_rgba {
+            let alpha = row[offset + 3];
+            row[offset] = chosen[0];
+            row[offset + 1] = chosen[1];
+            row[offset + 2] = chosen[2];
+            row[offset + 3] = alpha;
+        } else {
+            row[offset] = chosen[0];
+            row[offset + 1] = chosen[1];
+            row[offset + 2] = chosen[2];
+        }
+    }
+
+    Ok(())
+}
+
 pub(crate) fn yliluoma_2_in_place<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     palette: &Palette<S>,
@@ -182,6 +264,86 @@ pub(crate) fn yliluoma_2_in_place<S: Sample, L: PixelLayout>(
                 row[offset + 1] = chosen[1];
                 row[offset + 2] = chosen[2];
             }
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "rayon")]
+pub(crate) fn yliluoma_2_in_place_par<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    palette: &Palette<S>,
+) -> Result<()> {
+    buffer.validate()?;
+
+    let view = PaletteView::new(palette);
+    let width = buffer.width;
+    let height = buffer.height;
+    let stride = buffer.stride;
+    if (L::CHANNELS != 3 || L::HAS_ALPHA) && (L::CHANNELS != 4 || !L::HAS_ALPHA) {
+        return Err(Error::UnsupportedFormat(
+            "yliluoma ordered dithering supports Rgb and Rgba formats only",
+        ));
+    }
+    let channels = L::CHANNELS;
+    let is_rgba = L::HAS_ALPHA;
+
+    buffer
+        .data
+        .par_chunks_mut(stride)
+        .take(height)
+        .enumerate()
+        .try_for_each(|(y, row)| -> Result<()> {
+            yliluoma_2_row::<S>(row, y, width, channels, is_rgba, &view)
+        })?;
+
+    Ok(())
+}
+
+#[cfg(feature = "rayon")]
+fn yliluoma_2_row<S: Sample>(
+    row: &mut [S],
+    y: usize,
+    width: usize,
+    channels: usize,
+    is_rgba: bool,
+    view: &PaletteView<'_, S>,
+) -> Result<()> {
+    let mut cache = HashMap::<u32, Vec<usize>>::new();
+
+    for x in 0..width {
+        let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
+        let source_rgb = [
+            sample_to_byte(row[offset]),
+            sample_to_byte(row[offset + 1]),
+            sample_to_byte(row[offset + 2]),
+        ];
+        let key = pack_rgb(source_rgb);
+        let selected = {
+            let plan = cache
+                .entry(key)
+                .or_insert_with(|| devise_color_sequence(source_rgb, &view.colors_u8, &view.luma));
+            let map_value = usize::from(BAYER_8X8[y % 8][x % 8]);
+            let plan_index = map_value
+                .checked_mul(plan.len())
+                .ok_or(BufferError::OutOfBounds)?
+                / usize::from(DITHER_LEVELS);
+
+            plan[plan_index]
+        };
+        let chosen = view.colors[selected];
+
+        if is_rgba {
+            let alpha = row[offset + 3];
+            row[offset] = chosen[0];
+            row[offset + 1] = chosen[1];
+            row[offset + 2] = chosen[2];
+            row[offset + 3] = alpha;
+        } else {
+            row[offset] = chosen[0];
+            row[offset + 1] = chosen[1];
+            row[offset + 2] = chosen[2];
         }
     }
 
@@ -243,6 +405,88 @@ pub(crate) fn yliluoma_3_in_place<S: Sample, L: PixelLayout>(
                 row[offset + 1] = chosen[1];
                 row[offset + 2] = chosen[2];
             }
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "rayon")]
+pub(crate) fn yliluoma_3_in_place_par<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    palette: &Palette<S>,
+) -> Result<()> {
+    buffer.validate()?;
+
+    let view = PaletteView::new(palette);
+    let width = buffer.width;
+    let height = buffer.height;
+    let stride = buffer.stride;
+    if (L::CHANNELS != 3 || L::HAS_ALPHA) && (L::CHANNELS != 4 || !L::HAS_ALPHA) {
+        return Err(Error::UnsupportedFormat(
+            "yliluoma ordered dithering supports Rgb and Rgba formats only",
+        ));
+    }
+    let channels = L::CHANNELS;
+    let is_rgba = L::HAS_ALPHA;
+    let palette_gamma = view.gamma_table();
+
+    buffer
+        .data
+        .par_chunks_mut(stride)
+        .take(height)
+        .enumerate()
+        .try_for_each(|(y, row)| -> Result<()> {
+            yliluoma_3_row::<S>(row, y, width, channels, is_rgba, &view, &palette_gamma)
+        })?;
+
+    Ok(())
+}
+
+#[cfg(feature = "rayon")]
+fn yliluoma_3_row<S: Sample>(
+    row: &mut [S],
+    y: usize,
+    width: usize,
+    channels: usize,
+    is_rgba: bool,
+    view: &PaletteView<'_, S>,
+    palette_gamma: &[[f64; 3]],
+) -> Result<()> {
+    let mut cache = HashMap::<u32, Vec<usize>>::new();
+
+    for x in 0..width {
+        let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
+        let source_rgb = [
+            sample_to_byte(row[offset]),
+            sample_to_byte(row[offset + 1]),
+            sample_to_byte(row[offset + 2]),
+        ];
+        let key = pack_rgb(source_rgb);
+        let selected = {
+            let plan = cache.entry(key).or_insert_with(|| {
+                devise_color_sequence_algorithm3(source_rgb, view, palette_gamma)
+            });
+            let map_value = usize::from(BAYER_8X8[y % 8][x % 8]);
+            let plan_index = map_value
+                .checked_mul(plan.len())
+                .ok_or(BufferError::OutOfBounds)?
+                / usize::from(DITHER_LEVELS);
+
+            plan[plan_index]
+        };
+        let chosen = view.colors[selected];
+
+        if is_rgba {
+            let alpha = row[offset + 3];
+            row[offset] = chosen[0];
+            row[offset + 1] = chosen[1];
+            row[offset + 2] = chosen[2];
+            row[offset + 3] = alpha;
+        } else {
+            row[offset] = chosen[0];
+            row[offset + 1] = chosen[1];
+            row[offset + 2] = chosen[2];
         }
     }
 

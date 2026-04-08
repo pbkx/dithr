@@ -197,6 +197,9 @@
 //! - `cluster_dot_4x4_in_place_par`
 //! - `cluster_dot_8x8_in_place_par`
 //! - `custom_ordered_in_place_par`
+//! - `yliluoma_1_in_place_par`
+//! - `yliluoma_2_in_place_par`
+//! - `yliluoma_3_in_place_par`
 //!
 //! Parallel stochastic wrappers:
 //!
@@ -410,10 +413,19 @@ pub use ordered::custom_ordered_in_place;
 pub use ordered::custom_ordered_in_place_par;
 #[deprecated(since = "0.2.0", note = "use dithr::ordered::yliluoma_1_in_place")]
 pub use ordered::yliluoma_1_in_place;
+#[cfg(feature = "rayon")]
+#[deprecated(since = "0.2.0", note = "use dithr::ordered::yliluoma_1_in_place_par")]
+pub use ordered::yliluoma_1_in_place_par;
 #[deprecated(since = "0.2.0", note = "use dithr::ordered::yliluoma_2_in_place")]
 pub use ordered::yliluoma_2_in_place;
+#[cfg(feature = "rayon")]
+#[deprecated(since = "0.2.0", note = "use dithr::ordered::yliluoma_2_in_place_par")]
+pub use ordered::yliluoma_2_in_place_par;
 #[deprecated(since = "0.2.0", note = "use dithr::ordered::yliluoma_3_in_place")]
 pub use ordered::yliluoma_3_in_place;
+#[cfg(feature = "rayon")]
+#[deprecated(since = "0.2.0", note = "use dithr::ordered::yliluoma_3_in_place_par")]
+pub use ordered::yliluoma_3_in_place_par;
 #[deprecated(since = "0.2.0", note = "use dithr::riemersma::riemersma_in_place")]
 pub use riemersma::riemersma_in_place;
 #[deprecated(

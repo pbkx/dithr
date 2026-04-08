@@ -345,12 +345,13 @@ Enable `rayon` for parallel wrappers where available.
 Parallelized families:
 
 - Ordered: all `*_in_place_par` ordered wrappers
+- Yliluoma: `yliluoma_1_in_place_par`, `yliluoma_2_in_place_par`,
+  `yliluoma_3_in_place_par`
 - Binary stochastic: `threshold_binary_in_place_par`,
   `random_binary_in_place_par`
 
 Current serial-only families:
 
-- Yliluoma
 - Diffusion (classic/extended/variable)
 - Advanced halftoning
 
@@ -408,8 +409,8 @@ cargo test --doc --all-features
 - Variable diffusion methods are grayscale-only.
 - `direct_binary_search_in_place`, `lattice_boltzmann_in_place`, and
   `electrostatic_halftoning_in_place` are integer grayscale-only.
-- Parallel wrappers are currently provided for ordered and binary stochastic
-  families.
+- Parallel wrappers are currently provided for ordered, Yliluoma, and binary
+  stochastic families.
 
 ### References
 

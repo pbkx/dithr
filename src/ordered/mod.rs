@@ -114,6 +114,14 @@ pub fn yliluoma_1_in_place<S: Sample, L: PixelLayout>(
     yliluoma::yliluoma_1_in_place(buffer, palette)
 }
 
+#[cfg(feature = "rayon")]
+pub fn yliluoma_1_in_place_par<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    palette: &Palette<S>,
+) -> Result<()> {
+    yliluoma::yliluoma_1_in_place_par(buffer, palette)
+}
+
 pub fn yliluoma_2_in_place<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     palette: &Palette<S>,
@@ -121,11 +129,27 @@ pub fn yliluoma_2_in_place<S: Sample, L: PixelLayout>(
     yliluoma::yliluoma_2_in_place(buffer, palette)
 }
 
+#[cfg(feature = "rayon")]
+pub fn yliluoma_2_in_place_par<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    palette: &Palette<S>,
+) -> Result<()> {
+    yliluoma::yliluoma_2_in_place_par(buffer, palette)
+}
+
 pub fn yliluoma_3_in_place<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     palette: &Palette<S>,
 ) -> Result<()> {
     yliluoma::yliluoma_3_in_place(buffer, palette)
+}
+
+#[cfg(feature = "rayon")]
+pub fn yliluoma_3_in_place_par<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    palette: &Palette<S>,
+) -> Result<()> {
+    yliluoma::yliluoma_3_in_place_par(buffer, palette)
 }
 
 fn validate_custom_map(

@@ -12,6 +12,8 @@ use dithr::ordered::{
     cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
     yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
 };
+#[cfg(feature = "rayon")]
+use dithr::ordered::{yliluoma_1_in_place_par, yliluoma_2_in_place_par, yliluoma_3_in_place_par};
 use dithr::{Error, IndexedImage, IndexedImage16, OrderedError, Palette, QuantizeMode};
 
 const BAYER_2X2_FLAT: [u8; 4] = [0, 2, 3, 1];
@@ -920,6 +922,84 @@ fn custom_ordered_parallel_matches_sequential() {
         64,
     )
     .expect("parallel should succeed");
+
+    assert_eq!(seq, par);
+}
+
+#[cfg(feature = "rayon")]
+#[test]
+fn yliluoma_1_parallel_matches_sequential() {
+    let mut seq = rgb_gradient_8x8();
+    let mut par = seq.clone();
+    let palette = Palette::new(vec![
+        [0_u8, 0, 0],
+        [255, 255, 255],
+        [255, 0, 0],
+        [0, 255, 0],
+        [0, 0, 255],
+        [255, 255, 0],
+        [0, 255, 255],
+        [255, 0, 255],
+    ])
+    .expect("palette should be valid");
+
+    let mut seq_buffer = dithr::rgb_u8(&mut seq, 8, 8, 24).expect("valid buffer should construct");
+    let mut par_buffer = dithr::rgb_u8(&mut par, 8, 8, 24).expect("valid buffer should construct");
+
+    yliluoma_1_in_place(&mut seq_buffer, &palette).expect("sequential should succeed");
+    yliluoma_1_in_place_par(&mut par_buffer, &palette).expect("parallel should succeed");
+
+    assert_eq!(seq, par);
+}
+
+#[cfg(feature = "rayon")]
+#[test]
+fn yliluoma_2_parallel_matches_sequential() {
+    let mut seq = rgb_gradient_8x8();
+    let mut par = seq.clone();
+    let palette = Palette::new(vec![
+        [0_u8, 0, 0],
+        [255, 255, 255],
+        [255, 0, 0],
+        [0, 255, 0],
+        [0, 0, 255],
+        [255, 255, 0],
+        [0, 255, 255],
+        [255, 0, 255],
+    ])
+    .expect("palette should be valid");
+
+    let mut seq_buffer = dithr::rgb_u8(&mut seq, 8, 8, 24).expect("valid buffer should construct");
+    let mut par_buffer = dithr::rgb_u8(&mut par, 8, 8, 24).expect("valid buffer should construct");
+
+    yliluoma_2_in_place(&mut seq_buffer, &palette).expect("sequential should succeed");
+    yliluoma_2_in_place_par(&mut par_buffer, &palette).expect("parallel should succeed");
+
+    assert_eq!(seq, par);
+}
+
+#[cfg(feature = "rayon")]
+#[test]
+fn yliluoma_3_parallel_matches_sequential() {
+    let mut seq = rgb_gradient_8x8();
+    let mut par = seq.clone();
+    let palette = Palette::new(vec![
+        [0_u8, 0, 0],
+        [255, 255, 255],
+        [255, 0, 0],
+        [0, 255, 0],
+        [0, 0, 255],
+        [255, 255, 0],
+        [0, 255, 255],
+        [255, 0, 255],
+    ])
+    .expect("palette should be valid");
+
+    let mut seq_buffer = dithr::rgb_u8(&mut seq, 8, 8, 24).expect("valid buffer should construct");
+    let mut par_buffer = dithr::rgb_u8(&mut par, 8, 8, 24).expect("valid buffer should construct");
+
+    yliluoma_3_in_place(&mut seq_buffer, &palette).expect("sequential should succeed");
+    yliluoma_3_in_place_par(&mut par_buffer, &palette).expect("parallel should succeed");
 
     assert_eq!(seq, par);
 }

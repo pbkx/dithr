@@ -1,5 +1,5 @@
 use crate::{
-    core::{PixelLayout, Sample},
+    core::{layout::validate_layout_invariants, PixelLayout, Sample},
     math::fixed::mul_div_i32,
     quantize_pixel, Buffer, Error, QuantizeMode, Result,
 };
@@ -32,6 +32,7 @@ pub fn knuth_dot_diffusion_in_place<S: Sample, L: PixelLayout>(
     mode: QuantizeMode<'_, S>,
 ) -> Result<()> {
     buffer.validate()?;
+    validate_layout_invariants::<L>()?;
     if L::CHANNELS == 1 && !L::HAS_ALPHA {
         dot_diffuse_gray(buffer, mode)
     } else if (L::CHANNELS == 3 && !L::HAS_ALPHA) || (L::CHANNELS == 4 && L::HAS_ALPHA) {

@@ -4,6 +4,7 @@ use common::{
     checker_8x8, fnv1a64, gray_ramp_16x16, gray_ramp_8x8, gray_ramp_8x8_u16, rgb_cube_strip,
     rgb_gradient_8x8, rgb_gradient_8x8_f32, rgb_gradient_8x8_u16,
 };
+use dithr::core::PixelLayout;
 use dithr::diffusion::{
     atkinson_in_place, burkes_in_place, false_floyd_steinberg_in_place, fan_in_place,
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place,
@@ -370,6 +371,31 @@ fn gradient_based_error_diffusion_rejects_non_gray_formats() {
             "variable diffusion algorithms support grayscale formats only"
         ))
     ));
+}
+
+#[test]
+fn diffusion_rejects_malformed_layout_invariants() {
+    #[derive(Clone, Copy)]
+    struct InvalidAlphaLayout;
+
+    impl PixelLayout for InvalidAlphaLayout {
+        const CHANNELS: usize = 4;
+        const COLOR_CHANNELS: usize = 4;
+        const HAS_ALPHA: bool = true;
+        const IS_GRAY: bool = false;
+    }
+
+    let mut data = vec![0_u8; 2 * 2 * 4];
+    let mut buffer = dithr::Buffer::<u8, InvalidAlphaLayout>::new_typed(&mut data, 2, 2, 8)
+        .expect("custom layout buffer should construct");
+
+    let result = floyd_steinberg_in_place(&mut buffer, QuantizeMode::RgbLevels(2));
+    assert_eq!(
+        result,
+        Err(Error::UnsupportedFormat(
+            "alpha pixel layouts must reserve a non-color channel"
+        ))
+    );
 }
 
 #[test]

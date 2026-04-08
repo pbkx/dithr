@@ -1,5 +1,5 @@
 use crate::{
-    core::{alpha_index, read_unit_pixel, PixelLayout, Sample},
+    core::{alpha_index, layout::validate_layout_invariants, read_unit_pixel, PixelLayout, Sample},
     quantize_pixel, Buffer, BufferError, Error, QuantizeMode, Result,
 };
 #[cfg(feature = "rayon")]
@@ -42,6 +42,7 @@ pub fn random_binary_in_place_par<S: Sample, L: PixelLayout>(
     strength: u8,
 ) -> Result<()> {
     buffer.validate()?;
+    validate_layout_invariants::<L>()?;
     if !stochastic_layout_supported::<L>() {
         return Err(Error::UnsupportedFormat(
             "stochastic dithering supports Gray, Rgb, and Rgba layouts only",
@@ -96,6 +97,7 @@ where
     F: FnMut(usize, usize) -> f32,
 {
     buffer.validate()?;
+    validate_layout_invariants::<L>()?;
     if !stochastic_layout_supported::<L>() {
         return Err(Error::UnsupportedFormat(
             "stochastic dithering supports Gray, Rgb, and Rgba layouts only",
@@ -130,6 +132,7 @@ where
     F: Fn(usize, usize) -> f32 + Sync,
 {
     buffer.validate()?;
+    validate_layout_invariants::<L>()?;
     if !stochastic_layout_supported::<L>() {
         return Err(Error::UnsupportedFormat(
             "stochastic dithering supports Gray, Rgb, and Rgba layouts only",

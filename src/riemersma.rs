@@ -1,5 +1,5 @@
 use crate::{
-    core::{PixelLayout, Sample},
+    core::{layout::validate_layout_invariants, PixelLayout, Sample},
     quantize_pixel, Buffer, Error, QuantizeMode, Result,
 };
 use std::mem::size_of;
@@ -18,6 +18,7 @@ pub fn riemersma_in_place<S: Sample, L: PixelLayout>(
     mode: QuantizeMode<'_, S>,
 ) -> Result<()> {
     buffer.validate()?;
+    validate_layout_invariants::<L>()?;
 
     let width = buffer.width;
     let height = buffer.height;

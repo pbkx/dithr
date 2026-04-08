@@ -6,7 +6,9 @@ use common::{
 };
 use dithr::core::PixelLayout;
 use dithr::diffusion::floyd_steinberg_in_place;
+use dithr::dot_diffusion::knuth_dot_diffusion_in_place;
 use dithr::ordered::bayer_8x8_in_place;
+use dithr::riemersma::riemersma_in_place;
 use dithr::stochastic::{random_binary_in_place, threshold_binary_in_place};
 use dithr::{
     cga_palette, gray_u16, gray_u8, grayscale_16, grayscale_2, grayscale_4, levels_from_bits,
@@ -978,6 +980,81 @@ fn threshold_binary_rgb_uses_luma() {
     .expect("threshold binary should succeed");
 
     assert_eq!(data, vec![0, 0, 0, 255, 255, 255, 0, 0, 0]);
+}
+
+#[test]
+fn stochastic_rejects_malformed_layout_invariants() {
+    #[derive(Clone, Copy)]
+    struct InvalidGrayLayout;
+
+    impl PixelLayout for InvalidGrayLayout {
+        const CHANNELS: usize = 1;
+        const COLOR_CHANNELS: usize = 2;
+        const HAS_ALPHA: bool = false;
+        const IS_GRAY: bool = true;
+    }
+
+    let mut data = vec![0_u8; 4];
+    let mut buffer = Buffer::<u8, InvalidGrayLayout>::new_typed(&mut data, 2, 2, 2)
+        .expect("custom layout buffer should construct");
+
+    let result = threshold_binary_in_place(&mut buffer, QuantizeMode::GrayLevels(2), 127);
+    assert_eq!(
+        result,
+        Err(Error::UnsupportedFormat(
+            "pixel layout color channels cannot exceed total channels"
+        ))
+    );
+}
+
+#[test]
+fn riemersma_rejects_malformed_layout_invariants() {
+    #[derive(Clone, Copy)]
+    struct InvalidGrayLayout;
+
+    impl PixelLayout for InvalidGrayLayout {
+        const CHANNELS: usize = 1;
+        const COLOR_CHANNELS: usize = 2;
+        const HAS_ALPHA: bool = false;
+        const IS_GRAY: bool = true;
+    }
+
+    let mut data = vec![0_u8; 4];
+    let mut buffer = Buffer::<u8, InvalidGrayLayout>::new_typed(&mut data, 2, 2, 2)
+        .expect("custom layout buffer should construct");
+
+    let result = riemersma_in_place(&mut buffer, QuantizeMode::GrayLevels(2));
+    assert_eq!(
+        result,
+        Err(Error::UnsupportedFormat(
+            "pixel layout color channels cannot exceed total channels"
+        ))
+    );
+}
+
+#[test]
+fn dot_diffusion_rejects_malformed_layout_invariants() {
+    #[derive(Clone, Copy)]
+    struct InvalidGrayLayout;
+
+    impl PixelLayout for InvalidGrayLayout {
+        const CHANNELS: usize = 1;
+        const COLOR_CHANNELS: usize = 2;
+        const HAS_ALPHA: bool = false;
+        const IS_GRAY: bool = true;
+    }
+
+    let mut data = vec![0_u8; 4];
+    let mut buffer = Buffer::<u8, InvalidGrayLayout>::new_typed(&mut data, 2, 2, 2)
+        .expect("custom layout buffer should construct");
+
+    let result = knuth_dot_diffusion_in_place(&mut buffer, QuantizeMode::GrayLevels(2));
+    assert_eq!(
+        result,
+        Err(Error::UnsupportedFormat(
+            "pixel layout color channels cannot exceed total channels"
+        ))
+    );
 }
 
 #[test]

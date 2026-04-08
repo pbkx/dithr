@@ -1,5 +1,5 @@
 use crate::{
-    core::{alpha_index, read_unit_pixel, PixelLayout, Sample},
+    core::{alpha_index, layout::validate_layout_invariants, read_unit_pixel, PixelLayout, Sample},
     quantize_pixel, Buffer, BufferError, Error, QuantizeMode, Result,
 };
 #[cfg(feature = "rayon")]
@@ -14,6 +14,7 @@ pub(crate) fn ordered_dither_in_place<S: Sample, L: PixelLayout>(
     strength: f32,
 ) -> Result<()> {
     buffer.validate()?;
+    validate_layout_invariants::<L>()?;
     let (map_min, threshold_den) = validate_map(map, map_w, map_h)?;
 
     let width = buffer.width;
@@ -45,6 +46,7 @@ pub(crate) fn ordered_dither_in_place_par<S: Sample, L: PixelLayout>(
     strength: f32,
 ) -> Result<()> {
     buffer.validate()?;
+    validate_layout_invariants::<L>()?;
     let (map_min, threshold_den) = validate_map(map, map_w, map_h)?;
 
     let width = buffer.width;

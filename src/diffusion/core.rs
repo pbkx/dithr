@@ -1,5 +1,5 @@
 use crate::{
-    core::{alpha_index, read_unit_pixel, PixelLayout, Sample},
+    core::{alpha_index, layout::validate_layout_invariants, read_unit_pixel, PixelLayout, Sample},
     data::ErrorKernel,
     quantize_pixel, Buffer, BufferError, Error, QuantizeMode, Result,
 };
@@ -10,6 +10,7 @@ pub(crate) fn error_diffuse_in_place<S: Sample, L: PixelLayout>(
     kernel: &ErrorKernel,
 ) -> Result<()> {
     buffer.validate()?;
+    validate_layout_invariants::<L>()?;
     if kernel.weight_den <= 0 {
         return Err(Error::InvalidArgument(
             "kernel denominator must be positive",

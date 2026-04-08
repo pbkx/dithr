@@ -4,6 +4,7 @@ use common::{
     checker_8x8, fnv1a64, gray_ramp_16x16, gray_ramp_8x8, gray_ramp_8x8_u16, rgb_cube_strip,
     rgb_gradient_8x8, rgb_gradient_8x8_f32, rgb_gradient_8x8_u16,
 };
+use dithr::core::PixelLayout;
 use dithr::data::{
     generate_bayer_16x16, BAYER_2X2, BAYER_4X4, BAYER_8X8, CLUSTER_DOT_4X4, CLUSTER_DOT_8X8,
 };
@@ -219,6 +220,31 @@ fn custom_ordered_rejects_out_of_range_map_values() {
         64,
     );
     assert_eq!(result, Err(Error::Ordered(OrderedError::ValueOutOfRange)));
+}
+
+#[test]
+fn ordered_rejects_malformed_layout_invariants() {
+    #[derive(Clone, Copy)]
+    struct InvalidColorLayout;
+
+    impl PixelLayout for InvalidColorLayout {
+        const CHANNELS: usize = 3;
+        const COLOR_CHANNELS: usize = 0;
+        const HAS_ALPHA: bool = false;
+        const IS_GRAY: bool = false;
+    }
+
+    let mut data = vec![0_u8; 2 * 2 * 3];
+    let mut buffer = dithr::Buffer::<u8, InvalidColorLayout>::new_typed(&mut data, 2, 2, 6)
+        .expect("custom layout buffer should construct");
+
+    let result = bayer_2x2_in_place(&mut buffer, QuantizeMode::GrayLevels(2));
+    assert_eq!(
+        result,
+        Err(Error::UnsupportedFormat(
+            "pixel layout must define at least one color channel"
+        ))
+    );
 }
 
 #[test]

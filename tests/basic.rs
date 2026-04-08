@@ -207,6 +207,143 @@ fn buffer_kind_matches_rgba_f32() {
 }
 
 #[test]
+#[allow(deprecated)]
+fn buffer_f32_compat_aliases_match_canonical_names() {
+    let mut gray_alias_data = vec![0.0_f32; 4 * 4];
+    let mut gray_new_data = vec![0.0_f32; 4 * 4];
+    let gray_alias =
+        dithr::gray_f32(&mut gray_alias_data, 4, 4, 4).expect("valid gray alias buffer");
+    let gray_new = dithr::gray_32f(&mut gray_new_data, 4, 4, 4).expect("valid gray buffer");
+    assert_eq!(gray_alias.width(), gray_new.width());
+    assert_eq!(gray_alias.height(), gray_new.height());
+    assert_eq!(gray_alias.stride(), gray_new.stride());
+    assert_eq!(
+        gray_alias.kind().expect("kind should resolve"),
+        PixelFormat::Gray32F
+    );
+
+    let mut rgb_alias_data = vec![0.0_f32; 4 * 4 * 3];
+    let mut rgb_new_data = vec![0.0_f32; 4 * 4 * 3];
+    let rgb_alias = dithr::rgb_f32(&mut rgb_alias_data, 4, 4, 12).expect("valid rgb alias buffer");
+    let rgb_new = dithr::rgb_32f(&mut rgb_new_data, 4, 4, 12).expect("valid rgb buffer");
+    assert_eq!(rgb_alias.width(), rgb_new.width());
+    assert_eq!(rgb_alias.height(), rgb_new.height());
+    assert_eq!(rgb_alias.stride(), rgb_new.stride());
+    assert_eq!(
+        rgb_alias.kind().expect("kind should resolve"),
+        PixelFormat::Rgb32F
+    );
+
+    let mut rgba_alias_data = vec![0.0_f32; 4 * 4 * 4];
+    let mut rgba_new_data = vec![0.0_f32; 4 * 4 * 4];
+    let rgba_alias =
+        dithr::rgba_f32(&mut rgba_alias_data, 4, 4, 16).expect("valid rgba alias buffer");
+    let rgba_new = dithr::rgba_32f(&mut rgba_new_data, 4, 4, 16).expect("valid rgba buffer");
+    assert_eq!(rgba_alias.width(), rgba_new.width());
+    assert_eq!(rgba_alias.height(), rgba_new.height());
+    assert_eq!(rgba_alias.stride(), rgba_new.stride());
+    assert_eq!(
+        rgba_alias.kind().expect("kind should resolve"),
+        PixelFormat::Rgba32F
+    );
+}
+
+#[test]
+#[allow(deprecated)]
+fn stochastic_compat_aliases_match_binary_names() {
+    let mut threshold_alias_data = gray_ramp_8x8();
+    let mut threshold_binary_data = threshold_alias_data.clone();
+    let mut threshold_alias_buffer =
+        gray_u8(&mut threshold_alias_data, 8, 8, 8).expect("valid gray buffer should construct");
+    let mut threshold_binary_buffer =
+        gray_u8(&mut threshold_binary_data, 8, 8, 8).expect("valid gray buffer should construct");
+
+    dithr::stochastic::threshold_in_place(
+        &mut threshold_alias_buffer,
+        QuantizeMode::GrayLevels(2),
+        127_u8,
+    )
+    .expect("threshold alias should succeed");
+    threshold_binary_in_place(
+        &mut threshold_binary_buffer,
+        QuantizeMode::GrayLevels(2),
+        127_u8,
+    )
+    .expect("threshold binary should succeed");
+    assert_eq!(threshold_alias_data, threshold_binary_data);
+
+    let mut random_alias_data = gray_ramp_8x8();
+    let mut random_binary_data = random_alias_data.clone();
+    let mut random_alias_buffer =
+        gray_u8(&mut random_alias_data, 8, 8, 8).expect("valid gray buffer should construct");
+    let mut random_binary_buffer =
+        gray_u8(&mut random_binary_data, 8, 8, 8).expect("valid gray buffer should construct");
+
+    dithr::stochastic::random_in_place(
+        &mut random_alias_buffer,
+        QuantizeMode::GrayLevels(2),
+        7,
+        64,
+    )
+    .expect("random alias should succeed");
+    random_binary_in_place(
+        &mut random_binary_buffer,
+        QuantizeMode::GrayLevels(2),
+        7,
+        64,
+    )
+    .expect("random binary should succeed");
+    assert_eq!(random_alias_data, random_binary_data);
+}
+
+#[cfg(feature = "image")]
+#[test]
+#[allow(deprecated)]
+fn image_adapter_compat_aliases_match_current_names() {
+    let mut gray_alias_image = image::GrayImage::new(3, 2);
+    let mut gray_new_image = image::GrayImage::new(3, 2);
+    let gray_alias =
+        dithr::gray_image_as_buffer(&mut gray_alias_image).expect("gray alias should succeed");
+    let gray_new =
+        dithr::gray8_image_as_buffer(&mut gray_new_image).expect("gray adapter should succeed");
+    assert_eq!(gray_alias.width(), gray_new.width());
+    assert_eq!(gray_alias.height(), gray_new.height());
+    assert_eq!(gray_alias.stride(), gray_new.stride());
+    assert_eq!(
+        gray_alias.kind().expect("kind should resolve"),
+        PixelFormat::Gray8
+    );
+
+    let mut rgb_alias_image = image::RgbImage::new(3, 2);
+    let mut rgb_new_image = image::RgbImage::new(3, 2);
+    let rgb_alias =
+        dithr::rgb_image_as_buffer(&mut rgb_alias_image).expect("rgb alias should succeed");
+    let rgb_new =
+        dithr::rgb8_image_as_buffer(&mut rgb_new_image).expect("rgb adapter should succeed");
+    assert_eq!(rgb_alias.width(), rgb_new.width());
+    assert_eq!(rgb_alias.height(), rgb_new.height());
+    assert_eq!(rgb_alias.stride(), rgb_new.stride());
+    assert_eq!(
+        rgb_alias.kind().expect("kind should resolve"),
+        PixelFormat::Rgb8
+    );
+
+    let mut rgba_alias_image = image::RgbaImage::new(3, 2);
+    let mut rgba_new_image = image::RgbaImage::new(3, 2);
+    let rgba_alias =
+        dithr::rgba_image_as_buffer(&mut rgba_alias_image).expect("rgba alias should succeed");
+    let rgba_new =
+        dithr::rgba8_image_as_buffer(&mut rgba_new_image).expect("rgba adapter should succeed");
+    assert_eq!(rgba_alias.width(), rgba_new.width());
+    assert_eq!(rgba_alias.height(), rgba_new.height());
+    assert_eq!(rgba_alias.stride(), rgba_new.stride());
+    assert_eq!(
+        rgba_alias.kind().expect("kind should resolve"),
+        PixelFormat::Rgba8
+    );
+}
+
+#[test]
 fn buffer_validate_uses_layout_not_runtime_tag() {
     let mut data = vec![0_u8; 48];
     let result: dithr::Result<dithr::RgbBuffer8<'_>> =

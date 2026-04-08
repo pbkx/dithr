@@ -7,12 +7,14 @@ use common::{
     rgb_gradient, set_gray_throughput, set_rgb_throughput, touch_common,
 };
 use criterion::{criterion_group, criterion_main, Criterion};
+#[allow(deprecated)]
 use dithr::{
     random_binary_in_place, random_in_place, threshold_binary_in_place, threshold_in_place,
 };
 #[cfg(feature = "rayon")]
 use dithr::{random_binary_in_place_par, threshold_binary_in_place_par};
 
+#[allow(deprecated)]
 fn bench_stochastic(c: &mut Criterion) {
     touch_common();
 

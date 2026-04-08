@@ -276,10 +276,9 @@ pub mod stochastic;
 
 #[cfg(feature = "image")]
 pub use adapter::{
-    dynamic_image_as_buffer, gray16_image_as_buffer, gray8_image_as_buffer, gray_image_as_buffer,
-    rgb16_image_as_buffer, rgb32f_image_as_buffer, rgb8_image_as_buffer, rgb_image_as_buffer,
-    rgba16_image_as_buffer, rgba32f_image_as_buffer, rgba8_image_as_buffer, rgba_image_as_buffer,
-    DynamicImageBuffer,
+    dynamic_image_as_buffer, gray16_image_as_buffer, gray8_image_as_buffer, rgb16_image_as_buffer,
+    rgb32f_image_as_buffer, rgb8_image_as_buffer, rgba16_image_as_buffer, rgba32f_image_as_buffer,
+    rgba8_image_as_buffer, DynamicImageBuffer,
 };
 pub use buffer::{
     gray_32f, gray_32f_packed, gray_u16, gray_u16_packed, gray_u8, gray_u8_packed, rgb_32f,
@@ -299,6 +298,29 @@ pub use quantize::{
     levels_from_bits, quantize_error, quantize_gray, quantize_gray_u8, quantize_pixel,
     quantize_rgb, quantize_rgb_u8, QuantizeError, QuantizeMode,
 };
+
+#[cfg(feature = "image")]
+#[allow(deprecated)]
+#[deprecated(since = "0.2.0", note = "use dithr::gray8_image_as_buffer")]
+pub use adapter::gray_image_as_buffer;
+#[cfg(feature = "image")]
+#[allow(deprecated)]
+#[deprecated(since = "0.2.0", note = "use dithr::rgb8_image_as_buffer")]
+pub use adapter::rgb_image_as_buffer;
+#[cfg(feature = "image")]
+#[allow(deprecated)]
+#[deprecated(since = "0.2.0", note = "use dithr::rgba8_image_as_buffer")]
+pub use adapter::rgba_image_as_buffer;
+
+#[allow(deprecated)]
+#[deprecated(since = "0.2.0", note = "use dithr::gray_32f")]
+pub use buffer::gray_f32;
+#[allow(deprecated)]
+#[deprecated(since = "0.2.0", note = "use dithr::rgb_32f")]
+pub use buffer::rgb_f32;
+#[allow(deprecated)]
+#[deprecated(since = "0.2.0", note = "use dithr::rgba_32f")]
+pub use buffer::rgba_f32;
 
 #[deprecated(
     since = "0.2.0",
@@ -440,6 +462,7 @@ pub use stochastic::random_binary_in_place;
 )]
 pub use stochastic::random_binary_in_place_par;
 #[deprecated(since = "0.2.0", note = "use dithr::stochastic::random_in_place")]
+#[allow(deprecated)]
 pub use stochastic::random_in_place;
 #[deprecated(
     since = "0.2.0",
@@ -453,6 +476,7 @@ pub use stochastic::threshold_binary_in_place;
 )]
 pub use stochastic::threshold_binary_in_place_par;
 #[deprecated(since = "0.2.0", note = "use dithr::stochastic::threshold_in_place")]
+#[allow(deprecated)]
 pub use stochastic::threshold_in_place;
 
 #[deprecated(

@@ -501,6 +501,7 @@ pub fn rgba_32f_packed<'a>(
     Buffer::new_packed_typed(data, width, height)
 }
 
+#[deprecated(since = "0.2.0", note = "use dithr::gray_32f")]
 pub fn gray_f32<'a>(
     data: &'a mut [f32],
     width: usize,
@@ -510,6 +511,7 @@ pub fn gray_f32<'a>(
     gray_32f(data, width, height, stride)
 }
 
+#[deprecated(since = "0.2.0", note = "use dithr::rgb_32f")]
 pub fn rgb_f32<'a>(
     data: &'a mut [f32],
     width: usize,
@@ -519,6 +521,7 @@ pub fn rgb_f32<'a>(
     rgb_32f(data, width, height, stride)
 }
 
+#[deprecated(since = "0.2.0", note = "use dithr::rgba_32f")]
 pub fn rgba_f32<'a>(
     data: &'a mut [f32],
     width: usize,

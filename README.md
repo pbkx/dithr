@@ -332,6 +332,9 @@ Dynamic variants:
 - `DynamicImageBuffer::Rgb32F`
 - `DynamicImageBuffer::Rgba32F`
 
+`DynamicImage::ImageLumaA8` and `DynamicImage::ImageLumaA16` are promoted to
+`DynamicImageBuffer::Rgba8` and `DynamicImageBuffer::Rgba16` during adaptation.
+
 Current manifest configuration enables PNG and JPEG codecs for the optional
 `image` dependency.
 
@@ -405,7 +408,6 @@ cargo test --doc --all-features
 - Variable diffusion methods are grayscale-only.
 - `direct_binary_search_in_place`, `lattice_boltzmann_in_place`, and
   `electrostatic_halftoning_in_place` are integer grayscale-only.
-- `dynamic_image_as_buffer` does not support `DynamicImage` LumaA variants.
 - Parallel wrappers are currently provided for ordered and binary stochastic
   families.
 

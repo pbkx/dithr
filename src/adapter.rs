@@ -114,16 +114,60 @@ pub fn dynamic_image_as_buffer(img: &mut image::DynamicImage) -> Result<DynamicI
         image::DynamicImage::ImageRgba32F(inner) => {
             rgba32f_image_as_buffer(inner).map(DynamicImageBuffer::Rgba32F)
         }
-        image::DynamicImage::ImageLumaA8(_) => Err(Error::UnsupportedFormat(
-            "DynamicImage LumaA8 is unsupported",
-        )),
-        image::DynamicImage::ImageLumaA16(_) => Err(Error::UnsupportedFormat(
-            "DynamicImage LumaA16 is unsupported",
-        )),
+        image::DynamicImage::ImageLumaA8(_) => {
+            promote_lumaa8_to_rgba8(img)?;
+            match img {
+                image::DynamicImage::ImageRgba8(inner) => {
+                    rgba8_image_as_buffer(inner).map(DynamicImageBuffer::Rgba8)
+                }
+                _ => Err(Error::UnsupportedFormat(
+                    "DynamicImage LumaA8 promotion failed",
+                )),
+            }
+        }
+        image::DynamicImage::ImageLumaA16(_) => {
+            promote_lumaa16_to_rgba16(img)?;
+            match img {
+                image::DynamicImage::ImageRgba16(inner) => {
+                    rgba16_image_as_buffer(inner).map(DynamicImageBuffer::Rgba16)
+                }
+                _ => Err(Error::UnsupportedFormat(
+                    "DynamicImage LumaA16 promotion failed",
+                )),
+            }
+        }
         _ => Err(Error::UnsupportedFormat(
             "DynamicImage format is unsupported",
         )),
     }
+}
+
+fn promote_lumaa8_to_rgba8(img: &mut image::DynamicImage) -> Result<()> {
+    let lumaa = match img {
+        image::DynamicImage::ImageLumaA8(inner) => {
+            core::mem::replace(inner, image::GrayAlphaImage::new(0, 0))
+        }
+        _ => return Err(Error::InvalidArgument("expected DynamicImage::ImageLumaA8")),
+    };
+    let rgba = image::DynamicImage::ImageLumaA8(lumaa).into_rgba8();
+    *img = image::DynamicImage::ImageRgba8(rgba);
+    Ok(())
+}
+
+fn promote_lumaa16_to_rgba16(img: &mut image::DynamicImage) -> Result<()> {
+    let lumaa = match img {
+        image::DynamicImage::ImageLumaA16(inner) => {
+            core::mem::replace(inner, image::ImageBuffer::new(0, 0))
+        }
+        _ => {
+            return Err(Error::InvalidArgument(
+                "expected DynamicImage::ImageLumaA16",
+            ))
+        }
+    };
+    let rgba = image::DynamicImage::ImageLumaA16(lumaa).into_rgba16();
+    *img = image::DynamicImage::ImageRgba16(rgba);
+    Ok(())
 }
 
 fn image_dims(width: u32, height: u32) -> Result<(usize, usize)> {
@@ -140,7 +184,7 @@ mod tests {
         dynamic_image_as_buffer, gray16_image_as_buffer, gray8_image_as_buffer,
         gray_image_as_buffer, rgb8_image_as_buffer, rgba8_image_as_buffer, DynamicImageBuffer,
     };
-    use crate::{BufferKind, Error};
+    use crate::BufferKind;
 
     #[test]
     fn gray_image_adapter_uses_packed_stride() {
@@ -300,15 +344,68 @@ mod tests {
     }
 
     #[test]
-    fn dynamic_image_adapter_rejects_lumaa8() {
-        let mut img = image::DynamicImage::ImageLumaA8(image::GrayAlphaImage::new(2, 2));
-        let result = dynamic_image_as_buffer(&mut img);
+    fn dynamic_image_adapter_promotes_lumaa8_to_rgba8() {
+        let mut lumaa = image::GrayAlphaImage::new(2, 1);
+        lumaa.put_pixel(0, 0, image::LumaA([10, 20]));
+        lumaa.put_pixel(1, 0, image::LumaA([200, 255]));
+        let mut img = image::DynamicImage::ImageLumaA8(lumaa);
 
-        match result {
-            Err(Error::UnsupportedFormat(message)) => {
-                assert_eq!(message, "DynamicImage LumaA8 is unsupported");
+        {
+            let converted = dynamic_image_as_buffer(&mut img).expect("lumaa8 should be supported");
+
+            match converted {
+                DynamicImageBuffer::Rgba8(buffer) => {
+                    assert_eq!(buffer.width, 2);
+                    assert_eq!(buffer.height, 1);
+                    assert_eq!(buffer.stride, 8);
+                    assert_eq!(
+                        buffer.kind().expect("kind should resolve"),
+                        BufferKind::Rgba8
+                    );
+                }
+                _ => panic!("expected rgba8 buffer"),
             }
-            _ => panic!("expected unsupported format error"),
+        }
+
+        match &img {
+            image::DynamicImage::ImageRgba8(promoted) => {
+                assert_eq!(promoted.get_pixel(0, 0).0, [10, 10, 10, 20]);
+                assert_eq!(promoted.get_pixel(1, 0).0, [200, 200, 200, 255]);
+            }
+            _ => panic!("expected promoted rgba8 image"),
+        }
+    }
+
+    #[test]
+    fn dynamic_image_adapter_promotes_lumaa16_to_rgba16() {
+        let mut lumaa = image::ImageBuffer::<image::LumaA<u16>, Vec<u16>>::new(2, 1);
+        lumaa.put_pixel(0, 0, image::LumaA([1024, 2048]));
+        lumaa.put_pixel(1, 0, image::LumaA([50000, 65535]));
+        let mut img = image::DynamicImage::ImageLumaA16(lumaa);
+
+        {
+            let converted = dynamic_image_as_buffer(&mut img).expect("lumaa16 should be supported");
+
+            match converted {
+                DynamicImageBuffer::Rgba16(buffer) => {
+                    assert_eq!(buffer.width, 2);
+                    assert_eq!(buffer.height, 1);
+                    assert_eq!(buffer.stride, 8);
+                    assert_eq!(
+                        buffer.kind().expect("kind should resolve"),
+                        BufferKind::Rgba16
+                    );
+                }
+                _ => panic!("expected rgba16 buffer"),
+            }
+        }
+
+        match &img {
+            image::DynamicImage::ImageRgba16(promoted) => {
+                assert_eq!(promoted.get_pixel(0, 0).0, [1024, 1024, 1024, 2048]);
+                assert_eq!(promoted.get_pixel(1, 0).0, [50000, 50000, 50000, 65535]);
+            }
+            _ => panic!("expected promoted rgba16 image"),
         }
     }
 }

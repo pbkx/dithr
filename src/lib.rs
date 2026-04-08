@@ -232,6 +232,8 @@
 //! Dynamic adapter:
 //!
 //! - `dynamic_image_as_buffer`
+//! - `DynamicImage::ImageLumaA8` is promoted to `DynamicImageBuffer::Rgba8`
+//! - `DynamicImage::ImageLumaA16` is promoted to `DynamicImageBuffer::Rgba16`
 //!
 //! ## Errors and Result Types
 //!

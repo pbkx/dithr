@@ -5,13 +5,14 @@ use common::{
     rgb_gradient_8x8, rgb_gradient_8x8_f32, rgb_gradient_8x8_u16,
 };
 use dithr::core::PixelLayout;
+use dithr::data::maps::generate_void_and_cluster_64x64_flat;
 use dithr::data::{
     generate_bayer_16x16, BAYER_2X2, BAYER_4X4, BAYER_8X8, CLUSTER_DOT_4X4, CLUSTER_DOT_8X8,
 };
 use dithr::ordered::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
     cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
-    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
+    void_and_cluster_in_place, yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
 };
 #[cfg(feature = "rayon")]
 use dithr::ordered::{yliluoma_1_in_place_par, yliluoma_2_in_place_par, yliluoma_3_in_place_par};
@@ -168,6 +169,67 @@ fn cluster_dot_8x8_runs_and_quantizes() {
     .expect("cluster-dot 8x8 should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn void_and_cluster_map_is_deterministic_and_ranked() {
+    let map_a = generate_void_and_cluster_64x64_flat();
+    let map_b = generate_void_and_cluster_64x64_flat();
+
+    assert_eq!(map_a, map_b);
+
+    let mut seen = vec![false; 64 * 64];
+    for &rank in &map_a {
+        let idx = usize::from(rank);
+        assert!(idx < 64 * 64);
+        assert!(!seen[idx]);
+        seen[idx] = true;
+    }
+    assert!(seen.into_iter().all(|entry| entry));
+
+    let mut bytes = Vec::with_capacity((64 * 64) * 2);
+    for &rank in &map_a {
+        bytes.extend_from_slice(&rank.to_le_bytes());
+    }
+    assert_eq!(fnv1a64(&bytes), 14_735_008_391_156_396_837_u64);
+}
+
+#[test]
+fn void_and_cluster_runs_and_quantizes_u8() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    void_and_cluster_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("void-and-cluster should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn void_and_cluster_u16_binary_invariant() {
+    let mut data = gray_ramp_8x8_u16();
+    let mut buffer = dithr::gray_u16(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    void_and_cluster_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("void-and-cluster should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+}
+
+#[test]
+fn void_and_cluster_f32_binary_invariant() {
+    let mut data: Vec<f32> = (0..(8 * 8))
+        .map(|index| index as f32 / ((8 * 8 - 1) as f32))
+        .collect();
+    let mut buffer = dithr::gray_32f(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    void_and_cluster_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("void-and-cluster should succeed");
+
+    assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
 }
 
 #[test]

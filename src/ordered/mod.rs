@@ -1,6 +1,7 @@
 mod bayer;
 mod cluster;
 pub(crate) mod core;
+mod void_cluster;
 mod yliluoma;
 
 use crate::{
@@ -39,6 +40,7 @@ pub use bayer::{
 pub use cluster::{cluster_dot_4x4_in_place, cluster_dot_8x8_in_place};
 #[cfg(feature = "rayon")]
 pub use cluster::{cluster_dot_4x4_in_place_par, cluster_dot_8x8_in_place_par};
+pub use void_cluster::void_and_cluster_in_place;
 
 #[doc(hidden)]
 pub(crate) fn ordered_dither_in_place<S: Sample, L: PixelLayout>(

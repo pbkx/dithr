@@ -177,6 +177,7 @@ Cluster-dot:
 
 - `cluster_dot_4x4_in_place`
 - `cluster_dot_8x8_in_place`
+- `void_and_cluster_in_place`
 
 Custom map:
 
@@ -431,6 +432,7 @@ cargo test --doc --all-features
   <https://www.mia.uni-saarland.de/Publications/hagenburg-isvc09.pdf>
 - Electrostatic halftoning:
   <https://onlinelibrary.wiley.com/doi/10.1111/j.1467-8659.2010.01716.x>
+- Void-and-cluster dithering: <https://docslib.org/doc/9596963/the-void-and-cluster-method-for-dither-array-generation> <https://cv.ulichney.com/papers/1994-filter-design.pdf>
 
 ## License
 

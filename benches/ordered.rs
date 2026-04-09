@@ -9,6 +9,7 @@ use common::{
     CUSTOM_2X2_MAP,
 };
 use criterion::{criterion_group, criterion_main, Criterion};
+use dithr::ordered::void_and_cluster_in_place;
 use dithr::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
     cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place, QuantizeMode,
@@ -78,6 +79,14 @@ fn bench_ordered(c: &mut Criterion) {
         width,
         height,
         |buffer| cluster_dot_8x8_in_place(buffer, mode_gray_1()),
+    );
+    bench_gray_case(
+        &mut group,
+        "void_and_cluster_gray1_1024",
+        &fixture,
+        width,
+        height,
+        |buffer| void_and_cluster_in_place(buffer, mode_gray_1()),
     );
     bench_gray_case(
         &mut group,

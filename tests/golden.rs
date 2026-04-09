@@ -18,7 +18,7 @@ use dithr::dot_diffusion::knuth_dot_diffusion_in_place;
 use dithr::ordered::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
     cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
-    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
+    void_and_cluster_in_place, yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
 };
 use dithr::riemersma::riemersma_in_place;
 use dithr::stochastic::{random_binary_in_place, threshold_binary_in_place};
@@ -158,6 +158,20 @@ fn golden_cluster_dot_8x8_gray_ramp_16x16() {
     .expect("cluster-dot 8x8 should succeed");
 
     assert_eq!(fnv1a64(&data), 15_436_130_700_200_729_221_u64);
+}
+
+#[test]
+fn golden_void_and_cluster_gray_ramp_16x16() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    void_and_cluster_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("void-and-cluster should succeed");
+
+    assert_eq!(fnv1a64(&data), 1_335_029_263_686_083_691_u64);
 }
 
 #[test]

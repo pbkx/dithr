@@ -176,6 +176,7 @@
 //!
 //! - [`riemersma_in_place`]
 //! - [`knuth_dot_diffusion_in_place`]
+//! - [`optimized_dot_diffusion_in_place`]
 //! - [`direct_binary_search_in_place`]
 //! - [`lattice_boltzmann_in_place`]
 //! - [`electrostatic_halftoning_in_place`]

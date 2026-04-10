@@ -240,6 +240,7 @@ Specialized methods with narrower scope than the ordered/diffusion baseline.
 
 - `riemersma_in_place`
 - `knuth_dot_diffusion_in_place`
+- `optimized_dot_diffusion_in_place`
 - `direct_binary_search_in_place`
 - `lattice_boltzmann_in_place`
 - `electrostatic_halftoning_in_place`
@@ -248,8 +249,9 @@ Scope notes:
 
 - `direct_binary_search_in_place`, `lattice_boltzmann_in_place`, and
   `electrostatic_halftoning_in_place` require integer grayscale buffers.
-- `riemersma_in_place` and `knuth_dot_diffusion_in_place` support Gray/Rgb/Rgba
-  layouts, with alpha preserved for Rgba paths.
+- `riemersma_in_place`, `knuth_dot_diffusion_in_place`, and
+  `optimized_dot_diffusion_in_place` support Gray/Rgb/Rgba layouts, with alpha
+  preserved for Rgba paths.
 
 ### Palette Workflow
 
@@ -427,12 +429,13 @@ cargo test --doc --all-features
   <https://history.siggraph.org/learning/improving-mid-tone-quality-of-variable-coefficient-error-diffusion-using-threshold-modulation-by-zhou-and-fang/>
 - Riemersma dithering: <https://www.compuphase.com/riemer.htm>
 - Knuth dot diffusion: <https://dl.acm.org/doi/10.1145/35039.35040>
+- Optimized dot diffusion: <https://doi.org/10.1109/83.841944>
 - Direct binary search halftoning: <https://doi.org/10.1117/12.135959>
 - Lattice-Boltzmann halftoning:
   <https://www.mia.uni-saarland.de/Publications/hagenburg-isvc09.pdf>
 - Electrostatic halftoning:
   <https://onlinelibrary.wiley.com/doi/10.1111/j.1467-8659.2010.01716.x>
-- Void-and-cluster dithering: <https://docslib.org/doc/9596963/the-void-and-cluster-method-for-dither-array-generation> <https://cv.ulichney.com/papers/1994-filter-design.pdf>
+- Void-and-cluster dithering: <https://docslib.org/doc/9596963/the-void-and-cluster-method-for-dither-array-generation>, <https://cv.ulichney.com/papers/1994-filter-design.pdf>
 
 ## License
 

@@ -14,7 +14,7 @@ use dithr::diffusion::{
     sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place,
     two_row_sierra_in_place, zhou_fang_in_place,
 };
-use dithr::dot_diffusion::knuth_dot_diffusion_in_place;
+use dithr::dot_diffusion::{knuth_dot_diffusion_in_place, optimized_dot_diffusion_in_place};
 use dithr::ordered::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
     cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
@@ -530,6 +530,20 @@ fn golden_knuth_dot_diffusion_gray_ramp_16x16() {
     .expect("knuth dot diffusion should succeed");
 
     assert_eq!(fnv1a64(&data), 15_732_809_179_121_461_487_u64);
+}
+
+#[test]
+fn golden_optimized_dot_diffusion_gray_ramp_16x16() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    optimized_dot_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("optimized dot diffusion should succeed");
+
+    assert_eq!(fnv1a64(&data), 10_114_676_560_843_649_199_u64);
 }
 
 #[test]

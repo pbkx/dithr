@@ -7,7 +7,7 @@ use common::{
 use dithr::dbs::{
     direct_binary_search_in_place, electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
 };
-use dithr::dot_diffusion::knuth_dot_diffusion_in_place;
+use dithr::dot_diffusion::{knuth_dot_diffusion_in_place, optimized_dot_diffusion_in_place};
 use dithr::riemersma::riemersma_in_place;
 use dithr::QuantizeMode;
 
@@ -47,6 +47,20 @@ fn knuth_dot_diffusion_runs() {
         QuantizeMode::gray_bits(1).expect("valid bit depth"),
     )
     .expect("knuth dot diffusion should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn optimized_dot_diffusion_runs() {
+    let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    optimized_dot_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("optimized dot diffusion should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
 }
@@ -239,6 +253,56 @@ fn dot_diffusion_f32_smoke() {
         .expect("knuth dot diffusion should succeed");
 
     assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
+}
+
+#[test]
+fn optimized_dot_diffusion_u16_smoke() {
+    let mut data: Vec<u16> = (0_u32..256)
+        .map(|value| ((value * 257) % 65_536) as u16)
+        .collect();
+    let mut buffer = dithr::gray_u16(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    optimized_dot_diffusion_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("optimized dot diffusion should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+}
+
+#[test]
+fn optimized_dot_diffusion_f32_smoke() {
+    let mut data: Vec<f32> = (0_u32..(16 * 16 * 3))
+        .map(|value| (value % 256) as f32 / 255.0)
+        .collect();
+    let mut buffer = dithr::rgb_32f(&mut data, 16, 16, 48).expect("valid buffer should construct");
+
+    optimized_dot_diffusion_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("optimized dot diffusion should succeed");
+
+    assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
+}
+
+#[test]
+fn optimized_dot_diffusion_differs_from_knuth_on_canonical_fixture() {
+    let mut knuth_data = gray_ramp_16x16();
+    let mut optimized_data = gray_ramp_16x16();
+
+    let mut knuth_buffer =
+        dithr::gray_u8(&mut knuth_data, 16, 16, 16).expect("valid buffer should construct");
+    let mut optimized_buffer =
+        dithr::gray_u8(&mut optimized_data, 16, 16, 16).expect("valid buffer should construct");
+
+    knuth_dot_diffusion_in_place(
+        &mut knuth_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("knuth dot diffusion should succeed");
+    optimized_dot_diffusion_in_place(
+        &mut optimized_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("optimized dot diffusion should succeed");
+
+    assert_ne!(fnv1a64(&knuth_data), fnv1a64(&optimized_data));
 }
 
 fn dbs_objective_for_test(target: &[u8], binary: &[u8], width: usize, height: usize) -> f64 {

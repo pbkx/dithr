@@ -5,6 +5,7 @@ use common::{
     set_gray_throughput, set_rgb_throughput, touch_common,
 };
 use criterion::{criterion_group, criterion_main, Criterion};
+use dithr::dot_diffusion::optimized_dot_diffusion_in_place;
 use dithr::{
     direct_binary_search_in_place, electrostatic_halftoning_in_place, knuth_dot_diffusion_in_place,
     lattice_boltzmann_in_place, riemersma_in_place,
@@ -38,6 +39,14 @@ fn bench_advanced(c: &mut Criterion) {
         height,
         |buffer| knuth_dot_diffusion_in_place(buffer, mode_gray_1()),
     );
+    bench_gray_case(
+        &mut group,
+        "optimized_dot_diffusion_gray1_256",
+        &fixture,
+        width,
+        height,
+        |buffer| optimized_dot_diffusion_in_place(buffer, mode_gray_1()),
+    );
     group.finish();
 
     let fixture = rgb_gradient(width, height);
@@ -60,6 +69,14 @@ fn bench_advanced(c: &mut Criterion) {
         width,
         height,
         |buffer| knuth_dot_diffusion_in_place(buffer, mode_palette_cga()),
+    );
+    bench_rgb_case(
+        &mut group,
+        "optimized_dot_diffusion_rgb_palette_cga_256",
+        &fixture,
+        width,
+        height,
+        |buffer| optimized_dot_diffusion_in_place(buffer, mode_palette_cga()),
     );
     group.finish();
 

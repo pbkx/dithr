@@ -5,11 +5,11 @@ use common::{
     set_gray_throughput, set_rgb_throughput, touch_common,
 };
 use criterion::{criterion_group, criterion_main, Criterion};
-use dithr::dot_diffusion::optimized_dot_diffusion_in_place;
-use dithr::{
-    direct_binary_search_in_place, electrostatic_halftoning_in_place, knuth_dot_diffusion_in_place,
-    lattice_boltzmann_in_place, riemersma_in_place,
+use dithr::dbs::{
+    direct_binary_search_in_place, electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
 };
+use dithr::dot_diffusion::{knuth_dot_diffusion_in_place, optimized_dot_diffusion_in_place};
+use dithr::riemersma::riemersma_in_place;
 use std::time::Duration;
 
 fn bench_advanced(c: &mut Criterion) {

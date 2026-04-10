@@ -9,11 +9,9 @@ use dithr::{
 
 pub const CUSTOM_2X2_MAP: [u8; 4] = [0, 2, 3, 1];
 
-pub const SEQUENTIAL_ALGORITHMS: [&str; 35] = [
+pub const SEQUENTIAL_ALGORITHMS: [&str; 33] = [
     "threshold_binary_in_place",
     "random_binary_in_place",
-    "threshold_in_place",
-    "random_in_place",
     "bayer_2x2_in_place",
     "bayer_4x4_in_place",
     "bayer_8x8_in_place",

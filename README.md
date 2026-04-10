@@ -154,7 +154,6 @@ Fast binary dithering with fixed or randomized threshold behavior.
 
 - `threshold_binary_in_place`
 - `random_binary_in_place`
-- compatibility aliases: `threshold_in_place`, `random_in_place`
 
 Parallel variants (`rayon` feature):
 

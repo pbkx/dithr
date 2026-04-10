@@ -63,31 +63,6 @@ pub fn random_binary_in_place_par<S: Sample, L: PixelLayout>(
     stochastic_in_place_par(buffer, mode, |x, y| thresholds[y * width + x])
 }
 
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::stochastic::threshold_binary_in_place"
-)]
-pub fn threshold_in_place<S: Sample, L: PixelLayout>(
-    buffer: &mut Buffer<'_, S, L>,
-    mode: QuantizeMode<'_, S>,
-    threshold: S,
-) -> Result<()> {
-    threshold_binary_in_place(buffer, mode, threshold)
-}
-
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::stochastic::random_binary_in_place"
-)]
-pub fn random_in_place<S: Sample, L: PixelLayout>(
-    buffer: &mut Buffer<'_, S, L>,
-    mode: QuantizeMode<'_, S>,
-    seed: u64,
-    strength: u8,
-) -> Result<()> {
-    random_binary_in_place(buffer, mode, seed, strength)
-}
-
 fn stochastic_in_place<S: Sample, L: PixelLayout, F>(
     buffer: &mut Buffer<'_, S, L>,
     mode: QuantizeMode<'_, S>,

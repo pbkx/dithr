@@ -131,7 +131,6 @@
 //!
 //! - [`threshold_binary_in_place`]
 //! - [`random_binary_in_place`]
-//! - compatibility aliases: [`threshold_in_place`], [`random_in_place`]
 //!
 //! Ordered:
 //!
@@ -228,12 +227,6 @@
 //! - `rgb32f_image_as_buffer`
 //! - `rgba32f_image_as_buffer`
 //!
-//! Compatibility adapter names:
-//!
-//! - `gray_image_as_buffer`
-//! - `rgb_image_as_buffer`
-//! - `rgba_image_as_buffer`
-//!
 //! Dynamic adapter:
 //!
 //! - `dynamic_image_as_buffer`
@@ -252,11 +245,6 @@
 //! - [`OrderedError`]
 //! - [`PaletteError`]
 //! - [`BufferError`]
-//!
-//! ## Convenience Wrappers
-//!
-//! - [`floyd_steinberg_gray_u16_in_place`]
-//! - [`bayer_8x8_rgb16_in_place`]
 //!
 //! For complete workflows and runnable examples, see `examples/` and the
 //! repository README.
@@ -300,199 +288,3 @@ pub use quantize::{
     levels_from_bits, quantize_error, quantize_gray, quantize_gray_u8, quantize_pixel,
     quantize_rgb, quantize_rgb_u8, QuantizeError, QuantizeMode,
 };
-
-#[cfg(feature = "image")]
-#[allow(deprecated)]
-#[deprecated(since = "0.2.0", note = "use dithr::gray8_image_as_buffer")]
-pub use adapter::gray_image_as_buffer;
-#[cfg(feature = "image")]
-#[allow(deprecated)]
-#[deprecated(since = "0.2.0", note = "use dithr::rgb8_image_as_buffer")]
-pub use adapter::rgb_image_as_buffer;
-#[cfg(feature = "image")]
-#[allow(deprecated)]
-#[deprecated(since = "0.2.0", note = "use dithr::rgba8_image_as_buffer")]
-pub use adapter::rgba_image_as_buffer;
-
-#[allow(deprecated)]
-#[deprecated(since = "0.2.0", note = "use dithr::gray_32f")]
-pub use buffer::gray_f32;
-#[allow(deprecated)]
-#[deprecated(since = "0.2.0", note = "use dithr::rgb_32f")]
-pub use buffer::rgb_f32;
-#[allow(deprecated)]
-#[deprecated(since = "0.2.0", note = "use dithr::rgba_32f")]
-pub use buffer::rgba_f32;
-
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::dbs::direct_binary_search_in_place"
-)]
-pub use dbs::direct_binary_search_in_place;
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::dbs::electrostatic_halftoning_in_place"
-)]
-pub use dbs::electrostatic_halftoning_in_place;
-#[deprecated(since = "0.2.0", note = "use dithr::dbs::lattice_boltzmann_in_place")]
-pub use dbs::lattice_boltzmann_in_place;
-#[deprecated(since = "0.2.0", note = "use dithr::diffusion::atkinson_in_place")]
-pub use diffusion::atkinson_in_place;
-#[deprecated(since = "0.2.0", note = "use dithr::diffusion::burkes_in_place")]
-pub use diffusion::burkes_in_place;
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::diffusion::false_floyd_steinberg_in_place"
-)]
-pub use diffusion::false_floyd_steinberg_in_place;
-#[deprecated(since = "0.2.0", note = "use dithr::diffusion::fan_in_place")]
-pub use diffusion::fan_in_place;
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::diffusion::floyd_steinberg_in_place"
-)]
-pub use diffusion::floyd_steinberg_in_place;
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::diffusion::gradient_based_error_diffusion_in_place"
-)]
-pub use diffusion::gradient_based_error_diffusion_in_place;
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::diffusion::jarvis_judice_ninke_in_place"
-)]
-pub use diffusion::jarvis_judice_ninke_in_place;
-#[deprecated(since = "0.2.0", note = "use dithr::diffusion::ostromoukhov_in_place")]
-pub use diffusion::ostromoukhov_in_place;
-#[deprecated(since = "0.2.0", note = "use dithr::diffusion::shiau_fan_2_in_place")]
-pub use diffusion::shiau_fan_2_in_place;
-#[deprecated(since = "0.2.0", note = "use dithr::diffusion::shiau_fan_in_place")]
-pub use diffusion::shiau_fan_in_place;
-#[deprecated(since = "0.2.0", note = "use dithr::diffusion::sierra_in_place")]
-pub use diffusion::sierra_in_place;
-#[deprecated(since = "0.2.0", note = "use dithr::diffusion::sierra_lite_in_place")]
-pub use diffusion::sierra_lite_in_place;
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::diffusion::stevenson_arce_in_place"
-)]
-pub use diffusion::stevenson_arce_in_place;
-#[deprecated(since = "0.2.0", note = "use dithr::diffusion::stucki_in_place")]
-pub use diffusion::stucki_in_place;
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::diffusion::two_row_sierra_in_place"
-)]
-pub use diffusion::two_row_sierra_in_place;
-#[deprecated(since = "0.2.0", note = "use dithr::diffusion::zhou_fang_in_place")]
-pub use diffusion::zhou_fang_in_place;
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::dot_diffusion::knuth_dot_diffusion_in_place"
-)]
-pub use dot_diffusion::knuth_dot_diffusion_in_place;
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::bayer_16x16_in_place")]
-pub use ordered::bayer_16x16_in_place;
-#[cfg(feature = "rayon")]
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::bayer_16x16_in_place_par")]
-pub use ordered::bayer_16x16_in_place_par;
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::bayer_2x2_in_place")]
-pub use ordered::bayer_2x2_in_place;
-#[cfg(feature = "rayon")]
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::bayer_2x2_in_place_par")]
-pub use ordered::bayer_2x2_in_place_par;
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::bayer_4x4_in_place")]
-pub use ordered::bayer_4x4_in_place;
-#[cfg(feature = "rayon")]
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::bayer_4x4_in_place_par")]
-pub use ordered::bayer_4x4_in_place_par;
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::bayer_8x8_in_place")]
-pub use ordered::bayer_8x8_in_place;
-#[cfg(feature = "rayon")]
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::bayer_8x8_in_place_par")]
-pub use ordered::bayer_8x8_in_place_par;
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::cluster_dot_4x4_in_place")]
-pub use ordered::cluster_dot_4x4_in_place;
-#[cfg(feature = "rayon")]
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::ordered::cluster_dot_4x4_in_place_par"
-)]
-pub use ordered::cluster_dot_4x4_in_place_par;
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::cluster_dot_8x8_in_place")]
-pub use ordered::cluster_dot_8x8_in_place;
-#[cfg(feature = "rayon")]
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::ordered::cluster_dot_8x8_in_place_par"
-)]
-pub use ordered::cluster_dot_8x8_in_place_par;
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::custom_ordered_in_place")]
-pub use ordered::custom_ordered_in_place;
-#[cfg(feature = "rayon")]
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::ordered::custom_ordered_in_place_par"
-)]
-pub use ordered::custom_ordered_in_place_par;
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::yliluoma_1_in_place")]
-pub use ordered::yliluoma_1_in_place;
-#[cfg(feature = "rayon")]
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::yliluoma_1_in_place_par")]
-pub use ordered::yliluoma_1_in_place_par;
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::yliluoma_2_in_place")]
-pub use ordered::yliluoma_2_in_place;
-#[cfg(feature = "rayon")]
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::yliluoma_2_in_place_par")]
-pub use ordered::yliluoma_2_in_place_par;
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::yliluoma_3_in_place")]
-pub use ordered::yliluoma_3_in_place;
-#[cfg(feature = "rayon")]
-#[deprecated(since = "0.2.0", note = "use dithr::ordered::yliluoma_3_in_place_par")]
-pub use ordered::yliluoma_3_in_place_par;
-#[deprecated(since = "0.2.0", note = "use dithr::riemersma::riemersma_in_place")]
-pub use riemersma::riemersma_in_place;
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::stochastic::random_binary_in_place"
-)]
-pub use stochastic::random_binary_in_place;
-#[cfg(feature = "rayon")]
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::stochastic::random_binary_in_place_par"
-)]
-pub use stochastic::random_binary_in_place_par;
-#[deprecated(since = "0.2.0", note = "use dithr::stochastic::random_in_place")]
-#[allow(deprecated)]
-pub use stochastic::random_in_place;
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::stochastic::threshold_binary_in_place"
-)]
-pub use stochastic::threshold_binary_in_place;
-#[cfg(feature = "rayon")]
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::stochastic::threshold_binary_in_place_par"
-)]
-pub use stochastic::threshold_binary_in_place_par;
-#[deprecated(since = "0.2.0", note = "use dithr::stochastic::threshold_in_place")]
-#[allow(deprecated)]
-pub use stochastic::threshold_in_place;
-
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::diffusion::floyd_steinberg_in_place with QuantizeMode::GrayLevels"
-)]
-pub fn floyd_steinberg_gray_u16_in_place(buffer: &mut GrayBuffer16<'_>, levels: u16) -> Result<()> {
-    diffusion::floyd_steinberg_in_place(buffer, QuantizeMode::GrayLevels(levels))
-}
-
-#[deprecated(
-    since = "0.2.0",
-    note = "use dithr::ordered::bayer_8x8_in_place with QuantizeMode::RgbLevels"
-)]
-pub fn bayer_8x8_rgb16_in_place(buffer: &mut RgbBuffer16<'_>, levels: u16) -> Result<()> {
-    ordered::bayer_8x8_in_place(buffer, QuantizeMode::RgbLevels(levels))
-}

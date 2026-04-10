@@ -9,13 +9,14 @@ use common::{
     CUSTOM_2X2_MAP,
 };
 use criterion::{criterion_group, criterion_main, Criterion};
-use dithr::ordered::void_and_cluster_in_place;
-use dithr::{
+use dithr::ordered::{
     bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
-    cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place, QuantizeMode,
+    cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
+    void_and_cluster_in_place,
 };
+use dithr::QuantizeMode;
 #[cfg(feature = "rayon")]
-use dithr::{
+use dithr::ordered::{
     bayer_16x16_in_place_par, bayer_2x2_in_place_par, bayer_4x4_in_place_par,
     bayer_8x8_in_place_par, cluster_dot_4x4_in_place_par, cluster_dot_8x8_in_place_par,
     custom_ordered_in_place_par,

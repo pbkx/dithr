@@ -109,12 +109,6 @@ impl<S: Sample + PartialEq> Palette<S> {
     pub fn contains(&self, rgb: [S; 3]) -> bool {
         self.colors.contains(&rgb)
     }
-
-    #[deprecated(since = "0.1.0", note = "use nearest_rgb_index instead")]
-    #[must_use]
-    pub fn nearest_rgb(&self, rgb: [S; 3]) -> usize {
-        self.nearest_rgb_index(rgb)
-    }
 }
 
 impl<S: Sample> IndexedImage<S> {

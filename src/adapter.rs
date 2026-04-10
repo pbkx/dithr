@@ -39,21 +39,6 @@ pub fn rgba8_image_as_buffer(img: &mut image::RgbaImage) -> Result<RgbaBuffer8<'
     Ok(Buffer::new_typed(img.as_mut(), width, height, stride)?)
 }
 
-#[deprecated(since = "0.2.0", note = "use dithr::adapter::gray8_image_as_buffer")]
-pub fn gray_image_as_buffer(img: &mut image::GrayImage) -> Result<GrayBuffer8<'_>> {
-    gray8_image_as_buffer(img)
-}
-
-#[deprecated(since = "0.2.0", note = "use dithr::adapter::rgb8_image_as_buffer")]
-pub fn rgb_image_as_buffer(img: &mut image::RgbImage) -> Result<RgbBuffer8<'_>> {
-    rgb8_image_as_buffer(img)
-}
-
-#[deprecated(since = "0.2.0", note = "use dithr::adapter::rgba8_image_as_buffer")]
-pub fn rgba_image_as_buffer(img: &mut image::RgbaImage) -> Result<RgbaBuffer8<'_>> {
-    rgba8_image_as_buffer(img)
-}
-
 pub fn gray16_image_as_buffer(img: &mut Gray16Image) -> Result<GrayBuffer16<'_>> {
     let (width, height) = image_dims(img.width(), img.height())?;
     Ok(Buffer::new_typed(img.as_mut(), width, height, width)?)
@@ -190,10 +175,9 @@ mod tests {
     use crate::BufferKind;
 
     #[test]
-    #[allow(deprecated)]
     fn gray_image_adapter_uses_packed_stride() {
         let mut img = image::GrayImage::new(4, 3);
-        let buffer = super::gray_image_as_buffer(&mut img).expect("gray should be supported");
+        let buffer = gray8_image_as_buffer(&mut img).expect("gray should be supported");
 
         assert_eq!(buffer.width, 4);
         assert_eq!(buffer.height, 3);

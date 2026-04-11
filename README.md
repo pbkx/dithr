@@ -262,6 +262,7 @@ Specialized methods with narrower scope than the ordered/diffusion baseline.
 - `knuth_dot_diffusion_in_place`
 - `optimized_dot_diffusion_in_place`
 - `direct_binary_search_in_place`
+- `clustered_dot_direct_multibit_search_in_place`
 - `lattice_boltzmann_in_place`
 - `electrostatic_halftoning_in_place`
 - `model_based_med_in_place`
@@ -269,9 +270,11 @@ Specialized methods with narrower scope than the ordered/diffusion baseline.
 
 Scope notes:
 
-- `direct_binary_search_in_place`, `lattice_boltzmann_in_place`, and
-  `electrostatic_halftoning_in_place`, `model_based_med_in_place`, and
-  `least_squares_model_based_in_place` require integer grayscale buffers.
+- `direct_binary_search_in_place`,
+  `clustered_dot_direct_multibit_search_in_place`,
+  `lattice_boltzmann_in_place`, `electrostatic_halftoning_in_place`,
+  `model_based_med_in_place`, and `least_squares_model_based_in_place` require
+  integer grayscale buffers.
 - `riemersma_in_place`, `knuth_dot_diffusion_in_place`, and
   `optimized_dot_diffusion_in_place` support Gray/Rgb/Rgba layouts, with alpha
   preserved for Rgba paths.
@@ -436,8 +439,10 @@ cargo test --doc --all-features
   `adaptive_vector_error_diffusion_in_place`,
   `vector_error_diffusion_in_place`, and
   `semivector_error_diffusion_in_place` for Rgb/Rgba.
-- `direct_binary_search_in_place`, `lattice_boltzmann_in_place`, and
-  `electrostatic_halftoning_in_place` are integer grayscale-only.
+- `direct_binary_search_in_place`,
+  `clustered_dot_direct_multibit_search_in_place`,
+  `lattice_boltzmann_in_place`, and `electrostatic_halftoning_in_place` are
+  integer grayscale-only.
 - Parallel wrappers are currently provided for ordered, Yliluoma, and binary
   stochastic families.
 
@@ -490,6 +495,7 @@ cargo test --doc --all-features
 - Image-based dither screens: <https://graphicsinterface.org/wp-content/uploads/gi1999-22.pdf>, <https://doi.org/10.20380/GI1999.22>
 - Polyomino-based digital halftoning: <https://arxiv.org/abs/0812.1647>, <https://doi.org/10.48550/arXiv.0812.1647>
 - Stochastic clustered-dot dithering: <https://perso.liris.cnrs.fr/victor.ostromoukhov/publications/pdf/SPIE99_StochasticClust.pdf>, <https://pubmed.ncbi.nlm.nih.gov/18255440/>
+- Clustered-dot direct multibit search: <https://pubmed.ncbi.nlm.nih.gov/28113172/>, <https://doi.org/10.1109/TIP.2016.2552723>, <https://research.ibm.com/publications/hybrid-halftoning-using-direct-multi-bit-search-dms-screen-algorithm>
 
 ## License
 

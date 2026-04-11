@@ -1,5 +1,6 @@
 use crate::{
     core::{PixelLayout, Sample},
+    data::CLUSTER_DOT_8X8_FLAT,
     Buffer, Error, Result,
 };
 use std::mem::size_of;
@@ -184,6 +185,110 @@ pub fn direct_binary_search_in_place<S: Sample, L: PixelLayout>(
         let row = buffer.try_row_mut(y)?;
         for (x, value) in row.iter_mut().take(width).enumerate() {
             let domain = if binary[start + x] == 0 { 0 } else { max_value };
+            *value = domain_to_sample(domain, max_value);
+        }
+    }
+
+    Ok(())
+}
+
+pub fn clustered_dot_direct_multibit_search_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    max_iters: usize,
+    levels: u16,
+) -> Result<()> {
+    buffer.validate()?;
+    ensure_grayscale_integer_format::<S, L>()?;
+    if levels < 2 {
+        return Err(Error::InvalidArgument(
+            "clustered-dot direct multibit search requires at least 2 levels",
+        ));
+    }
+
+    let width = buffer.width;
+    let height = buffer.height;
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
+    let max_value = integer_sample_max::<S>()?;
+    let capacity = integer_sample_capacity::<S>()?;
+    if usize::from(levels) > capacity {
+        return Err(Error::InvalidArgument(
+            "clustered-dot direct multibit search levels exceed sample capacity",
+        ));
+    }
+
+    let target_unit = grayscale_target_unit(buffer, width, height, pixel_count)?;
+    let level_values = multibit_level_values(levels);
+    let mut levels_map = clustered_dot_initial_levels(&target_unit, width, height, levels);
+    let mut quantized = levels_to_unit_values(&levels_map, &level_values);
+    let hvs = dbs_hvs_filter();
+    let mut filtered_error = dbs_filtered_error_map_levels(
+        &target_unit,
+        &quantized,
+        width,
+        height,
+        &hvs,
+        DBS_HVS_RADIUS,
+    );
+
+    for _ in 0..max_iters {
+        let mut improved = false;
+
+        for y in 0..height {
+            for x in 0..width {
+                let idx = y * width + x;
+                let current = usize::from(levels_map[idx]);
+                let mut best_delta = 0.0_f64;
+                let mut best_level = current;
+
+                for candidate in candidate_levels(current, level_values.len()) {
+                    let delta = level_values[candidate] - level_values[current];
+                    if delta == 0.0 {
+                        continue;
+                    }
+
+                    let candidate_delta = dbs_candidate_delta_energy(
+                        width,
+                        height,
+                        &hvs,
+                        DBS_HVS_RADIUS,
+                        &filtered_error,
+                        &[(x, y, delta)],
+                    );
+                    if candidate_delta < best_delta {
+                        best_delta = candidate_delta;
+                        best_level = candidate;
+                    }
+                }
+
+                if best_level != current {
+                    let delta = level_values[best_level] - level_values[current];
+                    levels_map[idx] = best_level as u16;
+                    quantized[idx] = level_values[best_level];
+                    dbs_apply_delta_filtered_error(
+                        width,
+                        height,
+                        &hvs,
+                        DBS_HVS_RADIUS,
+                        &mut filtered_error,
+                        &[(x, y, delta)],
+                    );
+                    improved = true;
+                }
+            }
+        }
+
+        if !improved {
+            break;
+        }
+    }
+
+    for y in 0..height {
+        let row = buffer.try_row_mut(y)?;
+        for (x, value) in row.iter_mut().take(width).enumerate() {
+            let idx = y * width + x;
+            let domain = level_index_to_domain(i32::from(levels_map[idx]), max_value, levels);
             *value = domain_to_sample(domain, max_value);
         }
     }
@@ -556,6 +661,71 @@ fn grayscale_target_unit<S: Sample, L: PixelLayout>(
         }
     }
     Ok(target)
+}
+
+fn integer_sample_capacity<S: Sample>() -> Result<usize> {
+    match size_of::<S>() {
+        1 => Ok(256),
+        2 => Ok(65_536),
+        _ => Err(Error::UnsupportedFormat(
+            "unsupported integer sample width for research algorithms",
+        )),
+    }
+}
+
+fn multibit_level_values(levels: u16) -> Vec<f32> {
+    let levels_m1 = f32::from(levels.saturating_sub(1));
+    (0..levels)
+        .map(|level| f32::from(level) / levels_m1)
+        .collect()
+}
+
+fn clustered_dot_initial_levels(
+    target_unit: &[f32],
+    width: usize,
+    height: usize,
+    levels: u16,
+) -> Vec<u16> {
+    let levels_m1 = usize::from(levels.saturating_sub(1));
+    let mut out = Vec::with_capacity(target_unit.len());
+
+    for y in 0..height {
+        for x in 0..width {
+            let idx = y * width + x;
+            let scaled = target_unit[idx].clamp(0.0, 1.0) * levels_m1 as f32;
+            let base = scaled.floor().clamp(0.0, levels_m1 as f32) as usize;
+            let frac = scaled - base as f32;
+            let rank = CLUSTER_DOT_8X8_FLAT[(y % 8) * 8 + (x % 8)] as f32;
+            let threshold = (rank + 0.5) / 64.0;
+            let level = if frac > threshold && base < levels_m1 {
+                base + 1
+            } else {
+                base
+            };
+            out.push(level as u16);
+        }
+    }
+
+    out
+}
+
+fn levels_to_unit_values(levels_map: &[u16], level_values: &[f32]) -> Vec<f32> {
+    levels_map
+        .iter()
+        .map(|&level| level_values[usize::from(level)])
+        .collect()
+}
+
+fn candidate_levels(current: usize, total: usize) -> [usize; 2] {
+    let lower = current.saturating_sub(1);
+    let upper = (current + 1).min(total.saturating_sub(1));
+    [lower, upper]
+}
+
+fn level_index_to_domain(level: i32, max_value: i32, levels: u16) -> i32 {
+    let levels_m1 = i32::from(levels.saturating_sub(1)).max(1);
+    let numerator = i64::from(level) * i64::from(max_value) + i64::from(levels_m1 / 2);
+    (numerator / i64::from(levels_m1)) as i32
 }
 
 fn write_binary_output<S: Sample, L: PixelLayout>(
@@ -938,6 +1108,40 @@ fn dbs_filtered_error_map(
                     let sidx = sy as usize * width + sx as usize;
                     let halftone = if binary[sidx] == 0 { 0.0_f32 } else { 1.0_f32 };
                     acc += kernel[ky * DBS_HVS_SIZE + kx] * (halftone - target_unit[sidx]);
+                }
+            }
+
+            filtered[y * width + x] = acc;
+        }
+    }
+
+    filtered
+}
+
+fn dbs_filtered_error_map_levels(
+    target_unit: &[f32],
+    output_unit: &[f32],
+    width: usize,
+    height: usize,
+    kernel: &[f32; DBS_HVS_SIZE * DBS_HVS_SIZE],
+    radius: usize,
+) -> Vec<f32> {
+    let mut filtered = vec![0.0_f32; width * height];
+
+    for y in 0..height {
+        for x in 0..width {
+            let mut acc = 0.0_f32;
+
+            for ky in 0..DBS_HVS_SIZE {
+                for kx in 0..DBS_HVS_SIZE {
+                    let sx = x as isize + kx as isize - radius as isize;
+                    let sy = y as isize + ky as isize - radius as isize;
+                    if sx < 0 || sy < 0 || sx as usize >= width || sy as usize >= height {
+                        continue;
+                    }
+
+                    let sidx = sy as usize * width + sx as usize;
+                    acc += kernel[ky * DBS_HVS_SIZE + kx] * (output_unit[sidx] - target_unit[sidx]);
                 }
             }
 

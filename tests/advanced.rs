@@ -5,7 +5,8 @@ use common::{
     rgb_gradient_8x8, rgb_gradient_8x8_f32, rgb_gradient_8x8_u16,
 };
 use dithr::dbs::{
-    direct_binary_search_in_place, electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
+    clustered_dot_direct_multibit_search_in_place, direct_binary_search_in_place,
+    electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
     least_squares_model_based_in_place, model_based_med_in_place,
 };
 use dithr::dot_diffusion::{knuth_dot_diffusion_in_place, optimized_dot_diffusion_in_place};
@@ -109,6 +110,68 @@ fn dbs_u16_smoke() {
     direct_binary_search_in_place(&mut buffer, 4).expect("direct binary search should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+}
+
+#[test]
+fn clustered_dot_direct_multibit_search_runs_small_fixture() {
+    let mut data: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    clustered_dot_direct_multibit_search_in_place(&mut buffer, 4, 4)
+        .expect("clustered-dot direct multibit search should succeed");
+
+    let allowed = [0_u8, 85_u8, 170_u8, 255_u8];
+    assert!(data.iter().all(|value| allowed.contains(value)));
+}
+
+#[test]
+fn clustered_dot_direct_multibit_search_objective_nonincreasing_over_iterations() {
+    let target: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
+    let mut data_0 = target.clone();
+    let mut data_1 = target.clone();
+    let mut data_2 = target.clone();
+
+    let mut buffer_0 = dithr::gray_u8(&mut data_0, 8, 8, 8).expect("valid buffer should construct");
+    let mut buffer_1 = dithr::gray_u8(&mut data_1, 8, 8, 8).expect("valid buffer should construct");
+    let mut buffer_2 = dithr::gray_u8(&mut data_2, 8, 8, 8).expect("valid buffer should construct");
+
+    clustered_dot_direct_multibit_search_in_place(&mut buffer_0, 0, 4)
+        .expect("clustered-dot direct multibit search should succeed");
+    clustered_dot_direct_multibit_search_in_place(&mut buffer_1, 1, 4)
+        .expect("clustered-dot direct multibit search should succeed");
+    clustered_dot_direct_multibit_search_in_place(&mut buffer_2, 2, 4)
+        .expect("clustered-dot direct multibit search should succeed");
+
+    let objective_0 = multibit_objective_for_test(&target, &data_0, 8, 8);
+    let objective_1 = multibit_objective_for_test(&target, &data_1, 8, 8);
+    let objective_2 = multibit_objective_for_test(&target, &data_2, 8, 8);
+
+    assert!(objective_1 <= objective_0);
+    assert!(objective_2 <= objective_1);
+}
+
+#[test]
+fn clustered_dot_direct_multibit_search_rejects_non_gray_or_float() {
+    let mut rgb = rgb_gradient_8x8();
+    let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 8, 8, 24).expect("valid buffer should construct");
+    let rgb_result = clustered_dot_direct_multibit_search_in_place(&mut rgb_buffer, 2, 4);
+    assert_eq!(
+        rgb_result,
+        Err(dithr::Error::UnsupportedFormat(
+            "research algorithms support Gray8 and Gray16 only"
+        ))
+    );
+
+    let mut gray_f32: Vec<f32> = (0..64).map(|index| index as f32 / 63.0).collect();
+    let mut f32_buffer =
+        dithr::gray_32f(&mut gray_f32, 8, 8, 8).expect("valid buffer should construct");
+    let f32_result = clustered_dot_direct_multibit_search_in_place(&mut f32_buffer, 2, 4);
+    assert_eq!(
+        f32_result,
+        Err(dithr::Error::UnsupportedFormat(
+            "research algorithms support Gray8 and Gray16 only"
+        ))
+    );
 }
 
 #[test]
@@ -406,6 +469,52 @@ fn dbs_objective_for_test(target: &[u8], binary: &[u8], width: usize, height: us
                     }
                     let sidx = sy as usize * width + sx as usize;
                     filtered += kernel[ky * SIZE + kx] * (binary_unit[sidx] - target_unit[sidx]);
+                }
+            }
+            energy += f64::from(filtered) * f64::from(filtered);
+        }
+    }
+
+    energy
+}
+
+fn multibit_objective_for_test(target: &[u8], output: &[u8], width: usize, height: usize) -> f64 {
+    const RADIUS: usize = 3;
+    const SIZE: usize = RADIUS * 2 + 1;
+    const SIGMA: f64 = 1.0;
+
+    let mut kernel = [0.0_f32; SIZE * SIZE];
+    let mut sum = 0.0_f64;
+    for ky in 0..SIZE {
+        for kx in 0..SIZE {
+            let dx = kx as isize - RADIUS as isize;
+            let dy = ky as isize - RADIUS as isize;
+            let dist2 = (dx * dx + dy * dy) as f64;
+            let value = (-dist2 / (2.0 * SIGMA * SIGMA)).exp();
+            kernel[ky * SIZE + kx] = value as f32;
+            sum += value;
+        }
+    }
+    for value in &mut kernel {
+        *value = (*value as f64 / sum) as f32;
+    }
+
+    let target_unit: Vec<f32> = target.iter().map(|&v| f32::from(v) / 255.0).collect();
+    let output_unit: Vec<f32> = output.iter().map(|&v| f32::from(v) / 255.0).collect();
+
+    let mut energy = 0.0_f64;
+    for y in 0..height {
+        for x in 0..width {
+            let mut filtered = 0.0_f32;
+            for ky in 0..SIZE {
+                for kx in 0..SIZE {
+                    let sx = x as isize + kx as isize - RADIUS as isize;
+                    let sy = y as isize + ky as isize - RADIUS as isize;
+                    if sx < 0 || sy < 0 || sx as usize >= width || sy as usize >= height {
+                        continue;
+                    }
+                    let sidx = sy as usize * width + sx as usize;
+                    filtered += kernel[ky * SIZE + kx] * (output_unit[sidx] - target_unit[sidx]);
                 }
             }
             energy += f64::from(filtered) * f64::from(filtered);

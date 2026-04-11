@@ -6,7 +6,8 @@ use common::{
 };
 use criterion::{criterion_group, criterion_main, Criterion};
 use dithr::dbs::{
-    direct_binary_search_in_place, electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
+    clustered_dot_direct_multibit_search_in_place, direct_binary_search_in_place,
+    electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
     least_squares_model_based_in_place, model_based_med_in_place,
 };
 use dithr::dot_diffusion::{knuth_dot_diffusion_in_place, optimized_dot_diffusion_in_place};
@@ -140,6 +141,14 @@ fn bench_advanced(c: &mut Criterion) {
         width,
         height,
         |buffer| direct_binary_search_in_place(buffer, 4),
+    );
+    bench_gray_case(
+        &mut group,
+        "clustered_dot_direct_multibit_search_gray_32_iters4_levels4",
+        &fixture,
+        width,
+        height,
+        |buffer| clustered_dot_direct_multibit_search_in_place(buffer, 4, 4),
     );
     group.finish();
 }

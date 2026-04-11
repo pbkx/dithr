@@ -194,6 +194,7 @@
 //! - [`knuth_dot_diffusion_in_place`]
 //! - [`optimized_dot_diffusion_in_place`]
 //! - [`direct_binary_search_in_place`]
+//! - `dbs::clustered_dot_direct_multibit_search_in_place`
 //! - [`lattice_boltzmann_in_place`]
 //! - [`electrostatic_halftoning_in_place`]
 //! - [`model_based_med_in_place`]
@@ -221,6 +222,8 @@
 //!   [`electrostatic_halftoning_in_place`] are integer grayscale-only.
 //! - [`model_based_med_in_place`] and [`least_squares_model_based_in_place`]
 //!   are integer grayscale-only.
+//! - `dbs::clustered_dot_direct_multibit_search_in_place` is integer
+//!   grayscale-only.
 //!
 //! ## Parallel API (`rayon` feature)
 //!

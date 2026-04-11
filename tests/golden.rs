@@ -5,7 +5,8 @@ use common::{
     rgb_gradient_8x8, rgb_gradient_8x8_f32,
 };
 use dithr::dbs::{
-    direct_binary_search_in_place, electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
+    clustered_dot_direct_multibit_search_in_place, direct_binary_search_in_place,
+    electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
     least_squares_model_based_in_place, model_based_med_in_place,
 };
 use dithr::diffusion::{
@@ -801,6 +802,17 @@ fn golden_dbs_gray_ramp_8x8() {
     direct_binary_search_in_place(&mut buffer, 4).expect("direct binary search should succeed");
 
     assert_eq!(fnv1a64(&data), 13_524_482_342_131_736_653_u64);
+}
+
+#[test]
+fn golden_clustered_dot_direct_multibit_search_gray_ramp_8x8() {
+    let mut data = gray_ramp_8x8();
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    clustered_dot_direct_multibit_search_in_place(&mut buffer, 4, 4)
+        .expect("clustered-dot direct multibit search should succeed");
+
+    assert_eq!(fnv1a64(&data), 17_979_209_771_943_592_055_u64);
 }
 
 #[test]

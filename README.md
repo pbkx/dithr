@@ -229,6 +229,7 @@ Tone-dependent coefficient families.
 
 - `ostromoukhov_in_place`
 - `zhou_fang_in_place`
+- `hvs_optimized_error_diffusion_in_place`
 - `gradient_based_error_diffusion_in_place`
 - `multiscale_error_diffusion_in_place`
 - `feature_preserving_msed_in_place`
@@ -445,6 +446,8 @@ cargo test --doc --all-features
   <https://pubmed.ncbi.nlm.nih.gov/20215075/>, <https://www.eie.polyu.edu.hk/~enyhchan/J-TIP-Green_noise_digital_halftoning_with_MED.pdf>
 - Adaptive vector error diffusion:
   <https://pubmed.ncbi.nlm.nih.gov/18282985/>, <https://doi.org/10.1109/83.597270>
+- HVS-optimized error diffusion (Kolpatzik-Bouman):
+  <https://engineering.purdue.edu/~bouman/publications/pdf/jei1scan.pdf>, <https://engineering.purdue.edu/~bouman/publications/pub_doc.html>
 - Linear pixel shuffling error diffusion:
   <https://repository.rit.edu/other/391/>, <https://www.imaging.org/common/uploaded%20files/pdfs/Papers/2000/PICS-0-81/1625.pdf>
 - Riemersma dithering: <https://www.compuphase.com/riemer.htm>

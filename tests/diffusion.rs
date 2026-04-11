@@ -9,10 +9,10 @@ use dithr::diffusion::{
     adaptive_vector_error_diffusion_in_place, atkinson_in_place, burkes_in_place,
     false_floyd_steinberg_in_place, fan_in_place, feature_preserving_msed_in_place,
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
-    jarvis_judice_ninke_in_place, linear_pixel_shuffling_in_place,
-    multiscale_error_diffusion_in_place, ostromoukhov_in_place, shiau_fan_2_in_place,
-    shiau_fan_in_place, sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place,
-    stucki_in_place, two_row_sierra_in_place, zhou_fang_in_place,
+    hvs_optimized_error_diffusion_in_place, jarvis_judice_ninke_in_place,
+    linear_pixel_shuffling_in_place, multiscale_error_diffusion_in_place, ostromoukhov_in_place,
+    shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place, sierra_lite_in_place,
+    stevenson_arce_in_place, stucki_in_place, two_row_sierra_in_place, zhou_fang_in_place,
 };
 use dithr::{Error, GrayBuffer16, Palette, QuantizeMode, RgbBuffer32F};
 
@@ -272,6 +272,20 @@ fn zhou_fang_modulation_in_range() {
 }
 
 #[test]
+fn hvs_optimized_error_diffusion_runs() {
+    let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    hvs_optimized_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("hvs optimized diffusion should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
 fn gradient_based_error_diffusion_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
@@ -406,6 +420,36 @@ fn zhou_fang_rejects_non_gray_formats() {
     let mut rgba_buffer =
         dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
     let rgba_result = zhou_fang_in_place(
+        &mut rgba_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        rgba_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support grayscale formats only"
+        ))
+    ));
+}
+
+#[test]
+fn hvs_optimized_error_diffusion_rejects_non_gray_formats() {
+    let mut rgb = vec![128_u8; 4 * 4 * 3];
+    let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
+    let rgb_result = hvs_optimized_error_diffusion_in_place(
+        &mut rgb_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        rgb_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support grayscale formats only"
+        ))
+    ));
+
+    let mut rgba = vec![128_u8; 4 * 4 * 4];
+    let mut rgba_buffer =
+        dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
+    let rgba_result = hvs_optimized_error_diffusion_in_place(
         &mut rgba_buffer,
         QuantizeMode::gray_bits(1).expect("valid bit depth"),
     );
@@ -729,7 +773,7 @@ fn fixture_builders_are_deterministic() {
 
 #[test]
 fn diffusion_u16_every_wrapper_smoke_gray() {
-    let wrappers: [DiffusionWrapperU16; 20] = [
+    let wrappers: [DiffusionWrapperU16; 21] = [
         floyd_steinberg_in_place,
         false_floyd_steinberg_in_place,
         jarvis_judice_ninke_in_place,
@@ -745,6 +789,7 @@ fn diffusion_u16_every_wrapper_smoke_gray() {
         shiau_fan_2_in_place,
         ostromoukhov_in_place,
         zhou_fang_in_place,
+        hvs_optimized_error_diffusion_in_place,
         gradient_based_error_diffusion_in_place,
         multiscale_error_diffusion_in_place,
         feature_preserving_msed_in_place,
@@ -794,9 +839,10 @@ fn diffusion_f32_every_wrapper_smoke_gray() {
         assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
     }
 
-    let variable_wrappers: [DiffusionWrapperF32; 7] = [
+    let variable_wrappers: [DiffusionWrapperF32; 8] = [
         ostromoukhov_in_place,
         zhou_fang_in_place,
+        hvs_optimized_error_diffusion_in_place,
         gradient_based_error_diffusion_in_place,
         multiscale_error_diffusion_in_place,
         feature_preserving_msed_in_place,
@@ -1132,6 +1178,59 @@ fn linear_pixel_shuffling_output_hash_stable() {
     .expect("linear pixel shuffling should succeed");
 
     assert_eq!(fnv1a64(&data), 1_103_120_312_080_356_549_u64);
+}
+
+#[test]
+fn hvs_optimized_error_diffusion_is_deterministic() {
+    let seed_data = gray_ramp_16x16();
+    let mut a = seed_data.clone();
+    let mut b = seed_data;
+
+    let mut buffer_a = dithr::gray_u8(&mut a, 16, 16, 16).expect("valid buffer should construct");
+    let mut buffer_b = dithr::gray_u8(&mut b, 16, 16, 16).expect("valid buffer should construct");
+
+    hvs_optimized_error_diffusion_in_place(&mut buffer_a, QuantizeMode::GrayLevels(2))
+        .expect("hvs optimized diffusion should succeed");
+    hvs_optimized_error_diffusion_in_place(&mut buffer_b, QuantizeMode::GrayLevels(2))
+        .expect("hvs optimized diffusion should succeed");
+
+    assert_eq!(a, b);
+    assert_eq!(fnv1a64(&a), fnv1a64(&b));
+}
+
+#[test]
+fn hvs_optimized_error_diffusion_output_hash_stable() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    hvs_optimized_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("hvs optimized diffusion should succeed");
+
+    assert_eq!(fnv1a64(&data), 5_596_525_955_455_813_299_u64);
+}
+
+#[test]
+fn hvs_optimized_error_diffusion_levels_invariants() {
+    let mut binary_data = gray_ramp_16x16();
+    let mut binary_buffer =
+        dithr::gray_u8(&mut binary_data, 16, 16, 16).expect("valid buffer should construct");
+
+    hvs_optimized_error_diffusion_in_place(&mut binary_buffer, QuantizeMode::GrayLevels(2))
+        .expect("hvs optimized diffusion should succeed");
+    assert!(binary_data.iter().all(|&value| value == 0 || value == 255));
+
+    let mut levels_data = gray_ramp_16x16();
+    let mut levels_buffer =
+        dithr::gray_u8(&mut levels_data, 16, 16, 16).expect("valid buffer should construct");
+
+    hvs_optimized_error_diffusion_in_place(&mut levels_buffer, QuantizeMode::GrayLevels(4))
+        .expect("hvs optimized diffusion should succeed");
+    assert!(levels_data
+        .iter()
+        .all(|&value| matches!(value, 0 | 85 | 170 | 255)));
 }
 
 #[test]

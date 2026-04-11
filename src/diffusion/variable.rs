@@ -9,6 +9,7 @@ use crate::{
 enum GrayOnlyVariableAlgorithm {
     Ostromoukhov,
     ZhouFang,
+    HvsOptimized,
     GradientBased,
     Multiscale,
     FeaturePreservingMsed,
@@ -28,6 +29,13 @@ pub fn zhou_fang_in_place<S: Sample, L: PixelLayout>(
     mode: QuantizeMode<'_, S>,
 ) -> Result<()> {
     diffuse_gray_only_variable(buffer, mode, GrayOnlyVariableAlgorithm::ZhouFang)
+}
+
+pub fn hvs_optimized_error_diffusion_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    diffuse_gray_only_variable(buffer, mode, GrayOnlyVariableAlgorithm::HvsOptimized)
 }
 
 pub fn gradient_based_error_diffusion_in_place<S: Sample, L: PixelLayout>(
@@ -298,6 +306,7 @@ fn diffuse_gray_only_variable<S: Sample, L: PixelLayout>(
         GrayOnlyVariableAlgorithm::ZhouFang => {
             diffuse_variable_gray(buffer, mode, Some(&ZHOU_FANG_MODULATION))
         }
+        GrayOnlyVariableAlgorithm::HvsOptimized => diffuse_hvs_optimized_gray(buffer, mode),
         GrayOnlyVariableAlgorithm::GradientBased => diffuse_gradient_gray(buffer, mode),
         GrayOnlyVariableAlgorithm::Multiscale => diffuse_multiscale_gray(buffer, mode),
         GrayOnlyVariableAlgorithm::FeaturePreservingMsed => {
@@ -334,6 +343,10 @@ const ADAPTIVE_VECTOR_MAX_WEIGHT: f32 = 0.75;
 const ADAPTIVE_VECTOR_LEARNING_RATE: f32 = 0.09;
 const ADAPTIVE_VECTOR_RELAX_RATE: f32 = 0.035;
 const ADAPTIVE_VECTOR_EPSILON: f32 = 1.0e-7;
+const HVS_OPTIMIZED_FORWARD: f32 = 0.7770;
+const HVS_OPTIMIZED_DOWN_DIAGONAL: f32 = -0.0090;
+const HVS_OPTIMIZED_DOWN: f32 = 0.7861;
+const HVS_OPTIMIZED_DOWN_FORWARD: f32 = -0.6098;
 const LPS_BASE_SEED: u64 = 0x6C8E_9CF5_42A1_7D3B;
 const LPS_NEIGHBORS: [(isize, isize, f32); 8] = [
     (-1, -1, 1.0 / 12.0),
@@ -1076,6 +1089,126 @@ fn diffuse_gradient_gray<S: Sample, L: PixelLayout>(
                 y as isize + 1,
                 [down_right, 0.0, 0.0, 0.0],
             );
+        }
+    }
+
+    Ok(())
+}
+
+fn diffuse_hvs_optimized_gray<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    let width = buffer.width;
+    let height = buffer.height;
+    let mut errors = allocate_gray_error_buffer(width, height)?;
+
+    for y in 0..height {
+        let row = buffer.try_row_mut(y)?;
+        let reverse = (y & 1) == 1;
+
+        if reverse {
+            for x in (0..width).rev() {
+                let pixel = row.get_mut(x..=x).ok_or(BufferError::OutOfBounds)?;
+                let err_idx = (y * width + x) * 4;
+                let err = [
+                    errors[err_idx],
+                    errors[err_idx + 1],
+                    errors[err_idx + 2],
+                    errors[err_idx + 3],
+                ];
+                let adjusted = read_pixel_with_error::<S, L>(pixel, &err)?[0];
+                let quantized =
+                    quantize_pixel::<S, crate::core::Gray>(&[S::from_unit_f32(adjusted)], mode)?;
+                write_quantized_pixel::<S, L>(pixel, quantized);
+                let residual = adjusted - quantized[0].to_unit_f32();
+                let xi = x as isize;
+                let yi = y as isize;
+
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi - 1,
+                    yi,
+                    [residual * HVS_OPTIMIZED_FORWARD, 0.0, 0.0, 0.0],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi + 1,
+                    yi + 1,
+                    [residual * HVS_OPTIMIZED_DOWN_DIAGONAL, 0.0, 0.0, 0.0],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi,
+                    yi + 1,
+                    [residual * HVS_OPTIMIZED_DOWN, 0.0, 0.0, 0.0],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi - 1,
+                    yi + 1,
+                    [residual * HVS_OPTIMIZED_DOWN_FORWARD, 0.0, 0.0, 0.0],
+                );
+            }
+        } else {
+            for x in 0..width {
+                let pixel = row.get_mut(x..=x).ok_or(BufferError::OutOfBounds)?;
+                let err_idx = (y * width + x) * 4;
+                let err = [
+                    errors[err_idx],
+                    errors[err_idx + 1],
+                    errors[err_idx + 2],
+                    errors[err_idx + 3],
+                ];
+                let adjusted = read_pixel_with_error::<S, L>(pixel, &err)?[0];
+                let quantized =
+                    quantize_pixel::<S, crate::core::Gray>(&[S::from_unit_f32(adjusted)], mode)?;
+                write_quantized_pixel::<S, L>(pixel, quantized);
+                let residual = adjusted - quantized[0].to_unit_f32();
+                let xi = x as isize;
+                let yi = y as isize;
+
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi + 1,
+                    yi,
+                    [residual * HVS_OPTIMIZED_FORWARD, 0.0, 0.0, 0.0],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi - 1,
+                    yi + 1,
+                    [residual * HVS_OPTIMIZED_DOWN_DIAGONAL, 0.0, 0.0, 0.0],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi,
+                    yi + 1,
+                    [residual * HVS_OPTIMIZED_DOWN, 0.0, 0.0, 0.0],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi + 1,
+                    yi + 1,
+                    [residual * HVS_OPTIMIZED_DOWN_FORWARD, 0.0, 0.0, 0.0],
+                );
+            }
         }
     }
 

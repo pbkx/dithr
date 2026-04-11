@@ -169,6 +169,7 @@
 //!
 //! - [`ostromoukhov_in_place`]
 //! - [`zhou_fang_in_place`]
+//! - [`hvs_optimized_error_diffusion_in_place`]
 //! - [`gradient_based_error_diffusion_in_place`]
 //! - [`multiscale_error_diffusion_in_place`]
 //! - [`feature_preserving_msed_in_place`]
@@ -190,6 +191,7 @@
 //! Scope notes:
 //!
 //! - [`ostromoukhov_in_place`], [`zhou_fang_in_place`], and
+//!   [`hvs_optimized_error_diffusion_in_place`], and
 //!   [`gradient_based_error_diffusion_in_place`], and
 //!   [`multiscale_error_diffusion_in_place`], and
 //!   [`feature_preserving_msed_in_place`], and

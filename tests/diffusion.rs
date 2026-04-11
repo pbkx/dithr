@@ -6,9 +6,9 @@ use common::{
 };
 use dithr::core::PixelLayout;
 use dithr::diffusion::{
-    atkinson_in_place, burkes_in_place, false_floyd_steinberg_in_place, fan_in_place,
-    feature_preserving_msed_in_place, floyd_steinberg_in_place,
-    gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
+    adaptive_vector_error_diffusion_in_place, atkinson_in_place, burkes_in_place,
+    false_floyd_steinberg_in_place, fan_in_place, feature_preserving_msed_in_place,
+    floyd_steinberg_in_place, gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
     jarvis_judice_ninke_in_place, multiscale_error_diffusion_in_place, ostromoukhov_in_place,
     shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place, sierra_lite_in_place,
     stevenson_arce_in_place, stucki_in_place, two_row_sierra_in_place, zhou_fang_in_place,
@@ -327,6 +327,22 @@ fn green_noise_msed_runs() {
 }
 
 #[test]
+fn adaptive_vector_error_diffusion_runs_rgb() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    adaptive_vector_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("adaptive vector diffusion should succeed");
+
+    assert!(data
+        .iter()
+        .all(|&value| { matches!(value, 0 | 85 | 170 | 255) }));
+}
+
+#[test]
 fn ostromoukhov_rejects_non_gray_formats() {
     let mut rgb = vec![128_u8; 4 * 4 * 3];
     let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
@@ -502,6 +518,23 @@ fn green_noise_msed_rejects_non_gray_formats() {
         rgba_result,
         Err(Error::UnsupportedFormat(
             "variable diffusion algorithms support grayscale formats only"
+        ))
+    ));
+}
+
+#[test]
+fn adaptive_vector_error_diffusion_rejects_gray_formats() {
+    let mut gray = vec![128_u8; 4 * 4];
+    let mut gray_buffer =
+        dithr::gray_u8(&mut gray, 4, 4, 4).expect("valid buffer should construct");
+    let gray_result = adaptive_vector_error_diffusion_in_place(
+        &mut gray_buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        gray_result,
+        Err(Error::UnsupportedFormat(
+            "adaptive vector error diffusion supports Rgb and Rgba formats only"
         ))
     ));
 }
@@ -687,7 +720,7 @@ fn diffusion_u16_every_wrapper_smoke_gray() {
 
 #[test]
 fn diffusion_f32_every_wrapper_smoke_gray() {
-    let classic_extended_wrappers: [DiffusionWrapperF32; 13] = [
+    let classic_extended_wrappers: [DiffusionWrapperF32; 14] = [
         floyd_steinberg_in_place,
         false_floyd_steinberg_in_place,
         jarvis_judice_ninke_in_place,
@@ -701,6 +734,7 @@ fn diffusion_f32_every_wrapper_smoke_gray() {
         fan_in_place,
         shiau_fan_in_place,
         shiau_fan_2_in_place,
+        adaptive_vector_error_diffusion_in_place,
     ];
 
     for wrapper in classic_extended_wrappers {
@@ -1051,6 +1085,66 @@ fn green_noise_msed_low_frequency_suppression_proxy() {
     let baseline_ratio = green_noise_proxy_ratio(&baseline_data, 64, 64);
     let green_ratio = green_noise_proxy_ratio(&green_data, 64, 64);
     assert!(green_ratio <= baseline_ratio * 0.98);
+}
+
+#[test]
+fn adaptive_vector_error_diffusion_is_deterministic() {
+    let seed_data = rgb_gradient_8x8();
+    let mut a = seed_data.clone();
+    let mut b = seed_data;
+
+    let mut buffer_a = dithr::rgb_u8(&mut a, 8, 8, 24).expect("valid buffer should construct");
+    let mut buffer_b = dithr::rgb_u8(&mut b, 8, 8, 24).expect("valid buffer should construct");
+
+    adaptive_vector_error_diffusion_in_place(
+        &mut buffer_a,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("adaptive vector diffusion should succeed");
+    adaptive_vector_error_diffusion_in_place(
+        &mut buffer_b,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("adaptive vector diffusion should succeed");
+
+    assert_eq!(a, b);
+    assert_eq!(fnv1a64(&a), fnv1a64(&b));
+}
+
+#[test]
+fn adaptive_vector_error_diffusion_coeff_bounds_invariant() {
+    let mut data: Vec<f32> = (0..(32 * 32 * 3))
+        .map(|idx| {
+            let x = idx % 32;
+            let y = (idx / 32) % 32;
+            (((x * 17 + y * 31 + idx * 7) % 257) as f32 / 256.0).clamp(0.0, 1.0)
+        })
+        .collect();
+    let mut buffer = dithr::rgb_32f(&mut data, 32, 32, 96).expect("valid buffer should construct");
+
+    adaptive_vector_error_diffusion_in_place(&mut buffer, QuantizeMode::RgbLevels(4))
+        .expect("adaptive vector diffusion should succeed");
+
+    assert!(data.iter().all(|value| value.is_finite()));
+    assert!(data.iter().all(|&value| (0.0..=1.0).contains(&value)));
+}
+
+#[test]
+fn adaptive_vector_error_diffusion_preserves_rgba_alpha() {
+    let mut data: Vec<u8> = (0_u16..(16 * 16 * 4))
+        .map(|value| ((value * 37 + 19) % 256) as u8)
+        .collect();
+    let before_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
+    let mut buffer = dithr::rgba_u8(&mut data, 16, 16, 64).expect("valid buffer should construct");
+
+    adaptive_vector_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("adaptive vector diffusion should succeed");
+
+    let after_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_alpha, after_alpha);
 }
 
 #[test]

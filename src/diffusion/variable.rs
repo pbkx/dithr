@@ -1,6 +1,6 @@
 use super::core::{diffuse_error_forward, read_pixel_with_error, write_quantized_pixel};
 use crate::{
-    core::{PixelLayout, Sample},
+    core::{read_unit_pixel, PixelLayout, Sample},
     data::{OSTROMOUKHOV_COEFFS, ZHOU_FANG_MODULATION},
     quantize_pixel, Buffer, BufferError, Error, QuantizeMode, Result,
 };
@@ -61,6 +61,213 @@ pub fn green_noise_msed_in_place<S: Sample, L: PixelLayout>(
     diffuse_gray_only_variable(buffer, mode, GrayOnlyVariableAlgorithm::GreenNoiseMsed)
 }
 
+pub fn adaptive_vector_error_diffusion_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    buffer.validate()?;
+
+    if !(L::COLOR_CHANNELS == 3 && (L::CHANNELS == 3 || L::CHANNELS == 4)) {
+        return Err(Error::UnsupportedFormat(
+            "adaptive vector error diffusion supports Rgb and Rgba formats only",
+        ));
+    }
+
+    let width = buffer.width;
+    let height = buffer.height;
+    let channels = L::CHANNELS;
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
+    let error_len = pixel_count
+        .checked_mul(4)
+        .ok_or(Error::InvalidArgument("error buffer size overflow"))?;
+    let mut errors = vec![0.0_f32; error_len];
+    let mut weights = ADAPTIVE_VECTOR_BASE_WEIGHTS;
+    let mut previous_residual = [0.0_f32; 3];
+
+    for y in 0..height {
+        let reverse = (y & 1) == 1;
+        let row = buffer.try_row_mut(y)?;
+
+        if reverse {
+            for x in (0..width).rev() {
+                let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
+                let end = offset
+                    .checked_add(channels)
+                    .ok_or(BufferError::OutOfBounds)?;
+                let pixel = row.get_mut(offset..end).ok_or(BufferError::OutOfBounds)?;
+                let err_idx = (y * width + x) * 4;
+                let err = [
+                    errors[err_idx],
+                    errors[err_idx + 1],
+                    errors[err_idx + 2],
+                    errors[err_idx + 3],
+                ];
+                let adjusted_unit = read_pixel_with_error::<S, L>(pixel, &err)?;
+                let adjusted = [
+                    S::from_unit_f32(adjusted_unit[0]),
+                    S::from_unit_f32(adjusted_unit[1]),
+                    S::from_unit_f32(adjusted_unit[2]),
+                    S::from_unit_f32(adjusted_unit[3]),
+                ];
+                let quantized = quantize_pixel::<S, L>(&adjusted[..channels], mode)?;
+                let quantized_unit = read_unit_pixel::<S, L>(&quantized[..channels])?;
+                write_quantized_pixel::<S, L>(pixel, quantized);
+
+                let residual = [
+                    adjusted_unit[0] - quantized_unit[0],
+                    adjusted_unit[1] - quantized_unit[1],
+                    adjusted_unit[2] - quantized_unit[2],
+                ];
+                update_adaptive_vector_weights(&mut weights, residual, previous_residual)?;
+                previous_residual = residual;
+
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    x as isize - 1,
+                    y as isize,
+                    [
+                        residual[0] * weights[0],
+                        residual[1] * weights[0],
+                        residual[2] * weights[0],
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    x as isize + 1,
+                    y as isize + 1,
+                    [
+                        residual[0] * weights[1],
+                        residual[1] * weights[1],
+                        residual[2] * weights[1],
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    x as isize,
+                    y as isize + 1,
+                    [
+                        residual[0] * weights[2],
+                        residual[1] * weights[2],
+                        residual[2] * weights[2],
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    x as isize - 1,
+                    y as isize + 1,
+                    [
+                        residual[0] * weights[3],
+                        residual[1] * weights[3],
+                        residual[2] * weights[3],
+                        0.0,
+                    ],
+                );
+            }
+        } else {
+            for x in 0..width {
+                let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
+                let end = offset
+                    .checked_add(channels)
+                    .ok_or(BufferError::OutOfBounds)?;
+                let pixel = row.get_mut(offset..end).ok_or(BufferError::OutOfBounds)?;
+                let err_idx = (y * width + x) * 4;
+                let err = [
+                    errors[err_idx],
+                    errors[err_idx + 1],
+                    errors[err_idx + 2],
+                    errors[err_idx + 3],
+                ];
+                let adjusted_unit = read_pixel_with_error::<S, L>(pixel, &err)?;
+                let adjusted = [
+                    S::from_unit_f32(adjusted_unit[0]),
+                    S::from_unit_f32(adjusted_unit[1]),
+                    S::from_unit_f32(adjusted_unit[2]),
+                    S::from_unit_f32(adjusted_unit[3]),
+                ];
+                let quantized = quantize_pixel::<S, L>(&adjusted[..channels], mode)?;
+                let quantized_unit = read_unit_pixel::<S, L>(&quantized[..channels])?;
+                write_quantized_pixel::<S, L>(pixel, quantized);
+
+                let residual = [
+                    adjusted_unit[0] - quantized_unit[0],
+                    adjusted_unit[1] - quantized_unit[1],
+                    adjusted_unit[2] - quantized_unit[2],
+                ];
+                update_adaptive_vector_weights(&mut weights, residual, previous_residual)?;
+                previous_residual = residual;
+
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    x as isize + 1,
+                    y as isize,
+                    [
+                        residual[0] * weights[0],
+                        residual[1] * weights[0],
+                        residual[2] * weights[0],
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    x as isize - 1,
+                    y as isize + 1,
+                    [
+                        residual[0] * weights[1],
+                        residual[1] * weights[1],
+                        residual[2] * weights[1],
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    x as isize,
+                    y as isize + 1,
+                    [
+                        residual[0] * weights[2],
+                        residual[1] * weights[2],
+                        residual[2] * weights[2],
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    x as isize + 1,
+                    y as isize + 1,
+                    [
+                        residual[0] * weights[3],
+                        residual[1] * weights[3],
+                        residual[2] * weights[3],
+                        0.0,
+                    ],
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn diffuse_gray_only_variable<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     mode: QuantizeMode<'_, S>,
@@ -106,6 +313,12 @@ const GREEN_NOISE_SMALL_RADIUS: usize = 1;
 const GREEN_NOISE_LARGE_RADIUS: usize = 3;
 const GREEN_NOISE_THRESHOLD_AMPLITUDE: f32 = 0.0625;
 const GREEN_NOISE_DIFFUSION_AMPLITUDE: f32 = 0.2;
+const ADAPTIVE_VECTOR_BASE_WEIGHTS: [f32; 4] = [7.0 / 16.0, 3.0 / 16.0, 5.0 / 16.0, 1.0 / 16.0];
+const ADAPTIVE_VECTOR_MIN_WEIGHT: f32 = 0.05;
+const ADAPTIVE_VECTOR_MAX_WEIGHT: f32 = 0.75;
+const ADAPTIVE_VECTOR_LEARNING_RATE: f32 = 0.09;
+const ADAPTIVE_VECTOR_RELAX_RATE: f32 = 0.035;
+const ADAPTIVE_VECTOR_EPSILON: f32 = 1.0e-7;
 
 fn diffuse_multiscale_gray<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
@@ -969,4 +1182,138 @@ fn sample_to_byte<S: Sample>(value: S) -> u8 {
 
 fn luma_bucket_unit(value_unit: f32) -> u8 {
     (value_unit.clamp(0.0, 1.0) * 255.0).round() as u8
+}
+
+fn update_adaptive_vector_weights(
+    weights: &mut [f32; 4],
+    residual: [f32; 3],
+    previous_residual: [f32; 3],
+) -> Result<()> {
+    let residual_norm = vector_norm_sq(residual);
+    let previous_norm = vector_norm_sq(previous_residual);
+
+    if residual_norm > ADAPTIVE_VECTOR_EPSILON && previous_norm > ADAPTIVE_VECTOR_EPSILON {
+        let correlation = vector_dot(residual, previous_residual)
+            / ((residual_norm * previous_norm).sqrt() + ADAPTIVE_VECTOR_EPSILON);
+        let chroma = ((residual[0] - residual[1]).abs()
+            + (residual[1] - residual[2]).abs()
+            + (residual[2] - residual[0]).abs())
+            / 3.0;
+        let step = ADAPTIVE_VECTOR_LEARNING_RATE
+            * correlation
+            * residual_norm.sqrt().clamp(0.0, 1.0)
+            * (1.0 + 0.5 * chroma.clamp(0.0, 1.0));
+        weights[0] += step;
+        weights[2] += 0.5 * step;
+        weights[1] -= 0.75 * step;
+        weights[3] -= 0.75 * step;
+    }
+
+    for (idx, weight) in weights.iter_mut().enumerate() {
+        *weight += (ADAPTIVE_VECTOR_BASE_WEIGHTS[idx] - *weight) * ADAPTIVE_VECTOR_RELAX_RATE;
+        *weight = weight.clamp(ADAPTIVE_VECTOR_MIN_WEIGHT, ADAPTIVE_VECTOR_MAX_WEIGHT);
+    }
+
+    project_adaptive_vector_weights(weights)?;
+    validate_adaptive_vector_weights(*weights)
+}
+
+fn project_adaptive_vector_weights(weights: &mut [f32; 4]) -> Result<()> {
+    for weight in weights.iter_mut() {
+        if !weight.is_finite() {
+            return Err(Error::InvalidArgument(
+                "adaptive vector coefficients must remain finite",
+            ));
+        }
+        *weight = weight.clamp(ADAPTIVE_VECTOR_MIN_WEIGHT, ADAPTIVE_VECTOR_MAX_WEIGHT);
+    }
+
+    for _ in 0..8 {
+        let sum = weights.iter().copied().sum::<f32>();
+        if !sum.is_finite() {
+            return Err(Error::InvalidArgument(
+                "adaptive vector coefficient normalization failed",
+            ));
+        }
+        let delta = 1.0 - sum;
+        if delta.abs() <= 1.0e-6 {
+            return Ok(());
+        }
+
+        if delta > 0.0 {
+            let room = weights
+                .iter()
+                .map(|weight| ADAPTIVE_VECTOR_MAX_WEIGHT - *weight)
+                .sum::<f32>();
+            if room <= ADAPTIVE_VECTOR_EPSILON {
+                return Err(Error::InvalidArgument(
+                    "adaptive vector coefficient normalization failed",
+                ));
+            }
+            for weight in weights.iter_mut() {
+                let avail = ADAPTIVE_VECTOR_MAX_WEIGHT - *weight;
+                *weight += delta * (avail / room);
+            }
+        } else {
+            let room = weights
+                .iter()
+                .map(|weight| *weight - ADAPTIVE_VECTOR_MIN_WEIGHT)
+                .sum::<f32>();
+            if room <= ADAPTIVE_VECTOR_EPSILON {
+                return Err(Error::InvalidArgument(
+                    "adaptive vector coefficient normalization failed",
+                ));
+            }
+            for weight in weights.iter_mut() {
+                let avail = *weight - ADAPTIVE_VECTOR_MIN_WEIGHT;
+                *weight += delta * (avail / room);
+            }
+        }
+
+        for weight in weights.iter_mut() {
+            *weight = weight.clamp(ADAPTIVE_VECTOR_MIN_WEIGHT, ADAPTIVE_VECTOR_MAX_WEIGHT);
+        }
+    }
+
+    let final_sum = weights.iter().copied().sum::<f32>();
+    if (final_sum - 1.0).abs() > 1.0e-4 {
+        return Err(Error::InvalidArgument(
+            "adaptive vector coefficient normalization failed",
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_adaptive_vector_weights(weights: [f32; 4]) -> Result<()> {
+    let mut sum = 0.0_f32;
+    for weight in weights {
+        if !weight.is_finite() {
+            return Err(Error::InvalidArgument(
+                "adaptive vector coefficients must remain finite",
+            ));
+        }
+        if !(ADAPTIVE_VECTOR_MIN_WEIGHT..=ADAPTIVE_VECTOR_MAX_WEIGHT).contains(&weight) {
+            return Err(Error::InvalidArgument(
+                "adaptive vector coefficients out of bounds",
+            ));
+        }
+        sum += weight;
+    }
+
+    if (sum - 1.0).abs() > 1.0e-4 {
+        return Err(Error::InvalidArgument(
+            "adaptive vector coefficients must sum to one",
+        ));
+    }
+
+    Ok(())
+}
+
+fn vector_dot(a: [f32; 3], b: [f32; 3]) -> f32 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+fn vector_norm_sq(a: [f32; 3]) -> f32 {
+    vector_dot(a, a)
 }

@@ -233,8 +233,11 @@ Tone-dependent coefficient families.
 - `multiscale_error_diffusion_in_place`
 - `feature_preserving_msed_in_place`
 - `green_noise_msed_in_place`
+- `adaptive_vector_error_diffusion_in_place`
 
-Scope note: variable diffusion methods are grayscale-only.
+Scope note: variable diffusion methods are grayscale-only except
+`adaptive_vector_error_diffusion_in_place`, which supports Rgb/Rgba with alpha
+preservation on Rgba.
 
 #### Advanced halftoning
 
@@ -411,7 +414,8 @@ cargo test --doc --all-features
 - Core processing is in-memory and buffer-first; it does not provide general
   image editing workflows.
 - Not every algorithm supports every format/layout/sample combination.
-- Variable diffusion methods are grayscale-only.
+- Variable diffusion methods are grayscale-only except
+  `adaptive_vector_error_diffusion_in_place` for Rgb/Rgba.
 - `direct_binary_search_in_place`, `lattice_boltzmann_in_place`, and
   `electrostatic_halftoning_in_place` are integer grayscale-only.
 - Parallel wrappers are currently provided for ordered, Yliluoma, and binary
@@ -435,6 +439,8 @@ cargo test --doc --all-features
   <https://ira.lib.polyu.edu.hk/bitstream/10397/1524/1/J-JEI-Feature-preserving%20multiscale%20error%20diffusion_04.pdf>, <https://doi.org/10.1117/1.1758728>
 - Green-noise multiscale error diffusion:
   <https://pubmed.ncbi.nlm.nih.gov/20215075/>, <https://www.eie.polyu.edu.hk/~enyhchan/J-TIP-Green_noise_digital_halftoning_with_MED.pdf>
+- Adaptive vector error diffusion:
+  <https://pubmed.ncbi.nlm.nih.gov/18282985/>, <https://doi.org/10.1109/83.597270>
 - Riemersma dithering: <https://www.compuphase.com/riemer.htm>
 - Knuth dot diffusion: <https://dl.acm.org/doi/10.1145/35039.35040>
 - Optimized dot diffusion: <https://doi.org/10.1109/83.841944>

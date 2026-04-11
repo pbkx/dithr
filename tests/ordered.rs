@@ -12,9 +12,9 @@ use dithr::data::{
 use dithr::ordered::{
     adaptive_ordered_dither_in_place, bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place,
     bayer_8x8_in_place, cluster_dot_4x4_in_place, cluster_dot_8x8_in_place,
-    custom_ordered_in_place, image_based_dither_screen_in_place, ranked_dither_in_place,
-    space_filling_curve_ordered_dither_in_place, void_and_cluster_in_place, yliluoma_1_in_place,
-    yliluoma_2_in_place, yliluoma_3_in_place,
+    custom_ordered_in_place, image_based_dither_screen_in_place, polyomino_ordered_dither_in_place,
+    ranked_dither_in_place, space_filling_curve_ordered_dither_in_place, void_and_cluster_in_place,
+    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
 };
 #[cfg(feature = "rayon")]
 use dithr::ordered::{yliluoma_1_in_place_par, yliluoma_2_in_place_par, yliluoma_3_in_place_par};
@@ -477,6 +477,63 @@ fn image_based_dither_screen_generated_screen_is_deterministic() {
 
     assert_eq!(data_a, data_b);
     assert_eq!(fnv1a64(&data_a), 14_844_052_982_348_062_879_u64);
+}
+
+#[test]
+fn polyomino_ordered_runs_and_quantizes_u8() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    polyomino_ordered_dither_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("polyomino ordered dithering should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn polyomino_ordered_ranking_is_deterministic() {
+    let mut data_a = vec![127_u8; 48 * 48];
+    let mut data_b = vec![127_u8; 48 * 48];
+
+    let mut buffer_a =
+        dithr::gray_u8(&mut data_a, 48, 48, 48).expect("valid buffer should construct");
+    let mut buffer_b =
+        dithr::gray_u8(&mut data_b, 48, 48, 48).expect("valid buffer should construct");
+
+    polyomino_ordered_dither_in_place(
+        &mut buffer_a,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("polyomino ordered dithering should succeed");
+    polyomino_ordered_dither_in_place(
+        &mut buffer_b,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("polyomino ordered dithering should succeed");
+
+    assert_eq!(data_a, data_b);
+    assert_eq!(fnv1a64(&data_a), 8_198_126_068_382_287_799_u64);
+}
+
+#[test]
+fn polyomino_ordered_rejects_non_gray_layout() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    let result = polyomino_ordered_dither_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    );
+
+    assert_eq!(
+        result,
+        Err(Error::UnsupportedFormat(
+            "polyomino ordered dithering supports Gray layouts only"
+        ))
+    );
 }
 
 #[test]

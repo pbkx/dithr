@@ -143,6 +143,7 @@
 //! - Space-filling curve ordered: `ordered::space_filling_curve_ordered_dither_in_place`
 //! - Ranked dither: `ordered::ranked_dither_in_place`
 //! - Image-based dither screens: `ordered::image_based_dither_screen_in_place`
+//! - Polyomino ordered: `ordered::polyomino_ordered_dither_in_place`
 //!
 //! Palette-oriented ordered (Yliluoma):
 //!

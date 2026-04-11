@@ -3,6 +3,7 @@ mod bayer;
 mod cluster;
 pub(crate) mod core;
 mod image_based_screen;
+mod polyomino;
 mod ranked;
 mod space_filling;
 mod void_cluster;
@@ -46,6 +47,7 @@ pub use cluster::{cluster_dot_4x4_in_place, cluster_dot_8x8_in_place};
 #[cfg(feature = "rayon")]
 pub use cluster::{cluster_dot_4x4_in_place_par, cluster_dot_8x8_in_place_par};
 pub use image_based_screen::image_based_dither_screen_in_place;
+pub use polyomino::polyomino_ordered_dither_in_place;
 pub use ranked::ranked_dither_in_place;
 pub use space_filling::space_filling_curve_ordered_dither_in_place;
 pub use void_cluster::void_and_cluster_in_place;

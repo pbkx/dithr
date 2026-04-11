@@ -6,6 +6,7 @@ use common::{
 };
 use dithr::dbs::{
     direct_binary_search_in_place, electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
+    least_squares_model_based_in_place, model_based_med_in_place,
 };
 use dithr::dot_diffusion::{knuth_dot_diffusion_in_place, optimized_dot_diffusion_in_place};
 use dithr::riemersma::riemersma_in_place;
@@ -178,6 +179,66 @@ fn electrostatic_halftoning_u16_smoke() {
 }
 
 #[test]
+fn model_based_med_runs_small_fixture() {
+    let mut data_a: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
+    let mut data_b = data_a.clone();
+
+    let mut buffer_a = dithr::gray_u8(&mut data_a, 8, 8, 8).expect("valid buffer should construct");
+    let mut buffer_b = dithr::gray_u8(&mut data_b, 8, 8, 8).expect("valid buffer should construct");
+
+    model_based_med_in_place(&mut buffer_a).expect("model-based med should succeed");
+    model_based_med_in_place(&mut buffer_b).expect("model-based med should succeed");
+
+    assert!(data_a.iter().all(|&value| value == 0 || value == 255));
+    assert_eq!(fnv1a64(&data_a), fnv1a64(&data_b));
+}
+
+#[test]
+fn least_squares_model_based_runs_small_fixture() {
+    let mut data_a: Vec<u8> = (0_u16..64).map(|value| (value * 4) as u8).collect();
+    let mut data_b = data_a.clone();
+
+    let mut buffer_a = dithr::gray_u8(&mut data_a, 8, 8, 8).expect("valid buffer should construct");
+    let mut buffer_b = dithr::gray_u8(&mut data_b, 8, 8, 8).expect("valid buffer should construct");
+
+    least_squares_model_based_in_place(&mut buffer_a, 3)
+        .expect("least-squares model-based should succeed");
+    least_squares_model_based_in_place(&mut buffer_b, 3)
+        .expect("least-squares model-based should succeed");
+
+    assert!(data_a.iter().all(|&value| value == 0 || value == 255));
+    assert_eq!(fnv1a64(&data_a), fnv1a64(&data_b));
+}
+
+#[test]
+fn model_based_methods_improve_objective_vs_threshold_baseline() {
+    let target = gray_ramp_16x16();
+    let mut med_data = target.clone();
+    let mut lsmb_data = target.clone();
+    let baseline_data = target
+        .iter()
+        .copied()
+        .map(|value| if value >= 128 { 255_u8 } else { 0_u8 })
+        .collect::<Vec<u8>>();
+
+    let mut med_buffer =
+        dithr::gray_u8(&mut med_data, 16, 16, 16).expect("valid buffer should construct");
+    let mut lsmb_buffer =
+        dithr::gray_u8(&mut lsmb_data, 16, 16, 16).expect("valid buffer should construct");
+
+    model_based_med_in_place(&mut med_buffer).expect("model-based med should succeed");
+    least_squares_model_based_in_place(&mut lsmb_buffer, 4)
+        .expect("least-squares model-based should succeed");
+
+    let baseline_obj = model_based_objective_for_test(&target, &baseline_data, 16, 16);
+    let med_obj = model_based_objective_for_test(&target, &med_data, 16, 16);
+    let lsmb_obj = model_based_objective_for_test(&target, &lsmb_data, 16, 16);
+
+    assert!(med_obj < baseline_obj);
+    assert!(lsmb_obj < baseline_obj);
+}
+
+#[test]
 fn riemersma_runs() {
     let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
     let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
@@ -345,6 +406,87 @@ fn dbs_objective_for_test(target: &[u8], binary: &[u8], width: usize, height: us
                     }
                     let sidx = sy as usize * width + sx as usize;
                     filtered += kernel[ky * SIZE + kx] * (binary_unit[sidx] - target_unit[sidx]);
+                }
+            }
+            energy += f64::from(filtered) * f64::from(filtered);
+        }
+    }
+
+    energy
+}
+
+fn model_based_objective_for_test(
+    target: &[u8],
+    binary: &[u8],
+    width: usize,
+    height: usize,
+) -> f64 {
+    const PRINTER_KERNEL: [f32; 9] = [
+        0.025, 0.07, 0.025, //
+        0.07, 0.62, 0.07, //
+        0.025, 0.07, 0.025,
+    ];
+    const EYE_RADIUS: usize = 3;
+    const EYE_SIZE: usize = EYE_RADIUS * 2 + 1;
+    const EYE_SIGMA: f64 = 1.2;
+
+    let mut eye = [0.0_f32; EYE_SIZE * EYE_SIZE];
+    let mut eye_sum = 0.0_f64;
+    for ky in 0..EYE_SIZE {
+        for kx in 0..EYE_SIZE {
+            let dx = kx as isize - EYE_RADIUS as isize;
+            let dy = ky as isize - EYE_RADIUS as isize;
+            let dist2 = (dx * dx + dy * dy) as f64;
+            let value = (-dist2 / (2.0 * EYE_SIGMA * EYE_SIGMA)).exp();
+            eye[ky * EYE_SIZE + kx] = value as f32;
+            eye_sum += value;
+        }
+    }
+    for value in &mut eye {
+        *value = (*value as f64 / eye_sum) as f32;
+    }
+
+    let kernel_size = EYE_SIZE + 2;
+    let kernel_radius = kernel_size / 2;
+    let mut kernel = vec![0.0_f32; kernel_size * kernel_size];
+
+    for py in 0..3 {
+        for px in 0..3 {
+            let printer = PRINTER_KERNEL[py * 3 + px];
+            for ey in 0..EYE_SIZE {
+                for ex in 0..EYE_SIZE {
+                    kernel[(py + ey) * kernel_size + (px + ex)] +=
+                        printer * eye[ey * EYE_SIZE + ex];
+                }
+            }
+        }
+    }
+
+    let target_unit = target
+        .iter()
+        .copied()
+        .map(|value| f32::from(value) / 255.0)
+        .collect::<Vec<f32>>();
+    let binary_unit = binary
+        .iter()
+        .copied()
+        .map(|value| if value == 0 { 0.0_f32 } else { 1.0_f32 })
+        .collect::<Vec<f32>>();
+
+    let mut energy = 0.0_f64;
+    for y in 0..height {
+        for x in 0..width {
+            let mut filtered = 0.0_f32;
+            for ky in 0..kernel_size {
+                for kx in 0..kernel_size {
+                    let sx = x as isize + kx as isize - kernel_radius as isize;
+                    let sy = y as isize + ky as isize - kernel_radius as isize;
+                    if sx < 0 || sy < 0 || sx as usize >= width || sy as usize >= height {
+                        continue;
+                    }
+                    let sidx = sy as usize * width + sx as usize;
+                    filtered +=
+                        kernel[ky * kernel_size + kx] * (binary_unit[sidx] - target_unit[sidx]);
                 }
             }
             energy += f64::from(filtered) * f64::from(filtered);

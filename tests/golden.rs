@@ -6,6 +6,7 @@ use common::{
 };
 use dithr::dbs::{
     direct_binary_search_in_place, electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
+    least_squares_model_based_in_place, model_based_med_in_place,
 };
 use dithr::diffusion::{
     adaptive_vector_error_diffusion_in_place, atkinson_in_place, burkes_in_place,
@@ -647,6 +648,27 @@ fn golden_electrostatic_halftoning_gray_ramp_8x8() {
         .expect("electrostatic halftoning should succeed");
 
     assert_eq!(fnv1a64(&data), 17_642_593_173_974_510_369_u64);
+}
+
+#[test]
+fn golden_model_based_med_gray_ramp_8x8() {
+    let mut data = gray_ramp_8x8();
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    model_based_med_in_place(&mut buffer).expect("model-based med should succeed");
+
+    assert_eq!(fnv1a64(&data), 17_040_296_475_029_207_528_u64);
+}
+
+#[test]
+fn golden_least_squares_model_based_gray_ramp_8x8() {
+    let mut data = gray_ramp_8x8();
+    let mut buffer = dithr::gray_u8(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    least_squares_model_based_in_place(&mut buffer, 4)
+        .expect("least-squares model-based should succeed");
+
+    assert_eq!(fnv1a64(&data), 10_671_705_163_175_059_978_u64);
 }
 
 #[test]

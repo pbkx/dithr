@@ -250,11 +250,14 @@ Specialized methods with narrower scope than the ordered/diffusion baseline.
 - `direct_binary_search_in_place`
 - `lattice_boltzmann_in_place`
 - `electrostatic_halftoning_in_place`
+- `model_based_med_in_place`
+- `least_squares_model_based_in_place`
 
 Scope notes:
 
 - `direct_binary_search_in_place`, `lattice_boltzmann_in_place`, and
-  `electrostatic_halftoning_in_place` require integer grayscale buffers.
+  `electrostatic_halftoning_in_place`, `model_based_med_in_place`, and
+  `least_squares_model_based_in_place` require integer grayscale buffers.
 - `riemersma_in_place`, `knuth_dot_diffusion_in_place`, and
   `optimized_dot_diffusion_in_place` support Gray/Rgb/Rgba layouts, with alpha
   preserved for Rgba paths.
@@ -448,6 +451,8 @@ cargo test --doc --all-features
 - Knuth dot diffusion: <https://dl.acm.org/doi/10.1145/35039.35040>
 - Optimized dot diffusion: <https://doi.org/10.1109/83.841944>
 - Direct binary search halftoning: <https://doi.org/10.1117/12.135959>
+- Model-based halftoning (MED + LSMB):
+  <https://pubmed.ncbi.nlm.nih.gov/18282991/>, <https://doi.org/10.1117/12.135965>, <https://users.eecs.northwestern.edu/~pappas/papers/pappas_neuhoff_tip99.pdf>
 - Lattice-Boltzmann halftoning:
   <https://www.mia.uni-saarland.de/Publications/hagenburg-isvc09.pdf>
 - Electrostatic halftoning:

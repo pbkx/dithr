@@ -7,6 +7,7 @@ use common::{
 use criterion::{criterion_group, criterion_main, Criterion};
 use dithr::dbs::{
     direct_binary_search_in_place, electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
+    least_squares_model_based_in_place, model_based_med_in_place,
 };
 use dithr::dot_diffusion::{knuth_dot_diffusion_in_place, optimized_dot_diffusion_in_place};
 use dithr::riemersma::riemersma_in_place;
@@ -104,6 +105,22 @@ fn bench_advanced(c: &mut Criterion) {
         width,
         height,
         |buffer| electrostatic_halftoning_in_place(buffer, 4),
+    );
+    bench_gray_case(
+        &mut group,
+        "model_based_med_gray_64",
+        &fixture,
+        width,
+        height,
+        model_based_med_in_place,
+    );
+    bench_gray_case(
+        &mut group,
+        "least_squares_model_based_gray_64_iters2",
+        &fixture,
+        width,
+        height,
+        |buffer| least_squares_model_based_in_place(buffer, 2),
     );
     group.finish();
 

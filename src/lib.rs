@@ -184,6 +184,8 @@
 //! - [`direct_binary_search_in_place`]
 //! - [`lattice_boltzmann_in_place`]
 //! - [`electrostatic_halftoning_in_place`]
+//! - [`model_based_med_in_place`]
+//! - [`least_squares_model_based_in_place`]
 //!
 //! Scope notes:
 //!
@@ -197,6 +199,8 @@
 //!   layouts; alpha is preserved for `Rgba`.
 //! - [`direct_binary_search_in_place`], [`lattice_boltzmann_in_place`], and
 //!   [`electrostatic_halftoning_in_place`] are integer grayscale-only.
+//! - [`model_based_med_in_place`] and [`least_squares_model_based_in_place`]
+//!   are integer grayscale-only.
 //!
 //! ## Parallel API (`rayon` feature)
 //!

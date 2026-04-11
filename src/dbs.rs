@@ -46,6 +46,15 @@ const ELECTRO_ATTRACTION_WEIGHT: f64 = 1.0;
 const ELECTRO_STEP_SIZE: f64 = 0.2;
 const ELECTRO_SHAKE_BASE: f64 = 0.35;
 const ELECTRO_CONVERGENCE_EPSILON: f64 = 1e-3;
+const MODEL_PRINTER_KERNEL: [f32; 9] = [
+    0.025, 0.07, 0.025, //
+    0.07, 0.62, 0.07, //
+    0.025, 0.07, 0.025,
+];
+const MODEL_EYE_RADIUS: usize = 3;
+const MODEL_EYE_SIZE: usize = MODEL_EYE_RADIUS * 2 + 1;
+const MODEL_EYE_SIGMA: f64 = 1.2;
+const MODEL_MED_ERROR_LIMIT: f32 = 1.0;
 
 pub fn direct_binary_search_in_place<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
@@ -390,6 +399,494 @@ pub fn electrostatic_halftoning_in_place<S: Sample, L: PixelLayout>(
     }
 
     Ok(())
+}
+
+pub fn model_based_med_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+) -> Result<()> {
+    buffer.validate()?;
+    ensure_grayscale_integer_format::<S, L>()?;
+
+    let width = buffer.width;
+    let height = buffer.height;
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
+    let max_value = integer_sample_max::<S>()?;
+    let target = grayscale_target_unit(buffer, width, height, pixel_count)?;
+    let binary = model_based_med_binary(&target, width, height);
+
+    write_binary_output(buffer, &binary, width, height, max_value)
+}
+
+pub fn least_squares_model_based_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    max_iters: usize,
+) -> Result<()> {
+    buffer.validate()?;
+    ensure_grayscale_integer_format::<S, L>()?;
+
+    let width = buffer.width;
+    let height = buffer.height;
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
+    let max_value = integer_sample_max::<S>()?;
+    let target = grayscale_target_unit(buffer, width, height, pixel_count)?;
+    let mut binary = model_based_med_binary(&target, width, height);
+    let eye = model_based_eye_filter();
+    let kernel = model_based_kernel(&eye);
+    let kernel_size = MODEL_EYE_SIZE + 2;
+    let kernel_radius = kernel_size / 2;
+    let mut filtered_error =
+        model_based_filtered_error_map(&target, &binary, width, height, &kernel, kernel_size);
+
+    for _ in 0..max_iters {
+        let mut improved = false;
+
+        for y in 0..height {
+            for x in 0..width {
+                let idx = y * width + x;
+                let mut best_delta = 0.0_f64;
+                let mut best_move = CandidateMove::None;
+
+                let toggle_delta = model_based_candidate_delta_energy(
+                    width,
+                    height,
+                    kernel_radius,
+                    &kernel,
+                    kernel_size,
+                    &filtered_error,
+                    &[(x, y, toggle_delta_value(binary[idx]))],
+                );
+                if toggle_delta < best_delta {
+                    best_delta = toggle_delta;
+                    best_move = CandidateMove::Toggle(idx);
+                }
+
+                for (dx, dy) in DBS_SWAP_NEIGHBORS {
+                    let nx = x as isize + dx;
+                    let ny = y as isize + dy;
+                    if nx < 0 || ny < 0 || nx as usize >= width || ny as usize >= height {
+                        continue;
+                    }
+                    let nidx = ny as usize * width + nx as usize;
+                    if binary[idx] == binary[nidx] {
+                        continue;
+                    }
+
+                    let delta_primary = swap_primary_delta(binary[idx], binary[nidx]);
+                    let swap_delta = model_based_candidate_delta_energy(
+                        width,
+                        height,
+                        kernel_radius,
+                        &kernel,
+                        kernel_size,
+                        &filtered_error,
+                        &[
+                            (x, y, delta_primary),
+                            (nx as usize, ny as usize, -delta_primary),
+                        ],
+                    );
+                    if swap_delta < best_delta {
+                        best_delta = swap_delta;
+                        best_move = CandidateMove::Swap(idx, nidx);
+                    }
+                }
+
+                match best_move {
+                    CandidateMove::None => {}
+                    CandidateMove::Toggle(i) => {
+                        let px = i % width;
+                        let py = i / width;
+                        let delta = toggle_delta_value(binary[i]);
+                        binary[i] ^= 1;
+                        model_based_apply_delta_filtered_error(
+                            width,
+                            height,
+                            kernel_radius,
+                            &kernel,
+                            kernel_size,
+                            &mut filtered_error,
+                            &[(px, py, delta)],
+                        );
+                        improved = true;
+                    }
+                    CandidateMove::Swap(i, j) => {
+                        let ix = i % width;
+                        let iy = i / width;
+                        let jx = j % width;
+                        let jy = j / width;
+                        let delta_primary = swap_primary_delta(binary[i], binary[j]);
+                        binary.swap(i, j);
+                        model_based_apply_delta_filtered_error(
+                            width,
+                            height,
+                            kernel_radius,
+                            &kernel,
+                            kernel_size,
+                            &mut filtered_error,
+                            &[(ix, iy, delta_primary), (jx, jy, -delta_primary)],
+                        );
+                        improved = true;
+                    }
+                }
+            }
+        }
+
+        if !improved {
+            break;
+        }
+    }
+
+    write_binary_output(buffer, &binary, width, height, max_value)
+}
+
+fn grayscale_target_unit<S: Sample, L: PixelLayout>(
+    buffer: &Buffer<'_, S, L>,
+    width: usize,
+    height: usize,
+    pixel_count: usize,
+) -> Result<Vec<f32>> {
+    let mut target = Vec::with_capacity(pixel_count);
+    for y in 0..height {
+        let row = buffer.try_row(y)?;
+        for &value in row.iter().take(width) {
+            target.push(value.to_unit_f32().clamp(0.0, 1.0));
+        }
+    }
+    Ok(target)
+}
+
+fn write_binary_output<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    binary: &[u8],
+    width: usize,
+    height: usize,
+    max_value: i32,
+) -> Result<()> {
+    for y in 0..height {
+        let row = buffer.try_row_mut(y)?;
+        for (x, value) in row.iter_mut().take(width).enumerate() {
+            let idx = y * width + x;
+            let domain = if binary[idx] == 0 { 0 } else { max_value };
+            *value = domain_to_sample(domain, max_value);
+        }
+    }
+    Ok(())
+}
+
+fn model_based_med_binary(target: &[f32], width: usize, height: usize) -> Vec<u8> {
+    let pixel_count = width * height;
+    let mut binary = target
+        .iter()
+        .copied()
+        .map(|value| if value >= 0.5 { 1_u8 } else { 0_u8 })
+        .collect::<Vec<u8>>();
+    let mut error = vec![0.0_f32; pixel_count];
+
+    for y in 0..height {
+        let left_to_right = y % 2 == 0;
+
+        if left_to_right {
+            for x in 0..width {
+                model_based_med_apply_pixel(
+                    target,
+                    (width, height),
+                    x,
+                    y,
+                    true,
+                    &mut binary,
+                    &mut error,
+                );
+            }
+        } else {
+            for x in (0..width).rev() {
+                model_based_med_apply_pixel(
+                    target,
+                    (width, height),
+                    x,
+                    y,
+                    false,
+                    &mut binary,
+                    &mut error,
+                );
+            }
+        }
+    }
+
+    binary
+}
+
+fn model_based_med_apply_pixel(
+    target: &[f32],
+    dims: (usize, usize),
+    x: usize,
+    y: usize,
+    left_to_right: bool,
+    binary: &mut [u8],
+    error: &mut [f32],
+) {
+    let (width, height) = dims;
+    let idx = y * width + x;
+    let desired = (target[idx] + error[idx]).clamp(0.0, 1.0);
+    let predicted_white = model_based_local_printer_intensity(binary, width, height, x, y, 1);
+    let predicted_black = model_based_local_printer_intensity(binary, width, height, x, y, 0);
+    let choose_white = if (desired - predicted_white).abs() < (desired - predicted_black).abs() {
+        true
+    } else if (desired - predicted_white).abs() > (desired - predicted_black).abs() {
+        false
+    } else {
+        desired >= 0.5
+    };
+
+    let selected = if choose_white { 1_u8 } else { 0_u8 };
+    let predicted = if choose_white {
+        predicted_white
+    } else {
+        predicted_black
+    };
+    binary[idx] = selected;
+    error[idx] = 0.0;
+    let quant_error = (desired - predicted).clamp(-1.0, 1.0);
+    model_based_diffuse_error(error, width, height, x, y, left_to_right, quant_error);
+}
+
+fn model_based_local_printer_intensity(
+    binary: &[u8],
+    width: usize,
+    height: usize,
+    x: usize,
+    y: usize,
+    center_value: u8,
+) -> f32 {
+    let mut intensity = 0.0_f32;
+
+    for ky in 0..3 {
+        for kx in 0..3 {
+            let sx = x as isize + kx as isize - 1;
+            let sy = y as isize + ky as isize - 1;
+            let weight = MODEL_PRINTER_KERNEL[ky * 3 + kx];
+
+            if sx < 0 || sy < 0 || sx as usize >= width || sy as usize >= height {
+                intensity += weight;
+                continue;
+            }
+
+            let source_value = if sx as usize == x && sy as usize == y {
+                center_value
+            } else {
+                binary[sy as usize * width + sx as usize]
+            };
+            intensity += weight * f32::from(source_value);
+        }
+    }
+
+    intensity.clamp(0.0, 1.0)
+}
+
+fn model_based_diffuse_error(
+    error: &mut [f32],
+    width: usize,
+    height: usize,
+    x: usize,
+    y: usize,
+    left_to_right: bool,
+    quant_error: f32,
+) {
+    const WEIGHTS: [(isize, isize, f32); 4] = [
+        (1, 0, 7.0 / 16.0),
+        (-1, 1, 3.0 / 16.0),
+        (0, 1, 5.0 / 16.0),
+        (1, 1, 1.0 / 16.0),
+    ];
+
+    for &(dx, dy, weight) in &WEIGHTS {
+        let mx = if left_to_right { dx } else { -dx };
+        let nx = x as isize + mx;
+        let ny = y as isize + dy;
+        if nx < 0 || ny < 0 || nx as usize >= width || ny as usize >= height {
+            continue;
+        }
+
+        let idx = ny as usize * width + nx as usize;
+        let next = error[idx] + quant_error * weight;
+        error[idx] = next.clamp(-MODEL_MED_ERROR_LIMIT, MODEL_MED_ERROR_LIMIT);
+    }
+}
+
+fn model_based_eye_filter() -> [f32; MODEL_EYE_SIZE * MODEL_EYE_SIZE] {
+    let mut kernel = [0.0_f32; MODEL_EYE_SIZE * MODEL_EYE_SIZE];
+    let mut sum = 0.0_f64;
+
+    for ky in 0..MODEL_EYE_SIZE {
+        for kx in 0..MODEL_EYE_SIZE {
+            let dx = kx as isize - MODEL_EYE_RADIUS as isize;
+            let dy = ky as isize - MODEL_EYE_RADIUS as isize;
+            let dist2 = (dx * dx + dy * dy) as f64;
+            let value = (-dist2 / (2.0 * MODEL_EYE_SIGMA * MODEL_EYE_SIGMA)).exp();
+            kernel[ky * MODEL_EYE_SIZE + kx] = value as f32;
+            sum += value;
+        }
+    }
+
+    if sum > 0.0 {
+        for value in &mut kernel {
+            *value = (*value as f64 / sum) as f32;
+        }
+    }
+
+    kernel
+}
+
+fn model_based_kernel(eye: &[f32; MODEL_EYE_SIZE * MODEL_EYE_SIZE]) -> Vec<f32> {
+    let size = MODEL_EYE_SIZE + 2;
+    let mut kernel = vec![0.0_f32; size * size];
+
+    for py in 0..3 {
+        for px in 0..3 {
+            let printer_weight = MODEL_PRINTER_KERNEL[py * 3 + px];
+            if printer_weight == 0.0 {
+                continue;
+            }
+
+            for ey in 0..MODEL_EYE_SIZE {
+                for ex in 0..MODEL_EYE_SIZE {
+                    let out_x = px + ex;
+                    let out_y = py + ey;
+                    kernel[out_y * size + out_x] += printer_weight * eye[ey * MODEL_EYE_SIZE + ex];
+                }
+            }
+        }
+    }
+
+    let sum = kernel.iter().copied().sum::<f32>();
+    if sum != 0.0 {
+        for value in &mut kernel {
+            *value /= sum;
+        }
+    }
+
+    kernel
+}
+
+fn model_based_filtered_error_map(
+    target_unit: &[f32],
+    binary: &[u8],
+    width: usize,
+    height: usize,
+    kernel: &[f32],
+    kernel_size: usize,
+) -> Vec<f32> {
+    let radius = kernel_size / 2;
+    let mut filtered = vec![0.0_f32; width * height];
+
+    for y in 0..height {
+        for x in 0..width {
+            let mut acc = 0.0_f32;
+
+            for ky in 0..kernel_size {
+                for kx in 0..kernel_size {
+                    let sx = x as isize + kx as isize - radius as isize;
+                    let sy = y as isize + ky as isize - radius as isize;
+                    if sx < 0 || sy < 0 || sx as usize >= width || sy as usize >= height {
+                        continue;
+                    }
+
+                    let sidx = sy as usize * width + sx as usize;
+                    let halftone = f32::from(binary[sidx]);
+                    acc += kernel[ky * kernel_size + kx] * (halftone - target_unit[sidx]);
+                }
+            }
+
+            filtered[y * width + x] = acc;
+        }
+    }
+
+    filtered
+}
+
+fn model_based_candidate_delta_energy(
+    width: usize,
+    height: usize,
+    radius: usize,
+    kernel: &[f32],
+    kernel_size: usize,
+    filtered_error: &[f32],
+    points: &[(usize, usize, f32)],
+) -> f64 {
+    if points.is_empty() {
+        return 0.0;
+    }
+
+    let (min_x, max_x, min_y, max_y) = dbs_affected_bounds(width, height, radius, points);
+    let mut delta_energy = 0.0_f64;
+
+    for y in min_y..=max_y {
+        for x in min_x..=max_x {
+            let mut delta = 0.0_f32;
+            for &(px, py, dv) in points {
+                let dx = x as isize - px as isize;
+                let dy = y as isize - py as isize;
+                if dx.unsigned_abs() > radius || dy.unsigned_abs() > radius {
+                    continue;
+                }
+
+                let fx = (dx + radius as isize) as usize;
+                let fy = (dy + radius as isize) as usize;
+                delta += kernel[fy * kernel_size + fx] * dv;
+            }
+
+            if delta == 0.0 {
+                continue;
+            }
+
+            let idx = y * width + x;
+            let current = filtered_error[idx];
+            delta_energy +=
+                2.0 * f64::from(current) * f64::from(delta) + f64::from(delta) * f64::from(delta);
+        }
+    }
+
+    delta_energy
+}
+
+fn model_based_apply_delta_filtered_error(
+    width: usize,
+    height: usize,
+    radius: usize,
+    kernel: &[f32],
+    kernel_size: usize,
+    filtered_error: &mut [f32],
+    points: &[(usize, usize, f32)],
+) {
+    if points.is_empty() {
+        return;
+    }
+
+    let (min_x, max_x, min_y, max_y) = dbs_affected_bounds(width, height, radius, points);
+
+    for y in min_y..=max_y {
+        for x in min_x..=max_x {
+            let mut delta = 0.0_f32;
+            for &(px, py, dv) in points {
+                let dx = x as isize - px as isize;
+                let dy = y as isize - py as isize;
+                if dx.unsigned_abs() > radius || dy.unsigned_abs() > radius {
+                    continue;
+                }
+
+                let fx = (dx + radius as isize) as usize;
+                let fy = (dy + radius as isize) as usize;
+                delta += kernel[fy * kernel_size + fx] * dv;
+            }
+
+            if delta != 0.0 {
+                let idx = y * width + x;
+                filtered_error[idx] += delta;
+            }
+        }
+    }
 }
 
 fn dbs_hvs_filter() -> [f32; DBS_HVS_SIZE * DBS_HVS_SIZE] {

@@ -12,6 +12,7 @@ enum GrayOnlyVariableAlgorithm {
     GradientBased,
     Multiscale,
     FeaturePreservingMsed,
+    GreenNoiseMsed,
 }
 
 pub fn ostromoukhov_in_place<S: Sample, L: PixelLayout>(
@@ -53,6 +54,13 @@ pub fn feature_preserving_msed_in_place<S: Sample, L: PixelLayout>(
     )
 }
 
+pub fn green_noise_msed_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    diffuse_gray_only_variable(buffer, mode, GrayOnlyVariableAlgorithm::GreenNoiseMsed)
+}
+
 fn diffuse_gray_only_variable<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     mode: QuantizeMode<'_, S>,
@@ -76,6 +84,7 @@ fn diffuse_gray_only_variable<S: Sample, L: PixelLayout>(
         GrayOnlyVariableAlgorithm::FeaturePreservingMsed => {
             diffuse_feature_preserving_msed_gray(buffer, mode)
         }
+        GrayOnlyVariableAlgorithm::GreenNoiseMsed => diffuse_green_noise_msed_gray(buffer, mode),
     }
 }
 
@@ -83,6 +92,7 @@ fn diffuse_gray_only_variable<S: Sample, L: PixelLayout>(
 enum MultiscaleProfile {
     Baseline,
     FeaturePreserving,
+    GreenNoise,
 }
 
 struct MultiscaleLevel {
@@ -90,6 +100,12 @@ struct MultiscaleLevel {
     height: usize,
     data: Vec<f32>,
 }
+
+const GREEN_NOISE_BASE_SEED: u64 = 0xD1B5_4A32_7C6E_9F01;
+const GREEN_NOISE_SMALL_RADIUS: usize = 1;
+const GREEN_NOISE_LARGE_RADIUS: usize = 3;
+const GREEN_NOISE_THRESHOLD_AMPLITUDE: f32 = 0.0625;
+const GREEN_NOISE_DIFFUSION_AMPLITUDE: f32 = 0.2;
 
 fn diffuse_multiscale_gray<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
@@ -103,6 +119,13 @@ fn diffuse_feature_preserving_msed_gray<S: Sample, L: PixelLayout>(
     mode: QuantizeMode<'_, S>,
 ) -> Result<()> {
     diffuse_multiscale_gray_with_profile(buffer, mode, MultiscaleProfile::FeaturePreserving)
+}
+
+fn diffuse_green_noise_msed_gray<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    diffuse_multiscale_gray_with_profile(buffer, mode, MultiscaleProfile::GreenNoise)
 }
 
 fn diffuse_multiscale_gray_with_profile<S: Sample, L: PixelLayout>(
@@ -321,6 +344,15 @@ fn diffuse_multiscale_level<S: Sample>(
     } else {
         None
     };
+    let green_noise = if matches!(profile, MultiscaleProfile::GreenNoise) {
+        Some(build_green_noise_map(
+            width,
+            height,
+            GREEN_NOISE_BASE_SEED ^ ((width as u64) << 32) ^ height as u64,
+        )?)
+    } else {
+        None
+    };
     let mut errors = vec![0.0_f32; len];
     let mut residual = vec![0.0_f32; len];
 
@@ -329,11 +361,14 @@ fn diffuse_multiscale_level<S: Sample>(
             for x in (0..width).rev() {
                 let idx = y * width + x;
                 let adjusted = (data[idx] + errors[idx]).clamp(0.0, 1.0);
-                let quantized = quantize_unit_gray::<S>(adjusted, mode)?;
+                let threshold_adjusted =
+                    green_noise_threshold_adjusted(green_noise.as_deref(), idx, adjusted);
+                let quantized = quantize_unit_gray::<S>(threshold_adjusted, mode)?;
                 let err = adjusted - quantized;
                 data[idx] = quantized;
                 residual[idx] = err;
-                let diffusion_scale = feature_preservation_scale(features.as_deref(), idx, profile);
+                let diffusion_scale = feature_preservation_scale(features.as_deref(), idx, profile)
+                    * green_noise_diffusion_scale(green_noise.as_deref(), idx, profile);
 
                 diffuse_scalar_error(
                     &mut errors,
@@ -372,11 +407,14 @@ fn diffuse_multiscale_level<S: Sample>(
             for x in 0..width {
                 let idx = y * width + x;
                 let adjusted = (data[idx] + errors[idx]).clamp(0.0, 1.0);
-                let quantized = quantize_unit_gray::<S>(adjusted, mode)?;
+                let threshold_adjusted =
+                    green_noise_threshold_adjusted(green_noise.as_deref(), idx, adjusted);
+                let quantized = quantize_unit_gray::<S>(threshold_adjusted, mode)?;
                 let err = adjusted - quantized;
                 data[idx] = quantized;
                 residual[idx] = err;
-                let diffusion_scale = feature_preservation_scale(features.as_deref(), idx, profile);
+                let diffusion_scale = feature_preservation_scale(features.as_deref(), idx, profile)
+                    * green_noise_diffusion_scale(green_noise.as_deref(), idx, profile);
 
                 diffuse_scalar_error(
                     &mut errors,
@@ -471,6 +509,129 @@ fn feature_preservation_scale(
         }
     }
     1.0
+}
+
+fn green_noise_threshold_adjusted(green_noise: Option<&[f32]>, idx: usize, value: f32) -> f32 {
+    let modulation = green_noise
+        .and_then(|map| map.get(idx))
+        .copied()
+        .unwrap_or(0.0)
+        .clamp(-1.0, 1.0);
+    (value + modulation * GREEN_NOISE_THRESHOLD_AMPLITUDE).clamp(0.0, 1.0)
+}
+
+fn green_noise_diffusion_scale(
+    green_noise: Option<&[f32]>,
+    idx: usize,
+    profile: MultiscaleProfile,
+) -> f32 {
+    if matches!(profile, MultiscaleProfile::GreenNoise) {
+        let modulation = green_noise
+            .and_then(|map| map.get(idx))
+            .copied()
+            .unwrap_or(0.0)
+            .clamp(-1.0, 1.0);
+        return (1.0 + modulation * GREEN_NOISE_DIFFUSION_AMPLITUDE).clamp(0.8, 1.2);
+    }
+    1.0
+}
+
+fn build_green_noise_map(width: usize, height: usize, seed: u64) -> Result<Vec<f32>> {
+    let len = checked_gray_len(width, height)?;
+    let mut base = vec![0.0_f32; len];
+    for y in 0..height {
+        for x in 0..width {
+            base[y * width + x] = unit_hash_noise(x, y, seed) - 0.5;
+        }
+    }
+
+    let low = box_blur_scalar(&base, width, height, GREEN_NOISE_LARGE_RADIUS)?;
+    let mut band = vec![0.0_f32; len];
+    for idx in 0..len {
+        band[idx] = base[idx] - low[idx];
+    }
+
+    let shaped = box_blur_scalar(&band, width, height, GREEN_NOISE_SMALL_RADIUS)?;
+    let mean = shaped.iter().copied().sum::<f32>() / len as f32;
+    let max_abs = shaped
+        .iter()
+        .map(|&value| (value - mean).abs())
+        .fold(0.0_f32, f32::max);
+
+    if max_abs <= f32::EPSILON {
+        return Ok(vec![0.0_f32; len]);
+    }
+
+    let mut normalized = vec![0.0_f32; len];
+    for idx in 0..len {
+        normalized[idx] = ((shaped[idx] - mean) / max_abs).clamp(-1.0, 1.0);
+    }
+
+    Ok(normalized)
+}
+
+fn box_blur_scalar(source: &[f32], width: usize, height: usize, radius: usize) -> Result<Vec<f32>> {
+    let len = checked_gray_len(width, height)?;
+    if source.len() != len {
+        return Err(Error::InvalidArgument(
+            "green-noise scalar blur source shape mismatch",
+        ));
+    }
+    if radius == 0 || len == 0 {
+        return Ok(source.to_vec());
+    }
+
+    let integral_width = width
+        .checked_add(1)
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
+    let integral_height = height
+        .checked_add(1)
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
+    let integral_len = integral_width
+        .checked_mul(integral_height)
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
+    let mut integral = vec![0.0_f64; integral_len];
+
+    for y in 0..height {
+        let mut row_sum = 0.0_f64;
+        for x in 0..width {
+            row_sum += f64::from(source[y * width + x]);
+            let idx = (y + 1) * integral_width + (x + 1);
+            integral[idx] = integral[y * integral_width + (x + 1)] + row_sum;
+        }
+    }
+
+    let mut out = vec![0.0_f32; len];
+    for y in 0..height {
+        let y0 = y.saturating_sub(radius);
+        let y1 = (y + radius).min(height.saturating_sub(1));
+        for x in 0..width {
+            let x0 = x.saturating_sub(radius);
+            let x1 = (x + radius).min(width.saturating_sub(1));
+            let a = integral[y0 * integral_width + x0];
+            let b = integral[y0 * integral_width + (x1 + 1)];
+            let c = integral[(y1 + 1) * integral_width + x0];
+            let d = integral[(y1 + 1) * integral_width + (x1 + 1)];
+            let area = (x1 - x0 + 1)
+                .checked_mul(y1 - y0 + 1)
+                .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
+            out[y * width + x] = ((d - b - c + a) / area as f64) as f32;
+        }
+    }
+
+    Ok(out)
+}
+
+fn unit_hash_noise(x: usize, y: usize, seed: u64) -> f32 {
+    let mut state = seed
+        ^ (x as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        ^ (y as u64).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    state ^= state >> 30;
+    state = state.wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    state ^= state >> 27;
+    state = state.wrapping_mul(0x94D0_49BB_1331_11EB);
+    state ^= state >> 31;
+    (state >> 40) as f32 / 16_777_215.0
 }
 
 fn quantize_unit_gray<S: Sample>(value: f32, mode: QuantizeMode<'_, S>) -> Result<f32> {

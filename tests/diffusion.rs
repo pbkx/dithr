@@ -8,10 +8,10 @@ use dithr::core::PixelLayout;
 use dithr::diffusion::{
     atkinson_in_place, burkes_in_place, false_floyd_steinberg_in_place, fan_in_place,
     feature_preserving_msed_in_place, floyd_steinberg_in_place,
-    gradient_based_error_diffusion_in_place, jarvis_judice_ninke_in_place,
-    multiscale_error_diffusion_in_place, ostromoukhov_in_place, shiau_fan_2_in_place,
-    shiau_fan_in_place, sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place,
-    stucki_in_place, two_row_sierra_in_place, zhou_fang_in_place,
+    gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
+    jarvis_judice_ninke_in_place, multiscale_error_diffusion_in_place, ostromoukhov_in_place,
+    shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place, sierra_lite_in_place,
+    stevenson_arce_in_place, stucki_in_place, two_row_sierra_in_place, zhou_fang_in_place,
 };
 use dithr::{Error, GrayBuffer16, Palette, QuantizeMode, RgbBuffer32F};
 
@@ -313,6 +313,20 @@ fn feature_preserving_msed_runs() {
 }
 
 #[test]
+fn green_noise_msed_runs() {
+    let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    green_noise_msed_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("green-noise msed should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
 fn ostromoukhov_rejects_non_gray_formats() {
     let mut rgb = vec![128_u8; 4 * 4 * 3];
     let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
@@ -451,6 +465,36 @@ fn feature_preserving_msed_rejects_non_gray_formats() {
     let mut rgba_buffer =
         dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
     let rgba_result = feature_preserving_msed_in_place(
+        &mut rgba_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        rgba_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support grayscale formats only"
+        ))
+    ));
+}
+
+#[test]
+fn green_noise_msed_rejects_non_gray_formats() {
+    let mut rgb = vec![128_u8; 4 * 4 * 3];
+    let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
+    let rgb_result = green_noise_msed_in_place(
+        &mut rgb_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        rgb_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support grayscale formats only"
+        ))
+    ));
+
+    let mut rgba = vec![128_u8; 4 * 4 * 4];
+    let mut rgba_buffer =
+        dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
+    let rgba_result = green_noise_msed_in_place(
         &mut rgba_buffer,
         QuantizeMode::gray_bits(1).expect("valid bit depth"),
     );
@@ -607,7 +651,7 @@ fn fixture_builders_are_deterministic() {
 
 #[test]
 fn diffusion_u16_every_wrapper_smoke_gray() {
-    let wrappers: [DiffusionWrapperU16; 18] = [
+    let wrappers: [DiffusionWrapperU16; 19] = [
         floyd_steinberg_in_place,
         false_floyd_steinberg_in_place,
         jarvis_judice_ninke_in_place,
@@ -626,6 +670,7 @@ fn diffusion_u16_every_wrapper_smoke_gray() {
         gradient_based_error_diffusion_in_place,
         multiscale_error_diffusion_in_place,
         feature_preserving_msed_in_place,
+        green_noise_msed_in_place,
     ];
 
     for wrapper in wrappers {
@@ -669,12 +714,13 @@ fn diffusion_f32_every_wrapper_smoke_gray() {
         assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
     }
 
-    let variable_wrappers: [DiffusionWrapperF32; 5] = [
+    let variable_wrappers: [DiffusionWrapperF32; 6] = [
         ostromoukhov_in_place,
         zhou_fang_in_place,
         gradient_based_error_diffusion_in_place,
         multiscale_error_diffusion_in_place,
         feature_preserving_msed_in_place,
+        green_noise_msed_in_place,
     ];
 
     for wrapper in variable_wrappers {
@@ -907,6 +953,104 @@ fn feature_preserving_msed_edge_contrast_invariant() {
 
     assert!(boundary_contrast > off_edge_contrast);
     assert!(boundary_contrast >= (height as u32 * 64));
+}
+
+fn green_noise_proxy_ratio(data: &[u8], width: usize, height: usize) -> f32 {
+    let len = width * height;
+    let mean = data
+        .iter()
+        .map(|&value| f32::from(value) / 255.0)
+        .sum::<f32>()
+        / len as f32;
+
+    let mut total_energy = 0.0_f32;
+    let mut low_energy = 0.0_f32;
+    for y in 0..height {
+        for x in 0..width {
+            let idx = y * width + x;
+            let centered = f32::from(data[idx]) / 255.0 - mean;
+            total_energy += centered * centered;
+
+            let y0 = y.saturating_sub(2);
+            let y1 = (y + 2).min(height - 1);
+            let x0 = x.saturating_sub(2);
+            let x1 = (x + 2).min(width - 1);
+            let mut sum = 0.0_f32;
+            let mut count = 0_usize;
+            for yy in y0..=y1 {
+                for xx in x0..=x1 {
+                    sum += f32::from(data[yy * width + xx]) / 255.0 - mean;
+                    count += 1;
+                }
+            }
+            let low = sum / count as f32;
+            low_energy += low * low;
+        }
+    }
+
+    if total_energy <= f32::EPSILON {
+        return 0.0;
+    }
+    low_energy / total_energy
+}
+
+fn variable_gray_challenge_64x64() -> Vec<u8> {
+    let mut out = Vec::with_capacity(64 * 64);
+    for y in 0..64_usize {
+        for x in 0..64_usize {
+            out.push(((x * 17 + y * 31 + ((x * y) % 97)) % 256) as u8);
+        }
+    }
+    out
+}
+
+#[test]
+fn green_noise_msed_is_deterministic() {
+    let seed_data = gray_ramp_16x16();
+    let mut a = seed_data.clone();
+    let mut b = seed_data;
+
+    let mut buffer_a = dithr::gray_u8(&mut a, 16, 16, 16).expect("valid buffer should construct");
+    let mut buffer_b = dithr::gray_u8(&mut b, 16, 16, 16).expect("valid buffer should construct");
+
+    green_noise_msed_in_place(&mut buffer_a, QuantizeMode::GrayLevels(2))
+        .expect("green-noise msed should succeed");
+    green_noise_msed_in_place(&mut buffer_b, QuantizeMode::GrayLevels(2))
+        .expect("green-noise msed should succeed");
+
+    assert_eq!(a, b);
+    assert_eq!(fnv1a64(&a), fnv1a64(&b));
+}
+
+#[test]
+fn green_noise_msed_low_frequency_suppression_proxy() {
+    let mut baseline_data = variable_gray_challenge_64x64();
+    let mut green_data = baseline_data.clone();
+
+    let mut baseline_buffer =
+        dithr::gray_u8(&mut baseline_data, 64, 64, 64).expect("valid buffer should construct");
+    let mut green_buffer =
+        dithr::gray_u8(&mut green_data, 64, 64, 64).expect("valid buffer should construct");
+
+    multiscale_error_diffusion_in_place(
+        &mut baseline_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("multiscale diffusion should succeed");
+    green_noise_msed_in_place(
+        &mut green_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("green-noise msed should succeed");
+
+    assert!(baseline_data
+        .iter()
+        .all(|&value| value == 0 || value == 255));
+    assert!(green_data.iter().all(|&value| value == 0 || value == 255));
+
+    let baseline_ratio = green_noise_proxy_ratio(&baseline_data, 64, 64);
+    let green_ratio = green_noise_proxy_ratio(&green_data, 64, 64);
+    assert!(green_ratio <= baseline_ratio * 0.98);
 }
 
 #[test]

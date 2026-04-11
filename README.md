@@ -232,6 +232,7 @@ Tone-dependent coefficient families.
 - `gradient_based_error_diffusion_in_place`
 - `multiscale_error_diffusion_in_place`
 - `feature_preserving_msed_in_place`
+- `green_noise_msed_in_place`
 
 Scope note: variable diffusion methods are grayscale-only.
 
@@ -432,6 +433,8 @@ cargo test --doc --all-features
   <https://doi.org/10.1109/83.557360>, <https://mcl.usc.edu/wp-content/uploads/2014/01/1997-03-A-multiscale-error-diffusion-technique-for-digital-Halftoning.pdf>
 - Feature-preserving multiscale error diffusion:
   <https://ira.lib.polyu.edu.hk/bitstream/10397/1524/1/J-JEI-Feature-preserving%20multiscale%20error%20diffusion_04.pdf>, <https://doi.org/10.1117/1.1758728>
+- Green-noise multiscale error diffusion:
+  <https://pubmed.ncbi.nlm.nih.gov/20215075/>, <https://www.eie.polyu.edu.hk/~enyhchan/J-TIP-Green_noise_digital_halftoning_with_MED.pdf>
 - Riemersma dithering: <https://www.compuphase.com/riemer.htm>
 - Knuth dot diffusion: <https://dl.acm.org/doi/10.1145/35039.35040>
 - Optimized dot diffusion: <https://doi.org/10.1109/83.841944>

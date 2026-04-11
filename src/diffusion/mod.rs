@@ -17,7 +17,8 @@ pub use classic::{
 pub use extended::{fan_in_place, shiau_fan_2_in_place, shiau_fan_in_place};
 pub use variable::{
     feature_preserving_msed_in_place, gradient_based_error_diffusion_in_place,
-    multiscale_error_diffusion_in_place, ostromoukhov_in_place, zhou_fang_in_place,
+    green_noise_msed_in_place, multiscale_error_diffusion_in_place, ostromoukhov_in_place,
+    zhou_fang_in_place,
 };
 
 #[doc(hidden)]

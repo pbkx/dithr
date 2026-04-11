@@ -16,8 +16,8 @@ use dithr::diffusion::{
     jarvis_judice_ninke_in_place, linear_pixel_shuffling_in_place,
     multiscale_error_diffusion_in_place, ostromoukhov_in_place,
     semivector_error_diffusion_in_place, shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place,
-    sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place,
-    tone_dependent_error_diffusion_in_place, two_row_sierra_in_place,
+    sierra_lite_in_place, stevenson_arce_in_place, structure_aware_error_diffusion_in_place,
+    stucki_in_place, tone_dependent_error_diffusion_in_place, two_row_sierra_in_place,
     vector_error_diffusion_in_place, zhou_fang_in_place,
 };
 use dithr::dot_diffusion::{knuth_dot_diffusion_in_place, optimized_dot_diffusion_in_place};
@@ -592,6 +592,20 @@ fn golden_tone_dependent_error_diffusion_gray_challenge_64x64() {
     .expect("tone-dependent error diffusion should succeed");
 
     assert_eq!(fnv1a64(&data), 14_859_260_915_096_751_870_u64);
+}
+
+#[test]
+fn golden_structure_aware_error_diffusion_gray_challenge_64x64() {
+    let mut data = variable_gray_challenge_64x64();
+    let mut buffer = dithr::gray_u8(&mut data, 64, 64, 64).expect("valid buffer should construct");
+
+    structure_aware_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(2).expect("valid bit depth"),
+    )
+    .expect("structure-aware error diffusion should succeed");
+
+    assert_eq!(fnv1a64(&data), 14_754_324_612_077_891_702_u64);
 }
 
 #[test]

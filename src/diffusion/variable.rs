@@ -10,6 +10,7 @@ enum GrayOnlyVariableAlgorithm {
     Ostromoukhov,
     ZhouFang,
     ToneDependent,
+    StructureAware,
     HvsOptimized,
     GradientBased,
     Multiscale,
@@ -51,6 +52,13 @@ pub fn tone_dependent_error_diffusion_in_place<S: Sample, L: PixelLayout>(
     mode: QuantizeMode<'_, S>,
 ) -> Result<()> {
     diffuse_gray_only_variable(buffer, mode, GrayOnlyVariableAlgorithm::ToneDependent)
+}
+
+pub fn structure_aware_error_diffusion_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    diffuse_gray_only_variable(buffer, mode, GrayOnlyVariableAlgorithm::StructureAware)
 }
 
 pub fn gradient_based_error_diffusion_in_place<S: Sample, L: PixelLayout>(
@@ -621,6 +629,7 @@ fn diffuse_gray_only_variable<S: Sample, L: PixelLayout>(
             diffuse_variable_gray(buffer, mode, Some(&ZHOU_FANG_MODULATION))
         }
         GrayOnlyVariableAlgorithm::ToneDependent => diffuse_tone_dependent_gray(buffer, mode),
+        GrayOnlyVariableAlgorithm::StructureAware => diffuse_structure_aware_gray(buffer, mode),
         GrayOnlyVariableAlgorithm::HvsOptimized => diffuse_hvs_optimized_gray(buffer, mode),
         GrayOnlyVariableAlgorithm::GradientBased => diffuse_gradient_gray(buffer, mode),
         GrayOnlyVariableAlgorithm::Multiscale => diffuse_multiscale_gray(buffer, mode),
@@ -695,6 +704,12 @@ const TONE_DEPENDENT_DIFFUSION_COEFFS: [[f32; 3]; 16] = [
     [0.52, 0.24, 0.24],
     [0.50, 0.26, 0.24],
 ];
+const STRUCTURE_AWARE_FORWARD_REDUCTION: f32 = 0.22;
+const STRUCTURE_AWARE_DIAGONAL_BOOST: f32 = 0.33;
+const STRUCTURE_AWARE_DOWN_BOOST: f32 = 0.28;
+const STRUCTURE_AWARE_TONE_CENTER_BOOST: f32 = 0.18;
+const STRUCTURE_AWARE_GAIN_MIN: f32 = 0.82;
+const STRUCTURE_AWARE_GAIN_SCALE: f32 = 0.32;
 const HVS_OPTIMIZED_FORWARD: f32 = 0.7770;
 const HVS_OPTIMIZED_DOWN_DIAGONAL: f32 = -0.0090;
 const HVS_OPTIMIZED_DOWN: f32 = 0.7861;
@@ -1816,6 +1831,131 @@ fn diffuse_tone_dependent_gray<S: Sample, L: PixelLayout>(
     Ok(())
 }
 
+fn diffuse_structure_aware_gray<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    let width = buffer.width;
+    let height = buffer.height;
+    let source = read_gray_units(buffer)?;
+    let expected = checked_gray_len(width, height)?;
+    if source.len() != expected {
+        return Err(Error::InvalidArgument(
+            "structure-aware diffusion source shape mismatch",
+        ));
+    }
+    let mut errors = allocate_gray_error_buffer(width, height)?;
+
+    for y in 0..height {
+        let row = buffer.try_row_mut(y)?;
+        let reverse = (y & 1) == 1;
+
+        if reverse {
+            for x in (0..width).rev() {
+                let pixel = row.get_mut(x..=x).ok_or(BufferError::OutOfBounds)?;
+                let err_idx = (y * width + x) * 4;
+                let err = [
+                    errors[err_idx],
+                    errors[err_idx + 1],
+                    errors[err_idx + 2],
+                    errors[err_idx + 3],
+                ];
+                let adjusted = read_pixel_with_error::<S, L>(pixel, &err)?[0];
+                let quantized =
+                    quantize_pixel::<S, crate::core::Gray>(&[S::from_unit_f32(adjusted)], mode)?;
+                write_quantized_pixel::<S, L>(pixel, quantized);
+
+                let residual = adjusted - quantized[0].to_unit_f32();
+                let luma = luma_bucket_unit(adjusted);
+                let structure = local_structure_strength_from_units(&source, width, height, x, y)?;
+                let coeff = structure_aware_weights_for_pixel(luma, structure)?;
+                let forward = residual * coeff[0];
+                let down_diag = residual * coeff[1];
+                let down = residual * coeff[2];
+                let xi = x as isize;
+                let yi = y as isize;
+
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi - 1,
+                    yi,
+                    [forward, 0.0, 0.0, 0.0],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi + 1,
+                    yi + 1,
+                    [down_diag, 0.0, 0.0, 0.0],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi,
+                    yi + 1,
+                    [down, 0.0, 0.0, 0.0],
+                );
+            }
+        } else {
+            for x in 0..width {
+                let pixel = row.get_mut(x..=x).ok_or(BufferError::OutOfBounds)?;
+                let err_idx = (y * width + x) * 4;
+                let err = [
+                    errors[err_idx],
+                    errors[err_idx + 1],
+                    errors[err_idx + 2],
+                    errors[err_idx + 3],
+                ];
+                let adjusted = read_pixel_with_error::<S, L>(pixel, &err)?[0];
+                let quantized =
+                    quantize_pixel::<S, crate::core::Gray>(&[S::from_unit_f32(adjusted)], mode)?;
+                write_quantized_pixel::<S, L>(pixel, quantized);
+
+                let residual = adjusted - quantized[0].to_unit_f32();
+                let luma = luma_bucket_unit(adjusted);
+                let structure = local_structure_strength_from_units(&source, width, height, x, y)?;
+                let coeff = structure_aware_weights_for_pixel(luma, structure)?;
+                let forward = residual * coeff[0];
+                let down_diag = residual * coeff[1];
+                let down = residual * coeff[2];
+                let xi = x as isize;
+                let yi = y as isize;
+
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi + 1,
+                    yi,
+                    [forward, 0.0, 0.0, 0.0],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi - 1,
+                    yi + 1,
+                    [down_diag, 0.0, 0.0, 0.0],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi,
+                    yi + 1,
+                    [down, 0.0, 0.0, 0.0],
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn allocate_gray_error_buffer(width: usize, height: usize) -> Result<Vec<f32>> {
     let len = width
         .checked_mul(height)
@@ -1855,6 +1995,101 @@ fn tone_dependent_coeff_for_luma(luma: u8) -> Result<[f32; 3]> {
     }
 
     Ok([coeff[0] / sum, coeff[1] / sum, coeff[2] / sum])
+}
+
+fn structure_aware_weights_for_pixel(luma: u8, structure: f32) -> Result<[f32; 3]> {
+    let base = coefficient_for_luma(luma);
+    let den = f32::from(base.3);
+    if !den.is_finite() || den <= f32::EPSILON {
+        return Err(Error::InvalidArgument(
+            "structure-aware diffusion denominator must be positive",
+        ));
+    }
+
+    let forward_base = f32::from(base.0) / den;
+    let down_diag_base = f32::from(base.1) / den;
+    let down_base = f32::from(base.2) / den;
+
+    let structure_clamped = structure.clamp(0.0, 1.0);
+    let tone = f32::from(luma) / 255.0;
+    let tone_center = 1.0 - (2.0 * tone - 1.0).abs();
+    let flat = 1.0 - structure_clamped;
+
+    let forward = forward_base * (1.0 - STRUCTURE_AWARE_FORWARD_REDUCTION * structure_clamped);
+    let down_diag = down_diag_base * (1.0 + STRUCTURE_AWARE_DIAGONAL_BOOST * flat);
+    let down = down_base
+        * (1.0
+            + STRUCTURE_AWARE_DOWN_BOOST * structure_clamped
+            + STRUCTURE_AWARE_TONE_CENTER_BOOST * tone_center);
+
+    let sum = forward + down_diag + down;
+    if !sum.is_finite() || sum <= f32::EPSILON {
+        return Err(Error::InvalidArgument(
+            "structure-aware diffusion coefficient normalization failed",
+        ));
+    }
+
+    let gain = (STRUCTURE_AWARE_GAIN_MIN + STRUCTURE_AWARE_GAIN_SCALE * structure_clamped).clamp(
+        STRUCTURE_AWARE_GAIN_MIN,
+        STRUCTURE_AWARE_GAIN_MIN + STRUCTURE_AWARE_GAIN_SCALE,
+    );
+
+    Ok([
+        forward / sum * gain,
+        down_diag / sum * gain,
+        down / sum * gain,
+    ])
+}
+
+fn local_structure_strength_from_units(
+    source: &[f32],
+    width: usize,
+    height: usize,
+    x: usize,
+    y: usize,
+) -> Result<f32> {
+    if width == 0 || height == 0 {
+        return Err(Error::InvalidArgument(
+            "structure-aware diffusion requires non-empty dimensions",
+        ));
+    }
+    let expected = checked_gray_len(width, height)?;
+    if source.len() != expected {
+        return Err(Error::InvalidArgument(
+            "structure-aware diffusion source dimensions mismatch",
+        ));
+    }
+
+    let idx = y
+        .checked_mul(width)
+        .and_then(|base| base.checked_add(x))
+        .ok_or(Error::InvalidArgument(
+            "structure-aware diffusion index overflow",
+        ))?;
+    let center = *source.get(idx).ok_or(Error::InvalidArgument(
+        "structure-aware diffusion center index out of range",
+    ))?;
+
+    let sample = |sx: usize, sy: usize| -> f32 { source[sy * width + sx] };
+    let left = sample(x.saturating_sub(1), y);
+    let right = sample((x + 1).min(width - 1), y);
+    let up = sample(x, y.saturating_sub(1));
+    let down = sample(x, (y + 1).min(height - 1));
+    let nw = sample(x.saturating_sub(1), y.saturating_sub(1));
+    let ne = sample((x + 1).min(width - 1), y.saturating_sub(1));
+    let sw = sample(x.saturating_sub(1), (y + 1).min(height - 1));
+    let se = sample((x + 1).min(width - 1), (y + 1).min(height - 1));
+
+    let gx = (right - left).abs();
+    let gy = (down - up).abs();
+    let diag = ((se - nw).abs() + (sw - ne).abs()) * 0.5;
+    let local_var = ((left - center).abs()
+        + (right - center).abs()
+        + (up - center).abs()
+        + (down - center).abs())
+        * 0.25;
+
+    Ok((0.45 * (gx + gy) + 0.30 * diag + 0.25 * local_var).clamp(0.0, 1.0))
 }
 
 fn zhou_fang_thresholded_unit(value_unit: f32, x: usize, y: usize, table: &[u8; 256]) -> f32 {

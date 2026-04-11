@@ -236,6 +236,7 @@ Tone-dependent coefficient families.
 - `green_noise_msed_in_place`
 - `linear_pixel_shuffling_in_place`
 - `tone_dependent_error_diffusion_in_place`
+- `structure_aware_error_diffusion_in_place`
 - `adaptive_vector_error_diffusion_in_place`
 - `vector_error_diffusion_in_place`
 - `semivector_error_diffusion_in_place`
@@ -462,6 +463,8 @@ cargo test --doc --all-features
   <https://pubmed.ncbi.nlm.nih.gov/19473943/>, <https://doi.org/10.1109/TIP.2009.2019778>
 - Tone-dependent error diffusion:
   <https://pubmed.ncbi.nlm.nih.gov/15376941/>, <https://pubmed.ncbi.nlm.nih.gov/17283778/>
+- Structure-aware error diffusion:
+  <https://perso.liris.cnrs.fr/ostrom/publications/pdf/SIGGRAPH-ASIA09_saed.pdf>
 - Linear pixel shuffling error diffusion:
   <https://repository.rit.edu/other/391/>, <https://www.imaging.org/common/uploaded%20files/pdfs/Papers/2000/PICS-0-81/1625.pdf>
 - Riemersma dithering: <https://www.compuphase.com/riemer.htm>

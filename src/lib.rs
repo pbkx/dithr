@@ -176,6 +176,7 @@
 //! - [`green_noise_msed_in_place`]
 //! - [`linear_pixel_shuffling_in_place`]
 //! - [`tone_dependent_error_diffusion_in_place`]
+//! - [`structure_aware_error_diffusion_in_place`]
 //! - [`adaptive_vector_error_diffusion_in_place`]
 //! - [`vector_error_diffusion_in_place`]
 //! - [`semivector_error_diffusion_in_place`]
@@ -201,7 +202,8 @@
 //!   [`feature_preserving_msed_in_place`], and
 //!   [`green_noise_msed_in_place`], and
 //!   [`linear_pixel_shuffling_in_place`], and
-//!   [`tone_dependent_error_diffusion_in_place`] are grayscale-only.
+//!   [`tone_dependent_error_diffusion_in_place`], and
+//!   [`structure_aware_error_diffusion_in_place`] are grayscale-only.
 //! - [`adaptive_vector_error_diffusion_in_place`] supports `Rgb` and `Rgba`
 //!   layouts; alpha is preserved for `Rgba`.
 //! - [`vector_error_diffusion_in_place`] and

@@ -13,8 +13,8 @@ use dithr::diffusion::{
     jarvis_judice_ninke_in_place, linear_pixel_shuffling_in_place,
     multiscale_error_diffusion_in_place, ostromoukhov_in_place,
     semivector_error_diffusion_in_place, shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place,
-    sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place,
-    tone_dependent_error_diffusion_in_place, two_row_sierra_in_place,
+    sierra_lite_in_place, stevenson_arce_in_place, structure_aware_error_diffusion_in_place,
+    stucki_in_place, tone_dependent_error_diffusion_in_place, two_row_sierra_in_place,
     vector_error_diffusion_in_place, zhou_fang_in_place,
 };
 use dithr::{Error, GrayBuffer16, Palette, QuantizeMode, RgbBuffer32F};
@@ -373,6 +373,20 @@ fn tone_dependent_error_diffusion_runs() {
 }
 
 #[test]
+fn structure_aware_error_diffusion_runs() {
+    let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    structure_aware_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("structure-aware diffusion should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
 fn adaptive_vector_error_diffusion_runs_rgb() {
     let mut data = rgb_gradient_8x8();
     let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
@@ -691,6 +705,36 @@ fn tone_dependent_error_diffusion_rejects_non_gray_formats() {
 }
 
 #[test]
+fn structure_aware_error_diffusion_rejects_non_gray_formats() {
+    let mut rgb = vec![128_u8; 4 * 4 * 3];
+    let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
+    let rgb_result = structure_aware_error_diffusion_in_place(
+        &mut rgb_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        rgb_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support grayscale formats only"
+        ))
+    ));
+
+    let mut rgba = vec![128_u8; 4 * 4 * 4];
+    let mut rgba_buffer =
+        dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
+    let rgba_result = structure_aware_error_diffusion_in_place(
+        &mut rgba_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        rgba_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support grayscale formats only"
+        ))
+    ));
+}
+
+#[test]
 fn adaptive_vector_error_diffusion_rejects_gray_formats() {
     let mut gray = vec![128_u8; 4 * 4];
     let mut gray_buffer =
@@ -903,7 +947,7 @@ fn fixture_builders_are_deterministic() {
 
 #[test]
 fn diffusion_u16_every_wrapper_smoke_gray() {
-    let wrappers: [DiffusionWrapperU16; 22] = [
+    let wrappers: [DiffusionWrapperU16; 23] = [
         floyd_steinberg_in_place,
         false_floyd_steinberg_in_place,
         jarvis_judice_ninke_in_place,
@@ -926,6 +970,7 @@ fn diffusion_u16_every_wrapper_smoke_gray() {
         green_noise_msed_in_place,
         linear_pixel_shuffling_in_place,
         tone_dependent_error_diffusion_in_place,
+        structure_aware_error_diffusion_in_place,
     ];
 
     for wrapper in wrappers {
@@ -973,7 +1018,7 @@ fn diffusion_f32_every_wrapper_smoke_gray() {
         assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
     }
 
-    let variable_wrappers: [DiffusionWrapperF32; 9] = [
+    let variable_wrappers: [DiffusionWrapperF32; 10] = [
         ostromoukhov_in_place,
         zhou_fang_in_place,
         hvs_optimized_error_diffusion_in_place,
@@ -983,6 +1028,7 @@ fn diffusion_f32_every_wrapper_smoke_gray() {
         green_noise_msed_in_place,
         linear_pixel_shuffling_in_place,
         tone_dependent_error_diffusion_in_place,
+        structure_aware_error_diffusion_in_place,
     ];
 
     for wrapper in variable_wrappers {
@@ -1266,6 +1312,43 @@ fn variable_gray_challenge_64x64() -> Vec<u8> {
     out
 }
 
+fn structure_gray_fixture_64x64() -> Vec<u8> {
+    let mut out = Vec::with_capacity(64 * 64);
+    for y in 0..64_usize {
+        for x in 0..64_usize {
+            let edge = if x < 32 { 52_u8 } else { 202_u8 };
+            let stripe = if ((x + y) / 6) % 2 == 0 { 22_u8 } else { 0_u8 };
+            let texture = ((x * 13 + y * 17 + (x * y) % 41) % 32) as u8;
+            out.push(edge.saturating_add(stripe).saturating_add(texture));
+        }
+    }
+    out
+}
+
+fn structure_artifact_proxy(data: &[u8], width: usize, height: usize) -> f32 {
+    if width < 3 || height < 3 {
+        return 0.0;
+    }
+
+    let mut horizontal_runs = 0_u64;
+    let mut vertical_runs = 0_u64;
+    for y in 1..(height - 1) {
+        for x in 1..(width - 1) {
+            let idx = y * width + x;
+            let center = data[idx];
+            if center == data[idx - 1] && center == data[idx + 1] {
+                horizontal_runs += 1;
+            }
+            if center == data[idx - width] && center == data[idx + width] {
+                vertical_runs += 1;
+            }
+        }
+    }
+
+    let total = horizontal_runs + vertical_runs + 1;
+    (horizontal_runs.abs_diff(vertical_runs) as f32) / total as f32
+}
+
 #[test]
 fn green_noise_msed_is_deterministic() {
     let seed_data = gray_ramp_16x16();
@@ -1363,6 +1446,67 @@ fn tone_dependent_error_diffusion_coeff_index_bounds_test() {
     let white = data.iter().filter(|&&value| value == 255).count();
     assert!(black > 0);
     assert!(white > 0);
+}
+
+#[test]
+fn structure_aware_error_diffusion_is_deterministic() {
+    let seed_data = gray_ramp_16x16();
+    let mut a = seed_data.clone();
+    let mut b = seed_data;
+
+    let mut buffer_a = dithr::gray_u8(&mut a, 16, 16, 16).expect("valid buffer should construct");
+    let mut buffer_b = dithr::gray_u8(&mut b, 16, 16, 16).expect("valid buffer should construct");
+
+    structure_aware_error_diffusion_in_place(&mut buffer_a, QuantizeMode::GrayLevels(2))
+        .expect("structure-aware diffusion should succeed");
+    structure_aware_error_diffusion_in_place(&mut buffer_b, QuantizeMode::GrayLevels(2))
+        .expect("structure-aware diffusion should succeed");
+
+    assert_eq!(a, b);
+    assert_eq!(fnv1a64(&a), fnv1a64(&b));
+}
+
+#[test]
+fn structure_aware_error_diffusion_output_hash_stable() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    structure_aware_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("structure-aware diffusion should succeed");
+
+    assert_eq!(fnv1a64(&data), 17_592_859_310_743_849_017_u64);
+}
+
+#[test]
+fn structure_aware_error_diffusion_artifact_suppression_proxy() {
+    let mut baseline = structure_gray_fixture_64x64();
+    let mut saed = baseline.clone();
+
+    let mut baseline_buffer =
+        dithr::gray_u8(&mut baseline, 64, 64, 64).expect("valid buffer should construct");
+    let mut saed_buffer =
+        dithr::gray_u8(&mut saed, 64, 64, 64).expect("valid buffer should construct");
+
+    tone_dependent_error_diffusion_in_place(
+        &mut baseline_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("tone-dependent diffusion should succeed");
+    structure_aware_error_diffusion_in_place(
+        &mut saed_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("structure-aware diffusion should succeed");
+
+    assert!(baseline.iter().all(|&value| value == 0 || value == 255));
+    assert!(saed.iter().all(|&value| value == 0 || value == 255));
+
+    let baseline_proxy = structure_artifact_proxy(&baseline, 64, 64);
+    let saed_proxy = structure_artifact_proxy(&saed, 64, 64);
+    assert!(saed_proxy <= baseline_proxy * 1.02);
 }
 
 #[test]

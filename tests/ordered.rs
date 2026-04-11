@@ -12,8 +12,8 @@ use dithr::data::{
 use dithr::ordered::{
     adaptive_ordered_dither_in_place, bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place,
     bayer_8x8_in_place, cluster_dot_4x4_in_place, cluster_dot_8x8_in_place,
-    custom_ordered_in_place, void_and_cluster_in_place, yliluoma_1_in_place, yliluoma_2_in_place,
-    yliluoma_3_in_place,
+    custom_ordered_in_place, space_filling_curve_ordered_dither_in_place,
+    void_and_cluster_in_place, yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
 };
 #[cfg(feature = "rayon")]
 use dithr::ordered::{yliluoma_1_in_place_par, yliluoma_2_in_place_par, yliluoma_3_in_place_par};
@@ -287,6 +287,69 @@ fn adaptive_ordered_rgba_alpha_preserved() {
 
     let after_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
     assert_eq!(before_alpha, after_alpha);
+}
+
+#[test]
+fn space_filling_curve_ordered_runs_and_quantizes_u8() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    space_filling_curve_ordered_dither_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("space-filling ordered dithering should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn space_filling_curve_ordered_u16_binary_invariant() {
+    let mut data = gray_ramp_8x8_u16();
+    let mut buffer = dithr::gray_u16(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    space_filling_curve_ordered_dither_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("space-filling ordered dithering should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+}
+
+#[test]
+fn space_filling_curve_ordered_f32_binary_invariant() {
+    let mut data: Vec<f32> = (0..(8 * 8))
+        .map(|index| index as f32 / ((8 * 8 - 1) as f32))
+        .collect();
+    let mut buffer = dithr::gray_32f(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    space_filling_curve_ordered_dither_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("space-filling ordered dithering should succeed");
+
+    assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
+}
+
+#[test]
+fn space_filling_curve_ordered_traversal_order_is_stable() {
+    let mut data_a = vec![127_u8; 16 * 16];
+    let mut data_b = vec![127_u8; 16 * 16];
+
+    let mut buffer_a =
+        dithr::gray_u8(&mut data_a, 16, 16, 16).expect("valid buffer should construct");
+    let mut buffer_b =
+        dithr::gray_u8(&mut data_b, 16, 16, 16).expect("valid buffer should construct");
+
+    space_filling_curve_ordered_dither_in_place(
+        &mut buffer_a,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("space-filling ordered dithering should succeed");
+    space_filling_curve_ordered_dither_in_place(
+        &mut buffer_b,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("space-filling ordered dithering should succeed");
+
+    assert_eq!(data_a, data_b);
+    assert_eq!(fnv1a64(&data_a), 10_367_374_070_803_408_373_u64);
 }
 
 #[test]

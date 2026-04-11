@@ -24,8 +24,8 @@ use dithr::dot_diffusion::{knuth_dot_diffusion_in_place, optimized_dot_diffusion
 use dithr::ordered::{
     adaptive_ordered_dither_in_place, bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place,
     bayer_8x8_in_place, cluster_dot_4x4_in_place, cluster_dot_8x8_in_place,
-    custom_ordered_in_place, void_and_cluster_in_place, yliluoma_1_in_place, yliluoma_2_in_place,
-    yliluoma_3_in_place,
+    custom_ordered_in_place, space_filling_curve_ordered_dither_in_place,
+    void_and_cluster_in_place, yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
 };
 use dithr::riemersma::riemersma_in_place;
 use dithr::stochastic::{random_binary_in_place, threshold_binary_in_place};
@@ -193,6 +193,20 @@ fn golden_adaptive_ordered_gray_ramp_16x16() {
     .expect("adaptive ordered dithering should succeed");
 
     assert_eq!(fnv1a64(&data), 18_330_970_610_889_469_293_u64);
+}
+
+#[test]
+fn golden_space_filling_curve_ordered_gray_ramp_16x16() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    space_filling_curve_ordered_dither_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("space-filling ordered dithering should succeed");
+
+    assert_eq!(fnv1a64(&data), 9_301_650_280_567_871_445_u64);
 }
 
 #[test]

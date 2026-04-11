@@ -140,6 +140,7 @@
 //! - Custom map: [`custom_ordered_in_place`]
 //! - Void-and-cluster: `ordered::void_and_cluster_in_place`
 //! - Adaptive ordered: `ordered::adaptive_ordered_dither_in_place`
+//! - Space-filling curve ordered: `ordered::space_filling_curve_ordered_dither_in_place`
 //!
 //! Palette-oriented ordered (Yliluoma):
 //!

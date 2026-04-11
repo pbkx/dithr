@@ -2,6 +2,7 @@ mod adaptive;
 mod bayer;
 mod cluster;
 pub(crate) mod core;
+mod space_filling;
 mod void_cluster;
 mod yliluoma;
 
@@ -42,6 +43,7 @@ pub use bayer::{
 pub use cluster::{cluster_dot_4x4_in_place, cluster_dot_8x8_in_place};
 #[cfg(feature = "rayon")]
 pub use cluster::{cluster_dot_4x4_in_place_par, cluster_dot_8x8_in_place_par};
+pub use space_filling::space_filling_curve_ordered_dither_in_place;
 pub use void_cluster::void_and_cluster_in_place;
 
 #[doc(hidden)]

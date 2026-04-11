@@ -195,6 +195,7 @@
 //! - [`optimized_dot_diffusion_in_place`]
 //! - [`direct_binary_search_in_place`]
 //! - `dbs::clustered_dot_direct_multibit_search_in_place`
+//! - `dbs::direct_pattern_control_in_place`
 //! - [`lattice_boltzmann_in_place`]
 //! - [`electrostatic_halftoning_in_place`]
 //! - [`model_based_med_in_place`]
@@ -224,6 +225,8 @@
 //!   are integer grayscale-only.
 //! - `dbs::clustered_dot_direct_multibit_search_in_place` is integer
 //!   grayscale-only.
+//! - `dbs::direct_pattern_control_in_place` supports integer `Rgb`/`Rgba`
+//!   buffers; alpha is preserved for `Rgba`.
 //!
 //! ## Parallel API (`rayon` feature)
 //!

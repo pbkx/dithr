@@ -296,6 +296,151 @@ pub fn clustered_dot_direct_multibit_search_in_place<S: Sample, L: PixelLayout>(
     Ok(())
 }
 
+pub fn direct_pattern_control_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    max_iters: usize,
+) -> Result<()> {
+    buffer.validate()?;
+    ensure_rgb_integer_format::<S, L>()?;
+
+    let width = buffer.width;
+    let height = buffer.height;
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
+    let max_value = integer_sample_max::<S>()?;
+
+    let target = rgb_target_unit(buffer, width, height, pixel_count)?;
+    let mut states = target
+        .iter()
+        .map(|&rgb| nearest_primary_index(rgb))
+        .collect::<Vec<usize>>();
+    let mut output = states_to_primary_unit(&states);
+    let target_r = target.iter().map(|rgb| rgb[0]).collect::<Vec<f32>>();
+    let target_g = target.iter().map(|rgb| rgb[1]).collect::<Vec<f32>>();
+    let target_b = target.iter().map(|rgb| rgb[2]).collect::<Vec<f32>>();
+
+    let hvs = dbs_hvs_filter();
+    let mut filtered_error_r =
+        dbs_filtered_error_map_levels(&target_r, &output.0, width, height, &hvs, DBS_HVS_RADIUS);
+    let mut filtered_error_g =
+        dbs_filtered_error_map_levels(&target_g, &output.1, width, height, &hvs, DBS_HVS_RADIUS);
+    let mut filtered_error_b =
+        dbs_filtered_error_map_levels(&target_b, &output.2, width, height, &hvs, DBS_HVS_RADIUS);
+
+    for _ in 0..max_iters {
+        let mut improved = false;
+
+        for y in 0..height {
+            for x in 0..width {
+                let idx = y * width + x;
+                let current = states[idx];
+                let current_rgb = primary_unit(current);
+                let mut best_state = current;
+                let mut best_delta = 0.0_f64;
+
+                for candidate in primary_candidates(current) {
+                    if candidate == current {
+                        continue;
+                    }
+
+                    let next_rgb = primary_unit(candidate);
+                    let dr = next_rgb[0] - current_rgb[0];
+                    let dg = next_rgb[1] - current_rgb[1];
+                    let db = next_rgb[2] - current_rgb[2];
+
+                    let delta_r = dbs_candidate_delta_energy(
+                        width,
+                        height,
+                        &hvs,
+                        DBS_HVS_RADIUS,
+                        &filtered_error_r,
+                        &[(x, y, dr)],
+                    );
+                    let delta_g = dbs_candidate_delta_energy(
+                        width,
+                        height,
+                        &hvs,
+                        DBS_HVS_RADIUS,
+                        &filtered_error_g,
+                        &[(x, y, dg)],
+                    );
+                    let delta_b = dbs_candidate_delta_energy(
+                        width,
+                        height,
+                        &hvs,
+                        DBS_HVS_RADIUS,
+                        &filtered_error_b,
+                        &[(x, y, db)],
+                    );
+                    let delta = delta_r + delta_g + delta_b;
+                    if delta < best_delta {
+                        best_delta = delta;
+                        best_state = candidate;
+                    }
+                }
+
+                if best_state != current {
+                    let next_rgb = primary_unit(best_state);
+                    let dr = next_rgb[0] - current_rgb[0];
+                    let dg = next_rgb[1] - current_rgb[1];
+                    let db = next_rgb[2] - current_rgb[2];
+
+                    states[idx] = best_state;
+                    output.0[idx] = next_rgb[0];
+                    output.1[idx] = next_rgb[1];
+                    output.2[idx] = next_rgb[2];
+
+                    dbs_apply_delta_filtered_error(
+                        width,
+                        height,
+                        &hvs,
+                        DBS_HVS_RADIUS,
+                        &mut filtered_error_r,
+                        &[(x, y, dr)],
+                    );
+                    dbs_apply_delta_filtered_error(
+                        width,
+                        height,
+                        &hvs,
+                        DBS_HVS_RADIUS,
+                        &mut filtered_error_g,
+                        &[(x, y, dg)],
+                    );
+                    dbs_apply_delta_filtered_error(
+                        width,
+                        height,
+                        &hvs,
+                        DBS_HVS_RADIUS,
+                        &mut filtered_error_b,
+                        &[(x, y, db)],
+                    );
+                    improved = true;
+                }
+            }
+        }
+
+        if !improved {
+            break;
+        }
+    }
+
+    for y in 0..height {
+        let row = buffer.try_row_mut(y)?;
+        for x in 0..width {
+            let idx = y * width + x;
+            let state = states[idx];
+            let rgb = primary_domain(state, max_value);
+            let base = x * L::CHANNELS;
+            row[base] = domain_to_sample(rgb[0], max_value);
+            row[base + 1] = domain_to_sample(rgb[1], max_value);
+            row[base + 2] = domain_to_sample(rgb[2], max_value);
+        }
+    }
+
+    Ok(())
+}
+
 pub fn lattice_boltzmann_in_place<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     max_steps: usize,
@@ -726,6 +871,90 @@ fn level_index_to_domain(level: i32, max_value: i32, levels: u16) -> i32 {
     let levels_m1 = i32::from(levels.saturating_sub(1)).max(1);
     let numerator = i64::from(level) * i64::from(max_value) + i64::from(levels_m1 / 2);
     (numerator / i64::from(levels_m1)) as i32
+}
+
+fn rgb_target_unit<S: Sample, L: PixelLayout>(
+    buffer: &Buffer<'_, S, L>,
+    width: usize,
+    height: usize,
+    pixel_count: usize,
+) -> Result<Vec<[f32; 3]>> {
+    let mut target = Vec::with_capacity(pixel_count);
+    for y in 0..height {
+        let row = buffer.try_row(y)?;
+        for x in 0..width {
+            let base = x * L::CHANNELS;
+            target.push([
+                row[base].to_unit_f32().clamp(0.0, 1.0),
+                row[base + 1].to_unit_f32().clamp(0.0, 1.0),
+                row[base + 2].to_unit_f32().clamp(0.0, 1.0),
+            ]);
+        }
+    }
+    Ok(target)
+}
+
+fn nearest_primary_index(rgb: [f32; 3]) -> usize {
+    let mut best_index = 0_usize;
+    let mut best_dist = f32::INFINITY;
+
+    for candidate in 0..8_usize {
+        let p = primary_unit(candidate);
+        let dr = rgb[0] - p[0];
+        let dg = rgb[1] - p[1];
+        let db = rgb[2] - p[2];
+        let dist = dr * dr + dg * dg + db * db;
+        if dist < best_dist {
+            best_dist = dist;
+            best_index = candidate;
+        }
+    }
+
+    best_index
+}
+
+fn states_to_primary_unit(states: &[usize]) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
+    let mut r = Vec::with_capacity(states.len());
+    let mut g = Vec::with_capacity(states.len());
+    let mut b = Vec::with_capacity(states.len());
+
+    for &state in states {
+        let rgb = primary_unit(state);
+        r.push(rgb[0]);
+        g.push(rgb[1]);
+        b.push(rgb[2]);
+    }
+
+    (r, g, b)
+}
+
+fn primary_unit(state: usize) -> [f32; 3] {
+    [
+        if state & 0b001 != 0 { 1.0 } else { 0.0 },
+        if state & 0b010 != 0 { 1.0 } else { 0.0 },
+        if state & 0b100 != 0 { 1.0 } else { 0.0 },
+    ]
+}
+
+fn primary_domain(state: usize, max_value: i32) -> [i32; 3] {
+    [
+        if state & 0b001 != 0 { max_value } else { 0 },
+        if state & 0b010 != 0 { max_value } else { 0 },
+        if state & 0b100 != 0 { max_value } else { 0 },
+    ]
+}
+
+fn primary_candidates(current: usize) -> [usize; 8] {
+    [
+        current,
+        current ^ 0b001,
+        current ^ 0b010,
+        current ^ 0b100,
+        current ^ 0b011,
+        current ^ 0b101,
+        current ^ 0b110,
+        current ^ 0b111,
+    ]
 }
 
 fn write_binary_output<S: Sample, L: PixelLayout>(
@@ -1624,6 +1853,16 @@ fn ensure_grayscale_integer_format<S: Sample, L: PixelLayout>() -> Result<()> {
     } else {
         Err(Error::UnsupportedFormat(
             "research algorithms support Gray8 and Gray16 only",
+        ))
+    }
+}
+
+fn ensure_rgb_integer_format<S: Sample, L: PixelLayout>() -> Result<()> {
+    if (L::CHANNELS == 3 || L::CHANNELS == 4) && L::COLOR_CHANNELS == 3 && !S::IS_FLOAT {
+        Ok(())
+    } else {
+        Err(Error::UnsupportedFormat(
+            "research algorithms support Rgb8/Rgba8 and Rgb16/Rgba16 only",
         ))
     }
 }

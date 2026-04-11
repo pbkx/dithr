@@ -6,7 +6,7 @@ use common::{
 };
 use dithr::dbs::{
     clustered_dot_direct_multibit_search_in_place, direct_binary_search_in_place,
-    electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
+    direct_pattern_control_in_place, electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
     least_squares_model_based_in_place, model_based_med_in_place,
 };
 use dithr::dot_diffusion::{knuth_dot_diffusion_in_place, optimized_dot_diffusion_in_place};
@@ -172,6 +172,45 @@ fn clustered_dot_direct_multibit_search_rejects_non_gray_or_float() {
             "research algorithms support Gray8 and Gray16 only"
         ))
     );
+}
+
+#[test]
+fn direct_pattern_control_rgb_primary_membership() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    direct_pattern_control_in_place(&mut buffer, 3).expect("direct pattern control should succeed");
+
+    for px in data.chunks_exact(3) {
+        assert!(px[0] == 0 || px[0] == 255);
+        assert!(px[1] == 0 || px[1] == 255);
+        assert!(px[2] == 0 || px[2] == 255);
+    }
+}
+
+#[test]
+fn direct_pattern_control_rgba_preserves_alpha() {
+    let mut data = Vec::with_capacity(8 * 8 * 4);
+    for y in 0_u8..8 {
+        for x in 0_u8..8 {
+            data.push(x.saturating_mul(32));
+            data.push(y.saturating_mul(32));
+            data.push((x ^ y).saturating_mul(32));
+            data.push(x.wrapping_mul(17).wrapping_add(y.wrapping_mul(29)));
+        }
+    }
+    let alpha_before: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
+
+    let mut buffer = dithr::rgba_u8(&mut data, 8, 8, 32).expect("valid buffer should construct");
+    direct_pattern_control_in_place(&mut buffer, 3).expect("direct pattern control should succeed");
+
+    let alpha_after: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(alpha_before, alpha_after);
+    for px in data.chunks_exact(4) {
+        assert!(px[0] == 0 || px[0] == 255);
+        assert!(px[1] == 0 || px[1] == 255);
+        assert!(px[2] == 0 || px[2] == 255);
+    }
 }
 
 #[test]

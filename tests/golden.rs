@@ -9,10 +9,11 @@ use dithr::dbs::{
 };
 use dithr::diffusion::{
     atkinson_in_place, burkes_in_place, false_floyd_steinberg_in_place, fan_in_place,
-    floyd_steinberg_in_place, gradient_based_error_diffusion_in_place,
-    jarvis_judice_ninke_in_place, multiscale_error_diffusion_in_place, ostromoukhov_in_place,
-    shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place, sierra_lite_in_place,
-    stevenson_arce_in_place, stucki_in_place, two_row_sierra_in_place, zhou_fang_in_place,
+    feature_preserving_msed_in_place, floyd_steinberg_in_place,
+    gradient_based_error_diffusion_in_place, jarvis_judice_ninke_in_place,
+    multiscale_error_diffusion_in_place, ostromoukhov_in_place, shiau_fan_2_in_place,
+    shiau_fan_in_place, sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place,
+    stucki_in_place, two_row_sierra_in_place, zhou_fang_in_place,
 };
 use dithr::dot_diffusion::{knuth_dot_diffusion_in_place, optimized_dot_diffusion_in_place};
 use dithr::ordered::{
@@ -516,6 +517,20 @@ fn golden_multiscale_error_diffusion_gray_challenge_64x64() {
     .expect("multiscale error diffusion should succeed");
 
     assert_eq!(fnv1a64(&data), 9_756_998_446_205_497_565_u64);
+}
+
+#[test]
+fn golden_feature_preserving_msed_gray_challenge_64x64() {
+    let mut data = variable_gray_challenge_64x64();
+    let mut buffer = dithr::gray_u8(&mut data, 64, 64, 64).expect("valid buffer should construct");
+
+    feature_preserving_msed_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(2).expect("valid bit depth"),
+    )
+    .expect("feature-preserving msed should succeed");
+
+    assert_eq!(fnv1a64(&data), 9_507_571_359_692_171_175_u64);
 }
 
 #[test]

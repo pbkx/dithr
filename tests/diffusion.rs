@@ -7,10 +7,11 @@ use common::{
 use dithr::core::PixelLayout;
 use dithr::diffusion::{
     atkinson_in_place, burkes_in_place, false_floyd_steinberg_in_place, fan_in_place,
-    floyd_steinberg_in_place, gradient_based_error_diffusion_in_place,
-    jarvis_judice_ninke_in_place, multiscale_error_diffusion_in_place, ostromoukhov_in_place,
-    shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place, sierra_lite_in_place,
-    stevenson_arce_in_place, stucki_in_place, two_row_sierra_in_place, zhou_fang_in_place,
+    feature_preserving_msed_in_place, floyd_steinberg_in_place,
+    gradient_based_error_diffusion_in_place, jarvis_judice_ninke_in_place,
+    multiscale_error_diffusion_in_place, ostromoukhov_in_place, shiau_fan_2_in_place,
+    shiau_fan_in_place, sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place,
+    stucki_in_place, two_row_sierra_in_place, zhou_fang_in_place,
 };
 use dithr::{Error, GrayBuffer16, Palette, QuantizeMode, RgbBuffer32F};
 
@@ -298,6 +299,20 @@ fn multiscale_error_diffusion_runs() {
 }
 
 #[test]
+fn feature_preserving_msed_runs() {
+    let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    feature_preserving_msed_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("feature-preserving msed should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
 fn ostromoukhov_rejects_non_gray_formats() {
     let mut rgb = vec![128_u8; 4 * 4 * 3];
     let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
@@ -406,6 +421,36 @@ fn multiscale_error_diffusion_rejects_non_gray_formats() {
     let mut rgba_buffer =
         dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
     let rgba_result = multiscale_error_diffusion_in_place(
+        &mut rgba_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        rgba_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support grayscale formats only"
+        ))
+    ));
+}
+
+#[test]
+fn feature_preserving_msed_rejects_non_gray_formats() {
+    let mut rgb = vec![128_u8; 4 * 4 * 3];
+    let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
+    let rgb_result = feature_preserving_msed_in_place(
+        &mut rgb_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        rgb_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support grayscale formats only"
+        ))
+    ));
+
+    let mut rgba = vec![128_u8; 4 * 4 * 4];
+    let mut rgba_buffer =
+        dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
+    let rgba_result = feature_preserving_msed_in_place(
         &mut rgba_buffer,
         QuantizeMode::gray_bits(1).expect("valid bit depth"),
     );
@@ -562,7 +607,7 @@ fn fixture_builders_are_deterministic() {
 
 #[test]
 fn diffusion_u16_every_wrapper_smoke_gray() {
-    let wrappers: [DiffusionWrapperU16; 17] = [
+    let wrappers: [DiffusionWrapperU16; 18] = [
         floyd_steinberg_in_place,
         false_floyd_steinberg_in_place,
         jarvis_judice_ninke_in_place,
@@ -580,6 +625,7 @@ fn diffusion_u16_every_wrapper_smoke_gray() {
         zhou_fang_in_place,
         gradient_based_error_diffusion_in_place,
         multiscale_error_diffusion_in_place,
+        feature_preserving_msed_in_place,
     ];
 
     for wrapper in wrappers {
@@ -623,11 +669,12 @@ fn diffusion_f32_every_wrapper_smoke_gray() {
         assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
     }
 
-    let variable_wrappers: [DiffusionWrapperF32; 4] = [
+    let variable_wrappers: [DiffusionWrapperF32; 5] = [
         ostromoukhov_in_place,
         zhou_fang_in_place,
         gradient_based_error_diffusion_in_place,
         multiscale_error_diffusion_in_place,
+        feature_preserving_msed_in_place,
     ];
 
     for wrapper in variable_wrappers {
@@ -793,6 +840,73 @@ fn multiscale_error_diffusion_objective_invariants_gray() {
         .sum::<f32>()
         / data.len() as f32;
     assert!((output_mean - input_mean).abs() <= 0.1);
+}
+
+#[test]
+fn feature_preserving_msed_is_deterministic() {
+    let seed_data = gray_ramp_16x16();
+    let mut a = seed_data.clone();
+    let mut b = seed_data;
+
+    let mut buffer_a = dithr::gray_u8(&mut a, 16, 16, 16).expect("valid buffer should construct");
+    let mut buffer_b = dithr::gray_u8(&mut b, 16, 16, 16).expect("valid buffer should construct");
+
+    feature_preserving_msed_in_place(&mut buffer_a, QuantizeMode::GrayLevels(2))
+        .expect("feature-preserving msed should succeed");
+    feature_preserving_msed_in_place(&mut buffer_b, QuantizeMode::GrayLevels(2))
+        .expect("feature-preserving msed should succeed");
+
+    assert_eq!(a, b);
+}
+
+#[test]
+fn feature_preserving_msed_edge_contrast_invariant() {
+    let width = 64_usize;
+    let height = 64_usize;
+    let mut data = Vec::with_capacity(width * height);
+    for y in 0..height {
+        for x in 0..width {
+            let edge = if x < width / 2 { 48_u8 } else { 208_u8 };
+            let texture = (((x * 13 + y * 17) % 29) as u8).saturating_sub(14);
+            let value = edge.saturating_add(texture);
+            data.push(value);
+        }
+    }
+
+    let mut fp_buffer =
+        dithr::gray_u8(&mut data, width, height, width).expect("valid buffer should construct");
+    feature_preserving_msed_in_place(
+        &mut fp_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("feature-preserving msed should succeed");
+
+    let boundary = width / 2;
+    let boundary_contrast: u32 = (0..height)
+        .map(|y| {
+            let left = data[y * width + (boundary - 1)];
+            let right = data[y * width + boundary];
+            u32::from(left.abs_diff(right))
+        })
+        .sum();
+    let near_left_contrast: u32 = (0..height)
+        .map(|y| {
+            let left = data[y * width + 12];
+            let right = data[y * width + 13];
+            u32::from(left.abs_diff(right))
+        })
+        .sum();
+    let near_right_contrast: u32 = (0..height)
+        .map(|y| {
+            let left = data[y * width + 50];
+            let right = data[y * width + 51];
+            u32::from(left.abs_diff(right))
+        })
+        .sum();
+    let off_edge_contrast = (near_left_contrast + near_right_contrast) / 2;
+
+    assert!(boundary_contrast > off_edge_contrast);
+    assert!(boundary_contrast >= (height as u32 * 64));
 }
 
 #[test]

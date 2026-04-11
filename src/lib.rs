@@ -171,6 +171,7 @@
 //! - [`zhou_fang_in_place`]
 //! - [`gradient_based_error_diffusion_in_place`]
 //! - [`multiscale_error_diffusion_in_place`]
+//! - [`feature_preserving_msed_in_place`]
 //!
 //! Advanced halftoning:
 //!
@@ -185,7 +186,8 @@
 //!
 //! - [`ostromoukhov_in_place`], [`zhou_fang_in_place`], and
 //!   [`gradient_based_error_diffusion_in_place`], and
-//!   [`multiscale_error_diffusion_in_place`] are grayscale-only.
+//!   [`multiscale_error_diffusion_in_place`], and
+//!   [`feature_preserving_msed_in_place`] are grayscale-only.
 //! - [`direct_binary_search_in_place`], [`lattice_boltzmann_in_place`], and
 //!   [`electrostatic_halftoning_in_place`] are integer grayscale-only.
 //!

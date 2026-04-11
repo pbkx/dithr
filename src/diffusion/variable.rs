@@ -11,6 +11,7 @@ enum GrayOnlyVariableAlgorithm {
     ZhouFang,
     GradientBased,
     Multiscale,
+    FeaturePreservingMsed,
 }
 
 pub fn ostromoukhov_in_place<S: Sample, L: PixelLayout>(
@@ -41,6 +42,17 @@ pub fn multiscale_error_diffusion_in_place<S: Sample, L: PixelLayout>(
     diffuse_gray_only_variable(buffer, mode, GrayOnlyVariableAlgorithm::Multiscale)
 }
 
+pub fn feature_preserving_msed_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    diffuse_gray_only_variable(
+        buffer,
+        mode,
+        GrayOnlyVariableAlgorithm::FeaturePreservingMsed,
+    )
+}
+
 fn diffuse_gray_only_variable<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     mode: QuantizeMode<'_, S>,
@@ -61,7 +73,16 @@ fn diffuse_gray_only_variable<S: Sample, L: PixelLayout>(
         }
         GrayOnlyVariableAlgorithm::GradientBased => diffuse_gradient_gray(buffer, mode),
         GrayOnlyVariableAlgorithm::Multiscale => diffuse_multiscale_gray(buffer, mode),
+        GrayOnlyVariableAlgorithm::FeaturePreservingMsed => {
+            diffuse_feature_preserving_msed_gray(buffer, mode)
+        }
     }
+}
+
+#[derive(Clone, Copy)]
+enum MultiscaleProfile {
+    Baseline,
+    FeaturePreserving,
 }
 
 struct MultiscaleLevel {
@@ -73,6 +94,21 @@ struct MultiscaleLevel {
 fn diffuse_multiscale_gray<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    diffuse_multiscale_gray_with_profile(buffer, mode, MultiscaleProfile::Baseline)
+}
+
+fn diffuse_feature_preserving_msed_gray<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    diffuse_multiscale_gray_with_profile(buffer, mode, MultiscaleProfile::FeaturePreserving)
+}
+
+fn diffuse_multiscale_gray_with_profile<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+    profile: MultiscaleProfile,
 ) -> Result<()> {
     let mut levels = build_multiscale_pyramid(buffer)?;
     let mut propagated_error: Option<MultiscaleLevel> = None;
@@ -92,8 +128,13 @@ fn diffuse_multiscale_gray<S: Sample, L: PixelLayout>(
             )?;
         }
 
-        let residual =
-            diffuse_multiscale_level::<S>(&mut level.data, level.width, level.height, mode)?;
+        let residual = diffuse_multiscale_level::<S>(
+            &mut level.data,
+            level.width,
+            level.height,
+            mode,
+            profile,
+        )?;
         if level_index > 0 {
             propagated_error = Some(MultiscaleLevel {
                 width: level.width,
@@ -266,6 +307,7 @@ fn diffuse_multiscale_level<S: Sample>(
     width: usize,
     height: usize,
     mode: QuantizeMode<'_, S>,
+    profile: MultiscaleProfile,
 ) -> Result<Vec<f32>> {
     let len = checked_gray_len(width, height)?;
     if data.len() != len {
@@ -274,6 +316,11 @@ fn diffuse_multiscale_level<S: Sample>(
         ));
     }
 
+    let features = if matches!(profile, MultiscaleProfile::FeaturePreserving) {
+        Some(build_feature_map(data, width, height)?)
+    } else {
+        None
+    };
     let mut errors = vec![0.0_f32; len];
     let mut residual = vec![0.0_f32; len];
 
@@ -286,6 +333,7 @@ fn diffuse_multiscale_level<S: Sample>(
                 let err = adjusted - quantized;
                 data[idx] = quantized;
                 residual[idx] = err;
+                let diffusion_scale = feature_preservation_scale(features.as_deref(), idx, profile);
 
                 diffuse_scalar_error(
                     &mut errors,
@@ -293,7 +341,7 @@ fn diffuse_multiscale_level<S: Sample>(
                     height,
                     x as isize - 1,
                     y as isize,
-                    err * 7.0 / 16.0,
+                    err * diffusion_scale * 7.0 / 16.0,
                 );
                 diffuse_scalar_error(
                     &mut errors,
@@ -301,7 +349,7 @@ fn diffuse_multiscale_level<S: Sample>(
                     height,
                     x as isize + 1,
                     y as isize + 1,
-                    err * 3.0 / 16.0,
+                    err * diffusion_scale * 3.0 / 16.0,
                 );
                 diffuse_scalar_error(
                     &mut errors,
@@ -309,7 +357,7 @@ fn diffuse_multiscale_level<S: Sample>(
                     height,
                     x as isize,
                     y as isize + 1,
-                    err * 5.0 / 16.0,
+                    err * diffusion_scale * 5.0 / 16.0,
                 );
                 diffuse_scalar_error(
                     &mut errors,
@@ -317,7 +365,7 @@ fn diffuse_multiscale_level<S: Sample>(
                     height,
                     x as isize - 1,
                     y as isize + 1,
-                    err / 16.0,
+                    err * diffusion_scale / 16.0,
                 );
             }
         } else {
@@ -328,6 +376,7 @@ fn diffuse_multiscale_level<S: Sample>(
                 let err = adjusted - quantized;
                 data[idx] = quantized;
                 residual[idx] = err;
+                let diffusion_scale = feature_preservation_scale(features.as_deref(), idx, profile);
 
                 diffuse_scalar_error(
                     &mut errors,
@@ -335,7 +384,7 @@ fn diffuse_multiscale_level<S: Sample>(
                     height,
                     x as isize + 1,
                     y as isize,
-                    err * 7.0 / 16.0,
+                    err * diffusion_scale * 7.0 / 16.0,
                 );
                 diffuse_scalar_error(
                     &mut errors,
@@ -343,7 +392,7 @@ fn diffuse_multiscale_level<S: Sample>(
                     height,
                     x as isize - 1,
                     y as isize + 1,
-                    err * 3.0 / 16.0,
+                    err * diffusion_scale * 3.0 / 16.0,
                 );
                 diffuse_scalar_error(
                     &mut errors,
@@ -351,7 +400,7 @@ fn diffuse_multiscale_level<S: Sample>(
                     height,
                     x as isize,
                     y as isize + 1,
-                    err * 5.0 / 16.0,
+                    err * diffusion_scale * 5.0 / 16.0,
                 );
                 diffuse_scalar_error(
                     &mut errors,
@@ -359,13 +408,69 @@ fn diffuse_multiscale_level<S: Sample>(
                     height,
                     x as isize + 1,
                     y as isize + 1,
-                    err / 16.0,
+                    err * diffusion_scale / 16.0,
                 );
             }
         }
     }
 
     Ok(residual)
+}
+
+fn build_feature_map(data: &[f32], width: usize, height: usize) -> Result<Vec<f32>> {
+    let len = checked_gray_len(width, height)?;
+    if data.len() != len {
+        return Err(Error::InvalidArgument(
+            "feature map source shape does not match level dimensions",
+        ));
+    }
+
+    let mut features = vec![0.0_f32; len];
+    for y in 0..height {
+        for x in 0..width {
+            let idx = y * width + x;
+            let center = data[idx];
+            let left = if x > 0 {
+                data[y * width + (x - 1)]
+            } else {
+                center
+            };
+            let right = if x + 1 < width {
+                data[y * width + (x + 1)]
+            } else {
+                center
+            };
+            let up = if y > 0 {
+                data[(y - 1) * width + x]
+            } else {
+                center
+            };
+            let down = if y + 1 < height {
+                data[(y + 1) * width + x]
+            } else {
+                center
+            };
+            let gx = (right - left).abs();
+            let gy = (down - up).abs();
+            features[idx] = (0.5 * (gx + gy)).clamp(0.0, 1.0);
+        }
+    }
+
+    Ok(features)
+}
+
+fn feature_preservation_scale(
+    features: Option<&[f32]>,
+    idx: usize,
+    profile: MultiscaleProfile,
+) -> f32 {
+    if matches!(profile, MultiscaleProfile::FeaturePreserving) {
+        if let Some(feature_map) = features {
+            let edge = feature_map.get(idx).copied().unwrap_or(0.0).clamp(0.0, 1.0);
+            return (1.0 - 0.65 * edge).clamp(0.35, 1.0);
+        }
+    }
+    1.0
 }
 
 fn quantize_unit_gray<S: Sample>(value: f32, mode: QuantizeMode<'_, S>) -> Result<f32> {

@@ -21,6 +21,7 @@ enum GrayOnlyVariableAlgorithm {
 enum ColorVectorAlgorithm {
     Vector,
     SemiVector,
+    Hierarchical,
 }
 
 pub fn ostromoukhov_in_place<S: Sample, L: PixelLayout>(
@@ -308,6 +309,13 @@ pub fn semivector_error_diffusion_in_place<S: Sample, L: PixelLayout>(
     diffuse_color_vector(buffer, mode, ColorVectorAlgorithm::SemiVector)
 }
 
+pub fn hierarchical_error_diffusion_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    diffuse_color_vector(buffer, mode, ColorVectorAlgorithm::Hierarchical)
+}
+
 fn diffuse_color_vector<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     mode: QuantizeMode<'_, S>,
@@ -372,6 +380,9 @@ fn diffuse_color_vector<S: Sample, L: PixelLayout>(
                     }
                     ColorVectorAlgorithm::SemiVector => {
                         color_residual_matrix_apply(residual, SEMIVECTOR_DIFFUSION_MATRIX)
+                    }
+                    ColorVectorAlgorithm::Hierarchical => {
+                        hierarchical_color_residual_transform(residual, x, y)
                     }
                 };
                 let xi = x as isize;
@@ -467,6 +478,9 @@ fn diffuse_color_vector<S: Sample, L: PixelLayout>(
                     ColorVectorAlgorithm::SemiVector => {
                         color_residual_matrix_apply(residual, SEMIVECTOR_DIFFUSION_MATRIX)
                     }
+                    ColorVectorAlgorithm::Hierarchical => {
+                        hierarchical_color_residual_transform(residual, x, y)
+                    }
                 };
                 let xi = x as isize;
                 let yi = y as isize;
@@ -538,6 +552,48 @@ fn color_residual_matrix_apply(error: [f32; 3], matrix: [[f32; 3]; 3]) -> [f32; 
     ]
 }
 
+fn hierarchical_color_residual_transform(residual: [f32; 3], x: usize, y: usize) -> [f32; 3] {
+    let base = (residual[0] + residual[1] + residual[2]) / 3.0;
+    let chroma = [residual[0] - base, residual[1] - base, residual[2] - base];
+
+    let phase = ((x & 1) | ((y & 1) << 1)) & 3;
+    let sequence = HIERARCHICAL_COLOR_SEQUENCE[phase];
+    let mut sequenced = [
+        chroma[sequence[0]],
+        chroma[sequence[1]],
+        chroma[sequence[2]],
+    ];
+    let overlap = 0.5 * (sequenced[0] + sequenced[1]);
+    sequenced[0] += overlap * HIERARCHICAL_OVERLAP_PRIMARY;
+    sequenced[1] += overlap * HIERARCHICAL_OVERLAP_SECONDARY;
+    sequenced[2] -= overlap * HIERARCHICAL_OVERLAP_TERTIARY;
+
+    let position_gain = if ((x ^ y) & 1) == 0 {
+        1.0 + HIERARCHICAL_POSITION_GAIN
+    } else {
+        1.0 - HIERARCHICAL_POSITION_GAIN
+    };
+
+    let medium = color_residual_matrix_apply(chroma, VECTOR_DIFFUSION_MATRIX);
+    let sequenced_fine = color_residual_matrix_apply(sequenced, SEMIVECTOR_DIFFUSION_MATRIX);
+    let mut fine = [0.0_f32; 3];
+    fine[sequence[0]] = sequenced_fine[0];
+    fine[sequence[1]] = sequenced_fine[1];
+    fine[sequence[2]] = sequenced_fine[2];
+
+    [
+        base * HIERARCHICAL_BASE_WEIGHT
+            + medium[0] * HIERARCHICAL_MEDIUM_WEIGHT * position_gain
+            + fine[0] * HIERARCHICAL_FINE_WEIGHT,
+        base * HIERARCHICAL_BASE_WEIGHT
+            + medium[1] * HIERARCHICAL_MEDIUM_WEIGHT * position_gain
+            + fine[1] * HIERARCHICAL_FINE_WEIGHT,
+        base * HIERARCHICAL_BASE_WEIGHT
+            + medium[2] * HIERARCHICAL_MEDIUM_WEIGHT * position_gain
+            + fine[2] * HIERARCHICAL_FINE_WEIGHT,
+    ]
+}
+
 fn diffuse_gray_only_variable<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     mode: QuantizeMode<'_, S>,
@@ -604,6 +660,14 @@ const SEMIVECTOR_DIFFUSION_MATRIX: [[f32; 3]; 3] = [
     [0.09568, 0.86784, 0.03648],
     [0.09568, 0.18784, 0.71648],
 ];
+const HIERARCHICAL_COLOR_SEQUENCE: [[usize; 3]; 4] = [[0, 1, 2], [1, 2, 0], [2, 0, 1], [0, 2, 1]];
+const HIERARCHICAL_BASE_WEIGHT: f32 = 0.56;
+const HIERARCHICAL_MEDIUM_WEIGHT: f32 = 0.30;
+const HIERARCHICAL_FINE_WEIGHT: f32 = 0.14;
+const HIERARCHICAL_POSITION_GAIN: f32 = 0.08;
+const HIERARCHICAL_OVERLAP_PRIMARY: f32 = 0.34;
+const HIERARCHICAL_OVERLAP_SECONDARY: f32 = 0.16;
+const HIERARCHICAL_OVERLAP_TERTIARY: f32 = 0.24;
 const HVS_OPTIMIZED_FORWARD: f32 = 0.7770;
 const HVS_OPTIMIZED_DOWN_DIAGONAL: f32 = -0.0090;
 const HVS_OPTIMIZED_DOWN: f32 = 0.7861;

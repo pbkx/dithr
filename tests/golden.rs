@@ -12,8 +12,9 @@ use dithr::diffusion::{
     adaptive_vector_error_diffusion_in_place, atkinson_in_place, burkes_in_place,
     false_floyd_steinberg_in_place, fan_in_place, feature_preserving_msed_in_place,
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
-    hvs_optimized_error_diffusion_in_place, jarvis_judice_ninke_in_place,
-    linear_pixel_shuffling_in_place, multiscale_error_diffusion_in_place, ostromoukhov_in_place,
+    hierarchical_error_diffusion_in_place, hvs_optimized_error_diffusion_in_place,
+    jarvis_judice_ninke_in_place, linear_pixel_shuffling_in_place,
+    multiscale_error_diffusion_in_place, ostromoukhov_in_place,
     semivector_error_diffusion_in_place, shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place,
     sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place, two_row_sierra_in_place,
     vector_error_diffusion_in_place, zhou_fang_in_place,
@@ -618,6 +619,20 @@ fn golden_semivector_error_diffusion_rgb_gradient_8x8() {
     .expect("semivector diffusion should succeed");
 
     assert_eq!(fnv1a64(&data), 12_394_747_726_639_947_453_u64);
+}
+
+#[test]
+fn golden_hierarchical_error_diffusion_rgb_gradient_8x8() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    hierarchical_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("hierarchical diffusion should succeed");
+
+    assert_eq!(fnv1a64(&data), 11_794_439_059_347_037_317_u64);
 }
 
 #[test]

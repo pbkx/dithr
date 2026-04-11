@@ -9,8 +9,9 @@ use dithr::diffusion::{
     adaptive_vector_error_diffusion_in_place, atkinson_in_place, burkes_in_place,
     false_floyd_steinberg_in_place, fan_in_place, feature_preserving_msed_in_place,
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
-    hvs_optimized_error_diffusion_in_place, jarvis_judice_ninke_in_place,
-    linear_pixel_shuffling_in_place, multiscale_error_diffusion_in_place, ostromoukhov_in_place,
+    hierarchical_error_diffusion_in_place, hvs_optimized_error_diffusion_in_place,
+    jarvis_judice_ninke_in_place, linear_pixel_shuffling_in_place,
+    multiscale_error_diffusion_in_place, ostromoukhov_in_place,
     semivector_error_diffusion_in_place, shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place,
     sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place, two_row_sierra_in_place,
     vector_error_diffusion_in_place, zhou_fang_in_place,
@@ -696,6 +697,23 @@ fn semivector_diffusion_rejects_gray_formats() {
 }
 
 #[test]
+fn hierarchical_diffusion_rejects_gray_formats() {
+    let mut gray = vec![128_u8; 4 * 4];
+    let mut gray_buffer =
+        dithr::gray_u8(&mut gray, 4, 4, 4).expect("valid buffer should construct");
+    let gray_result = hierarchical_error_diffusion_in_place(
+        &mut gray_buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        gray_result,
+        Err(Error::UnsupportedFormat(
+            "vector diffusion algorithms support Rgb and Rgba formats only"
+        ))
+    ));
+}
+
+#[test]
 fn diffusion_rejects_malformed_layout_invariants() {
     #[derive(Clone, Copy)]
     struct InvalidAlphaLayout;
@@ -878,7 +896,7 @@ fn diffusion_u16_every_wrapper_smoke_gray() {
 
 #[test]
 fn diffusion_f32_every_wrapper_smoke_gray() {
-    let classic_extended_wrappers: [DiffusionWrapperF32; 16] = [
+    let classic_extended_wrappers: [DiffusionWrapperF32; 17] = [
         floyd_steinberg_in_place,
         false_floyd_steinberg_in_place,
         jarvis_judice_ninke_in_place,
@@ -895,6 +913,7 @@ fn diffusion_f32_every_wrapper_smoke_gray() {
         vector_error_diffusion_in_place,
         semivector_error_diffusion_in_place,
         adaptive_vector_error_diffusion_in_place,
+        hierarchical_error_diffusion_in_place,
     ];
 
     for wrapper in classic_extended_wrappers {
@@ -1434,6 +1453,93 @@ fn semivector_error_diffusion_output_hash_stable() {
 }
 
 #[test]
+fn hierarchical_error_diffusion_is_deterministic() {
+    let seed_data = rgb_gradient_8x8();
+    let mut a = seed_data.clone();
+    let mut b = seed_data;
+
+    let mut buffer_a = dithr::rgb_u8(&mut a, 8, 8, 24).expect("valid buffer should construct");
+    let mut buffer_b = dithr::rgb_u8(&mut b, 8, 8, 24).expect("valid buffer should construct");
+
+    hierarchical_error_diffusion_in_place(
+        &mut buffer_a,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("hierarchical diffusion should succeed");
+    hierarchical_error_diffusion_in_place(
+        &mut buffer_b,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("hierarchical diffusion should succeed");
+
+    assert_eq!(a, b);
+    assert_eq!(fnv1a64(&a), fnv1a64(&b));
+}
+
+#[test]
+fn hierarchical_error_diffusion_no_boundary_artifact_regression() {
+    let width = 64_usize;
+    let height = 64_usize;
+    let mut data = Vec::with_capacity(width * height * 3);
+    for y in 0..height {
+        for x in 0..width {
+            data.push(((x * 17 + y * 31) % 256) as u8);
+            data.push(((x * 29 + y * 11 + 37) % 256) as u8);
+            data.push(((x * 7 + y * 43 + ((x * y) % 59)) % 256) as u8);
+        }
+    }
+
+    let mut buffer =
+        dithr::rgb_u8(&mut data, width, height, width * 3).expect("valid buffer should construct");
+    hierarchical_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("hierarchical diffusion should succeed");
+
+    let mut boundary_sum = 0_u64;
+    let mut boundary_count = 0_u64;
+    let mut interior_sum = 0_u64;
+    let mut interior_count = 0_u64;
+
+    for y in 0..height {
+        for x in 0..width {
+            let idx = (y * width + x) * 3;
+            if x + 1 < width {
+                let right = idx + 3;
+                let delta = u64::from(data[idx].abs_diff(data[right]))
+                    + u64::from(data[idx + 1].abs_diff(data[right + 1]))
+                    + u64::from(data[idx + 2].abs_diff(data[right + 2]));
+                if x < 2 || x + 1 >= width - 2 || y < 2 || y >= height - 2 {
+                    boundary_sum += delta;
+                    boundary_count += 1;
+                } else {
+                    interior_sum += delta;
+                    interior_count += 1;
+                }
+            }
+            if y + 1 < height {
+                let down = idx + width * 3;
+                let delta = u64::from(data[idx].abs_diff(data[down]))
+                    + u64::from(data[idx + 1].abs_diff(data[down + 1]))
+                    + u64::from(data[idx + 2].abs_diff(data[down + 2]));
+                if x < 2 || x >= width - 2 || y < 2 || y + 1 >= height - 2 {
+                    boundary_sum += delta;
+                    boundary_count += 1;
+                } else {
+                    interior_sum += delta;
+                    interior_count += 1;
+                }
+            }
+        }
+    }
+
+    let boundary_mean = boundary_sum as f32 / boundary_count as f32;
+    let interior_mean = interior_sum as f32 / interior_count as f32;
+    assert!(boundary_mean <= interior_mean * 1.75);
+}
+
+#[test]
 fn adaptive_vector_error_diffusion_coeff_bounds_invariant() {
     let mut data: Vec<f32> = (0..(32 * 32 * 3))
         .map(|idx| {
@@ -1500,6 +1606,24 @@ fn semivector_error_diffusion_preserves_rgba_alpha() {
         QuantizeMode::rgb_bits(2).expect("valid bit depth"),
     )
     .expect("semivector diffusion should succeed");
+
+    let after_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_alpha, after_alpha);
+}
+
+#[test]
+fn hierarchical_error_diffusion_preserves_rgba_alpha() {
+    let mut data: Vec<u8> = (0_u16..(16 * 16 * 4))
+        .map(|value| ((value * 47 + 13) % 256) as u8)
+        .collect();
+    let before_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
+    let mut buffer = dithr::rgba_u8(&mut data, 16, 16, 64).expect("valid buffer should construct");
+
+    hierarchical_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("hierarchical diffusion should succeed");
 
     let after_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
     assert_eq!(before_alpha, after_alpha);

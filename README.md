@@ -238,10 +238,12 @@ Tone-dependent coefficient families.
 - `adaptive_vector_error_diffusion_in_place`
 - `vector_error_diffusion_in_place`
 - `semivector_error_diffusion_in_place`
+- `hierarchical_error_diffusion_in_place`
 
 Scope note: variable diffusion methods are grayscale-only except
 `adaptive_vector_error_diffusion_in_place`, `vector_error_diffusion_in_place`,
-and `semivector_error_diffusion_in_place`, which support Rgb/Rgba with alpha
+`semivector_error_diffusion_in_place`, and
+`hierarchical_error_diffusion_in_place`, which support Rgb/Rgba with alpha
 preservation on Rgba.
 
 #### Advanced halftoning
@@ -455,6 +457,8 @@ cargo test --doc --all-features
   <https://engineering.purdue.edu/~bouman/publications/pdf/jei1scan.pdf>, <https://engineering.purdue.edu/~bouman/publications/pub_doc.html>
 - Vector and semivector color error diffusion:
   <https://pubmed.ncbi.nlm.nih.gov/18255498/>, <https://doi.org/10.1109/83.951540>, <https://users.ece.utexas.edu/~bevans/papers/2003/colorDiffusion/index.html>
+- Hierarchical error diffusion:
+  <https://pubmed.ncbi.nlm.nih.gov/19473943/>, <https://doi.org/10.1109/TIP.2009.2019778>
 - Linear pixel shuffling error diffusion:
   <https://repository.rit.edu/other/391/>, <https://www.imaging.org/common/uploaded%20files/pdfs/Papers/2000/PICS-0-81/1625.pdf>
 - Riemersma dithering: <https://www.compuphase.com/riemer.htm>

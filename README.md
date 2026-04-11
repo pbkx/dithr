@@ -186,6 +186,7 @@ Custom map:
 - `ranked_dither_in_place`
 - `image_based_dither_screen_in_place`
 - `polyomino_ordered_dither_in_place`
+- `stochastic_clustered_dot_in_place`
 
 Parallel variants (`rayon` feature):
 
@@ -488,6 +489,7 @@ cargo test --doc --all-features
 - Ranked dither: <https://www.mayagupta.org/publications/GuptaBowenSPIE07.pdf>
 - Image-based dither screens: <https://graphicsinterface.org/wp-content/uploads/gi1999-22.pdf>, <https://doi.org/10.20380/GI1999.22>
 - Polyomino-based digital halftoning: <https://arxiv.org/abs/0812.1647>, <https://doi.org/10.48550/arXiv.0812.1647>
+- Stochastic clustered-dot dithering: <https://perso.liris.cnrs.fr/victor.ostromoukhov/publications/pdf/SPIE99_StochasticClust.pdf>, <https://pubmed.ncbi.nlm.nih.gov/18255440/>
 
 ## License
 

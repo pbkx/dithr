@@ -13,8 +13,9 @@ use dithr::ordered::{
     adaptive_ordered_dither_in_place, bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place,
     bayer_8x8_in_place, cluster_dot_4x4_in_place, cluster_dot_8x8_in_place,
     custom_ordered_in_place, image_based_dither_screen_in_place, polyomino_ordered_dither_in_place,
-    ranked_dither_in_place, space_filling_curve_ordered_dither_in_place, void_and_cluster_in_place,
-    yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
+    ranked_dither_in_place, space_filling_curve_ordered_dither_in_place,
+    stochastic_clustered_dot_in_place, void_and_cluster_in_place, yliluoma_1_in_place,
+    yliluoma_2_in_place, yliluoma_3_in_place,
 };
 #[cfg(feature = "rayon")]
 use dithr::ordered::{yliluoma_1_in_place_par, yliluoma_2_in_place_par, yliluoma_3_in_place_par};
@@ -534,6 +535,69 @@ fn polyomino_ordered_rejects_non_gray_layout() {
             "polyomino ordered dithering supports Gray layouts only"
         ))
     );
+}
+
+#[test]
+fn stochastic_clustered_dot_runs_and_quantizes_u8() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    stochastic_clustered_dot_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("stochastic clustered-dot should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn stochastic_clustered_dot_u16_binary_invariant() {
+    let mut data = gray_ramp_8x8_u16();
+    let mut buffer = dithr::gray_u16(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    stochastic_clustered_dot_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("stochastic clustered-dot should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+}
+
+#[test]
+fn stochastic_clustered_dot_f32_binary_invariant() {
+    let mut data: Vec<f32> = (0..(8 * 8))
+        .map(|index| index as f32 / ((8 * 8 - 1) as f32))
+        .collect();
+    let mut buffer = dithr::gray_32f(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    stochastic_clustered_dot_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("stochastic clustered-dot should succeed");
+
+    assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
+}
+
+#[test]
+fn stochastic_clustered_dot_generated_screen_is_deterministic() {
+    let mut data_a = vec![127_u8; 64 * 64];
+    let mut data_b = vec![127_u8; 64 * 64];
+
+    let mut buffer_a =
+        dithr::gray_u8(&mut data_a, 64, 64, 64).expect("valid buffer should construct");
+    let mut buffer_b =
+        dithr::gray_u8(&mut data_b, 64, 64, 64).expect("valid buffer should construct");
+
+    stochastic_clustered_dot_in_place(
+        &mut buffer_a,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("stochastic clustered-dot should succeed");
+    stochastic_clustered_dot_in_place(
+        &mut buffer_b,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("stochastic clustered-dot should succeed");
+
+    assert_eq!(data_a, data_b);
+    assert_eq!(fnv1a64(&data_a), 15_527_226_259_204_765_055_u64);
 }
 
 #[test]

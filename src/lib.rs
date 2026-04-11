@@ -144,6 +144,7 @@
 //! - Ranked dither: `ordered::ranked_dither_in_place`
 //! - Image-based dither screens: `ordered::image_based_dither_screen_in_place`
 //! - Polyomino ordered: `ordered::polyomino_ordered_dither_in_place`
+//! - Stochastic clustered-dot: `ordered::stochastic_clustered_dot_in_place`
 //!
 //! Palette-oriented ordered (Yliluoma):
 //!

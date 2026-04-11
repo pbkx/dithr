@@ -13,7 +13,8 @@ use dithr::ordered::{
     adaptive_ordered_dither_in_place, bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place,
     bayer_8x8_in_place, cluster_dot_4x4_in_place, cluster_dot_8x8_in_place,
     custom_ordered_in_place, image_based_dither_screen_in_place, polyomino_ordered_dither_in_place,
-    ranked_dither_in_place, space_filling_curve_ordered_dither_in_place, void_and_cluster_in_place,
+    ranked_dither_in_place, space_filling_curve_ordered_dither_in_place,
+    stochastic_clustered_dot_in_place, void_and_cluster_in_place,
 };
 #[cfg(feature = "rayon")]
 use dithr::ordered::{
@@ -129,6 +130,14 @@ fn bench_ordered(c: &mut Criterion) {
         width,
         height,
         |buffer| polyomino_ordered_dither_in_place(buffer, mode_gray_1()),
+    );
+    bench_gray_case(
+        &mut group,
+        "stochastic_clustered_dot_gray1_1024",
+        &fixture,
+        width,
+        height,
+        |buffer| stochastic_clustered_dot_in_place(buffer, mode_gray_1()),
     );
     bench_gray_case(
         &mut group,

@@ -6,6 +6,7 @@ mod image_based_screen;
 mod polyomino;
 mod ranked;
 mod space_filling;
+mod stochastic_cluster;
 mod void_cluster;
 mod yliluoma;
 
@@ -50,6 +51,7 @@ pub use image_based_screen::image_based_dither_screen_in_place;
 pub use polyomino::polyomino_ordered_dither_in_place;
 pub use ranked::ranked_dither_in_place;
 pub use space_filling::space_filling_curve_ordered_dither_in_place;
+pub use stochastic_cluster::stochastic_clustered_dot_in_place;
 pub use void_cluster::void_and_cluster_in_place;
 
 #[doc(hidden)]

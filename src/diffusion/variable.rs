@@ -13,6 +13,7 @@ enum GrayOnlyVariableAlgorithm {
     Multiscale,
     FeaturePreservingMsed,
     GreenNoiseMsed,
+    LinearPixelShuffling,
 }
 
 pub fn ostromoukhov_in_place<S: Sample, L: PixelLayout>(
@@ -59,6 +60,17 @@ pub fn green_noise_msed_in_place<S: Sample, L: PixelLayout>(
     mode: QuantizeMode<'_, S>,
 ) -> Result<()> {
     diffuse_gray_only_variable(buffer, mode, GrayOnlyVariableAlgorithm::GreenNoiseMsed)
+}
+
+pub fn linear_pixel_shuffling_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    diffuse_gray_only_variable(
+        buffer,
+        mode,
+        GrayOnlyVariableAlgorithm::LinearPixelShuffling,
+    )
 }
 
 pub fn adaptive_vector_error_diffusion_in_place<S: Sample, L: PixelLayout>(
@@ -292,6 +304,9 @@ fn diffuse_gray_only_variable<S: Sample, L: PixelLayout>(
             diffuse_feature_preserving_msed_gray(buffer, mode)
         }
         GrayOnlyVariableAlgorithm::GreenNoiseMsed => diffuse_green_noise_msed_gray(buffer, mode),
+        GrayOnlyVariableAlgorithm::LinearPixelShuffling => {
+            diffuse_linear_pixel_shuffling_gray(buffer, mode)
+        }
     }
 }
 
@@ -319,6 +334,17 @@ const ADAPTIVE_VECTOR_MAX_WEIGHT: f32 = 0.75;
 const ADAPTIVE_VECTOR_LEARNING_RATE: f32 = 0.09;
 const ADAPTIVE_VECTOR_RELAX_RATE: f32 = 0.035;
 const ADAPTIVE_VECTOR_EPSILON: f32 = 1.0e-7;
+const LPS_BASE_SEED: u64 = 0x6C8E_9CF5_42A1_7D3B;
+const LPS_NEIGHBORS: [(isize, isize, f32); 8] = [
+    (-1, -1, 1.0 / 12.0),
+    (0, -1, 2.0 / 12.0),
+    (1, -1, 1.0 / 12.0),
+    (-1, 0, 2.0 / 12.0),
+    (1, 0, 2.0 / 12.0),
+    (-1, 1, 1.0 / 12.0),
+    (0, 1, 2.0 / 12.0),
+    (1, 1, 1.0 / 12.0),
+];
 
 fn diffuse_multiscale_gray<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
@@ -339,6 +365,85 @@ fn diffuse_green_noise_msed_gray<S: Sample, L: PixelLayout>(
     mode: QuantizeMode<'_, S>,
 ) -> Result<()> {
     diffuse_multiscale_gray_with_profile(buffer, mode, MultiscaleProfile::GreenNoise)
+}
+
+fn diffuse_linear_pixel_shuffling_gray<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    let width = buffer.width;
+    let height = buffer.height;
+    let len = checked_gray_len(width, height)?;
+    let mut data = read_gray_units(buffer)?;
+    if data.len() != len {
+        return Err(Error::InvalidArgument(
+            "linear pixel shuffling source shape mismatch",
+        ));
+    }
+
+    let order = linear_pixel_shuffling_permutation(width, height, LPS_BASE_SEED)?;
+    if order.len() != len {
+        return Err(Error::InvalidArgument(
+            "linear pixel shuffling traversal size mismatch",
+        ));
+    }
+
+    let mut errors = vec![0.0_f32; len];
+    let mut processed = vec![false; len];
+
+    for &idx in &order {
+        if idx >= len {
+            return Err(Error::InvalidArgument(
+                "linear pixel shuffling traversal contains invalid index",
+            ));
+        }
+        if processed[idx] {
+            return Err(Error::InvalidArgument(
+                "linear pixel shuffling traversal repeats index",
+            ));
+        }
+
+        let x = idx % width;
+        let y = idx / width;
+        let adjusted = (data[idx] + errors[idx]).clamp(0.0, 1.0);
+        let quantized = quantize_unit_gray::<S>(adjusted, mode)?;
+        let residual = adjusted - quantized;
+        data[idx] = quantized;
+        processed[idx] = true;
+
+        let mut available = [(0_usize, 0.0_f32); 8];
+        let mut available_len = 0_usize;
+        let mut available_weight_sum = 0.0_f32;
+        for &(dx, dy, weight) in &LPS_NEIGHBORS {
+            let nx = x as isize + dx;
+            let ny = y as isize + dy;
+            if nx < 0 || ny < 0 {
+                continue;
+            }
+            let nx = nx as usize;
+            let ny = ny as usize;
+            if nx >= width || ny >= height {
+                continue;
+            }
+
+            let nidx = ny * width + nx;
+            if processed[nidx] {
+                continue;
+            }
+
+            available[available_len] = (nidx, weight);
+            available_len += 1;
+            available_weight_sum += weight;
+        }
+
+        if available_len > 0 && available_weight_sum > 0.0 {
+            for &(nidx, weight) in available.iter().take(available_len) {
+                errors[nidx] += residual * (weight / available_weight_sum);
+            }
+        }
+    }
+
+    write_multiscale_output(buffer, &data)
 }
 
 fn diffuse_multiscale_gray_with_profile<S: Sample, L: PixelLayout>(
@@ -1182,6 +1287,82 @@ fn sample_to_byte<S: Sample>(value: S) -> u8 {
 
 fn luma_bucket_unit(value_unit: f32) -> u8 {
     (value_unit.clamp(0.0, 1.0) * 255.0).round() as u8
+}
+
+fn linear_pixel_shuffling_permutation(
+    width: usize,
+    height: usize,
+    seed: u64,
+) -> Result<Vec<usize>> {
+    let len = checked_gray_len(width, height)?;
+    if len == 0 {
+        return Err(Error::InvalidArgument(
+            "linear pixel shuffling requires non-empty image",
+        ));
+    }
+    if len == 1 {
+        return Ok(vec![0]);
+    }
+
+    let mixed = splitmix64(seed ^ (width as u64).rotate_left(17) ^ (height as u64).rotate_left(49));
+    let stride = coprime_stride(len, mixed as usize)?;
+    let offset = (splitmix64(mixed ^ 0xA5A5_A5A5_A5A5_A5A5) as usize) % len;
+    let mut order = Vec::with_capacity(len);
+    let mut visited = vec![false; len];
+
+    let mut idx = offset;
+    for _ in 0..len {
+        if visited[idx] {
+            return Err(Error::InvalidArgument(
+                "linear pixel shuffling permutation generation failed",
+            ));
+        }
+        visited[idx] = true;
+        order.push(idx);
+        idx = (idx + stride) % len;
+    }
+
+    Ok(order)
+}
+
+fn coprime_stride(len: usize, candidate: usize) -> Result<usize> {
+    if len <= 1 {
+        return Ok(1);
+    }
+
+    let mut stride = (candidate % len).max(1);
+    let mut attempts = 0_usize;
+    while gcd_usize(stride, len) != 1 {
+        stride += 1;
+        if stride >= len {
+            stride = 1;
+        }
+        attempts += 1;
+        if attempts > len {
+            return Err(Error::InvalidArgument(
+                "linear pixel shuffling failed to derive coprime stride",
+            ));
+        }
+    }
+
+    Ok(stride)
+}
+
+fn gcd_usize(mut a: usize, mut b: usize) -> usize {
+    while b != 0 {
+        let t = a % b;
+        a = b;
+        b = t;
+    }
+    a
+}
+
+fn splitmix64(mut state: u64) -> u64 {
+    state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut z = state;
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
 }
 
 fn update_adaptive_vector_weights(

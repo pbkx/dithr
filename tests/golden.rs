@@ -11,9 +11,10 @@ use dithr::diffusion::{
     adaptive_vector_error_diffusion_in_place, atkinson_in_place, burkes_in_place,
     false_floyd_steinberg_in_place, fan_in_place, feature_preserving_msed_in_place,
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
-    jarvis_judice_ninke_in_place, multiscale_error_diffusion_in_place, ostromoukhov_in_place,
-    shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place, sierra_lite_in_place,
-    stevenson_arce_in_place, stucki_in_place, two_row_sierra_in_place, zhou_fang_in_place,
+    jarvis_judice_ninke_in_place, linear_pixel_shuffling_in_place,
+    multiscale_error_diffusion_in_place, ostromoukhov_in_place, shiau_fan_2_in_place,
+    shiau_fan_in_place, sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place,
+    stucki_in_place, two_row_sierra_in_place, zhou_fang_in_place,
 };
 use dithr::dot_diffusion::{knuth_dot_diffusion_in_place, optimized_dot_diffusion_in_place};
 use dithr::ordered::{
@@ -545,6 +546,20 @@ fn golden_green_noise_msed_gray_challenge_64x64() {
     .expect("green-noise msed should succeed");
 
     assert_eq!(fnv1a64(&data), 9_368_629_261_744_928_761_u64);
+}
+
+#[test]
+fn golden_linear_pixel_shuffling_gray_challenge_64x64() {
+    let mut data = variable_gray_challenge_64x64();
+    let mut buffer = dithr::gray_u8(&mut data, 64, 64, 64).expect("valid buffer should construct");
+
+    linear_pixel_shuffling_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(2).expect("valid bit depth"),
+    )
+    .expect("linear pixel shuffling should succeed");
+
+    assert_eq!(fnv1a64(&data), 482_996_107_186_433_349_u64);
 }
 
 #[test]

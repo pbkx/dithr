@@ -173,6 +173,7 @@
 //! - [`multiscale_error_diffusion_in_place`]
 //! - [`feature_preserving_msed_in_place`]
 //! - [`green_noise_msed_in_place`]
+//! - [`linear_pixel_shuffling_in_place`]
 //! - [`adaptive_vector_error_diffusion_in_place`]
 //!
 //! Advanced halftoning:
@@ -190,7 +191,8 @@
 //!   [`gradient_based_error_diffusion_in_place`], and
 //!   [`multiscale_error_diffusion_in_place`], and
 //!   [`feature_preserving_msed_in_place`], and
-//!   [`green_noise_msed_in_place`] are grayscale-only.
+//!   [`green_noise_msed_in_place`], and
+//!   [`linear_pixel_shuffling_in_place`] are grayscale-only.
 //! - [`adaptive_vector_error_diffusion_in_place`] supports `Rgb` and `Rgba`
 //!   layouts; alpha is preserved for `Rgba`.
 //! - [`direct_binary_search_in_place`], [`lattice_boltzmann_in_place`], and

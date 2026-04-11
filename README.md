@@ -233,6 +233,7 @@ Tone-dependent coefficient families.
 - `multiscale_error_diffusion_in_place`
 - `feature_preserving_msed_in_place`
 - `green_noise_msed_in_place`
+- `linear_pixel_shuffling_in_place`
 - `adaptive_vector_error_diffusion_in_place`
 
 Scope note: variable diffusion methods are grayscale-only except
@@ -441,6 +442,8 @@ cargo test --doc --all-features
   <https://pubmed.ncbi.nlm.nih.gov/20215075/>, <https://www.eie.polyu.edu.hk/~enyhchan/J-TIP-Green_noise_digital_halftoning_with_MED.pdf>
 - Adaptive vector error diffusion:
   <https://pubmed.ncbi.nlm.nih.gov/18282985/>, <https://doi.org/10.1109/83.597270>
+- Linear pixel shuffling error diffusion:
+  <https://repository.rit.edu/other/391/>, <https://www.imaging.org/common/uploaded%20files/pdfs/Papers/2000/PICS-0-81/1625.pdf>
 - Riemersma dithering: <https://www.compuphase.com/riemer.htm>
 - Knuth dot diffusion: <https://dl.acm.org/doi/10.1145/35039.35040>
 - Optimized dot diffusion: <https://doi.org/10.1109/83.841944>

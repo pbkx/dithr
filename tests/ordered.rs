@@ -12,7 +12,7 @@ use dithr::data::{
 use dithr::ordered::{
     adaptive_ordered_dither_in_place, bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place,
     bayer_8x8_in_place, cluster_dot_4x4_in_place, cluster_dot_8x8_in_place,
-    custom_ordered_in_place, space_filling_curve_ordered_dither_in_place,
+    custom_ordered_in_place, ranked_dither_in_place, space_filling_curve_ordered_dither_in_place,
     void_and_cluster_in_place, yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
 };
 #[cfg(feature = "rayon")]
@@ -350,6 +350,69 @@ fn space_filling_curve_ordered_traversal_order_is_stable() {
 
     assert_eq!(data_a, data_b);
     assert_eq!(fnv1a64(&data_a), 10_367_374_070_803_408_373_u64);
+}
+
+#[test]
+fn ranked_dither_runs_and_quantizes_u8() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    ranked_dither_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("ranked dither should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn ranked_dither_u16_binary_invariant() {
+    let mut data = gray_ramp_8x8_u16();
+    let mut buffer = dithr::gray_u16(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    ranked_dither_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("ranked dither should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+}
+
+#[test]
+fn ranked_dither_f32_binary_invariant() {
+    let mut data: Vec<f32> = (0..(8 * 8))
+        .map(|index| index as f32 / ((8 * 8 - 1) as f32))
+        .collect();
+    let mut buffer = dithr::gray_32f(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    ranked_dither_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("ranked dither should succeed");
+
+    assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
+}
+
+#[test]
+fn ranked_dither_rank_map_is_deterministic() {
+    let mut data_a = vec![127_u8; 16 * 16];
+    let mut data_b = vec![127_u8; 16 * 16];
+
+    let mut buffer_a =
+        dithr::gray_u8(&mut data_a, 16, 16, 16).expect("valid buffer should construct");
+    let mut buffer_b =
+        dithr::gray_u8(&mut data_b, 16, 16, 16).expect("valid buffer should construct");
+
+    ranked_dither_in_place(
+        &mut buffer_a,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("ranked dither should succeed");
+    ranked_dither_in_place(
+        &mut buffer_b,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("ranked dither should succeed");
+
+    assert_eq!(data_a, data_b);
+    assert_eq!(fnv1a64(&data_a), 690_402_364_730_067_173_u64);
 }
 
 #[test]

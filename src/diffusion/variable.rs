@@ -10,6 +10,7 @@ enum GrayOnlyVariableAlgorithm {
     Ostromoukhov,
     ZhouFang,
     GradientBased,
+    Multiscale,
 }
 
 pub fn ostromoukhov_in_place<S: Sample, L: PixelLayout>(
@@ -33,6 +34,13 @@ pub fn gradient_based_error_diffusion_in_place<S: Sample, L: PixelLayout>(
     diffuse_gray_only_variable(buffer, mode, GrayOnlyVariableAlgorithm::GradientBased)
 }
 
+pub fn multiscale_error_diffusion_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    diffuse_gray_only_variable(buffer, mode, GrayOnlyVariableAlgorithm::Multiscale)
+}
+
 fn diffuse_gray_only_variable<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     mode: QuantizeMode<'_, S>,
@@ -52,7 +60,369 @@ fn diffuse_gray_only_variable<S: Sample, L: PixelLayout>(
             diffuse_variable_gray(buffer, mode, Some(&ZHOU_FANG_MODULATION))
         }
         GrayOnlyVariableAlgorithm::GradientBased => diffuse_gradient_gray(buffer, mode),
+        GrayOnlyVariableAlgorithm::Multiscale => diffuse_multiscale_gray(buffer, mode),
     }
+}
+
+struct MultiscaleLevel {
+    width: usize,
+    height: usize,
+    data: Vec<f32>,
+}
+
+fn diffuse_multiscale_gray<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    let mut levels = build_multiscale_pyramid(buffer)?;
+    let mut propagated_error: Option<MultiscaleLevel> = None;
+
+    for level_index in (0..levels.len()).rev() {
+        let level = levels
+            .get_mut(level_index)
+            .ok_or(Error::InvalidArgument("multiscale level indexing failed"))?;
+        if let Some(coarser_error) = propagated_error.take() {
+            add_upsampled_error(
+                &mut level.data,
+                level.width,
+                level.height,
+                &coarser_error.data,
+                coarser_error.width,
+                coarser_error.height,
+            )?;
+        }
+
+        let residual =
+            diffuse_multiscale_level::<S>(&mut level.data, level.width, level.height, mode)?;
+        if level_index > 0 {
+            propagated_error = Some(MultiscaleLevel {
+                width: level.width,
+                height: level.height,
+                data: residual,
+            });
+        }
+    }
+
+    let finest = levels
+        .first()
+        .ok_or(Error::InvalidArgument("multiscale pyramid is empty"))?;
+    write_multiscale_output(buffer, &finest.data)
+}
+
+fn build_multiscale_pyramid<S: Sample, L: PixelLayout>(
+    buffer: &Buffer<'_, S, L>,
+) -> Result<Vec<MultiscaleLevel>> {
+    let mut levels = Vec::new();
+    let mut current = MultiscaleLevel {
+        width: buffer.width,
+        height: buffer.height,
+        data: read_gray_units(buffer)?,
+    };
+    levels.push(MultiscaleLevel {
+        width: current.width,
+        height: current.height,
+        data: current.data.clone(),
+    });
+
+    while current.width > 1 || current.height > 1 {
+        let next_width = current.width.div_ceil(2);
+        let next_height = current.height.div_ceil(2);
+        let next_data = downsample_gray_units(&current.data, current.width, current.height)?;
+        current = MultiscaleLevel {
+            width: next_width,
+            height: next_height,
+            data: next_data,
+        };
+        levels.push(MultiscaleLevel {
+            width: current.width,
+            height: current.height,
+            data: current.data.clone(),
+        });
+    }
+
+    Ok(levels)
+}
+
+fn read_gray_units<S: Sample, L: PixelLayout>(buffer: &Buffer<'_, S, L>) -> Result<Vec<f32>> {
+    let len = checked_gray_len(buffer.width, buffer.height)?;
+    let mut out = vec![0.0_f32; len];
+
+    for y in 0..buffer.height {
+        let row = buffer.try_row(y)?;
+        for x in 0..buffer.width {
+            let value = row.get(x).ok_or(BufferError::OutOfBounds)?;
+            out[y * buffer.width + x] = value.to_unit_f32();
+        }
+    }
+
+    Ok(out)
+}
+
+fn downsample_gray_units(source: &[f32], width: usize, height: usize) -> Result<Vec<f32>> {
+    let next_width = width.div_ceil(2);
+    let next_height = height.div_ceil(2);
+    let len = checked_gray_len(next_width, next_height)?;
+    let mut out = vec![0.0_f32; len];
+
+    for y in 0..next_height {
+        for x in 0..next_width {
+            let x0 = x * 2;
+            let y0 = y * 2;
+            let mut sum = 0.0_f32;
+            let mut count = 0_u32;
+
+            for dy in 0..2 {
+                for dx in 0..2 {
+                    let sx = x0 + dx;
+                    let sy = y0 + dy;
+                    if sx < width && sy < height {
+                        sum += source[sy * width + sx];
+                        count += 1;
+                    }
+                }
+            }
+
+            out[y * next_width + x] = if count > 0 { sum / count as f32 } else { 0.0 };
+        }
+    }
+
+    Ok(out)
+}
+
+fn add_upsampled_error(
+    target: &mut [f32],
+    target_width: usize,
+    target_height: usize,
+    source: &[f32],
+    source_width: usize,
+    source_height: usize,
+) -> Result<()> {
+    let expected_target = checked_gray_len(target_width, target_height)?;
+    let expected_source = checked_gray_len(source_width, source_height)?;
+    if target.len() != expected_target || source.len() != expected_source {
+        return Err(Error::InvalidArgument(
+            "multiscale level shape does not match level buffers",
+        ));
+    }
+
+    for y in 0..target_height {
+        for x in 0..target_width {
+            let sample = bilinear_sample(
+                source,
+                source_width,
+                source_height,
+                x,
+                y,
+                target_width,
+                target_height,
+            );
+            let idx = y * target_width + x;
+            target[idx] = (target[idx] + sample).clamp(0.0, 1.0);
+        }
+    }
+
+    Ok(())
+}
+
+fn bilinear_sample(
+    source: &[f32],
+    source_width: usize,
+    source_height: usize,
+    x: usize,
+    y: usize,
+    target_width: usize,
+    target_height: usize,
+) -> f32 {
+    let fx = if target_width > 1 && source_width > 1 {
+        x as f32 * (source_width - 1) as f32 / (target_width - 1) as f32
+    } else {
+        0.0
+    };
+    let fy = if target_height > 1 && source_height > 1 {
+        y as f32 * (source_height - 1) as f32 / (target_height - 1) as f32
+    } else {
+        0.0
+    };
+
+    let x0 = fx.floor() as usize;
+    let y0 = fy.floor() as usize;
+    let x1 = (x0 + 1).min(source_width.saturating_sub(1));
+    let y1 = (y0 + 1).min(source_height.saturating_sub(1));
+    let tx = fx - x0 as f32;
+    let ty = fy - y0 as f32;
+
+    let p00 = source[y0 * source_width + x0];
+    let p10 = source[y0 * source_width + x1];
+    let p01 = source[y1 * source_width + x0];
+    let p11 = source[y1 * source_width + x1];
+
+    let top = p00 + (p10 - p00) * tx;
+    let bottom = p01 + (p11 - p01) * tx;
+    top + (bottom - top) * ty
+}
+
+fn diffuse_multiscale_level<S: Sample>(
+    data: &mut [f32],
+    width: usize,
+    height: usize,
+    mode: QuantizeMode<'_, S>,
+) -> Result<Vec<f32>> {
+    let len = checked_gray_len(width, height)?;
+    if data.len() != len {
+        return Err(Error::InvalidArgument(
+            "multiscale diffusion level buffer has invalid shape",
+        ));
+    }
+
+    let mut errors = vec![0.0_f32; len];
+    let mut residual = vec![0.0_f32; len];
+
+    for y in 0..height {
+        if (y & 1) == 1 {
+            for x in (0..width).rev() {
+                let idx = y * width + x;
+                let adjusted = (data[idx] + errors[idx]).clamp(0.0, 1.0);
+                let quantized = quantize_unit_gray::<S>(adjusted, mode)?;
+                let err = adjusted - quantized;
+                data[idx] = quantized;
+                residual[idx] = err;
+
+                diffuse_scalar_error(
+                    &mut errors,
+                    width,
+                    height,
+                    x as isize - 1,
+                    y as isize,
+                    err * 7.0 / 16.0,
+                );
+                diffuse_scalar_error(
+                    &mut errors,
+                    width,
+                    height,
+                    x as isize + 1,
+                    y as isize + 1,
+                    err * 3.0 / 16.0,
+                );
+                diffuse_scalar_error(
+                    &mut errors,
+                    width,
+                    height,
+                    x as isize,
+                    y as isize + 1,
+                    err * 5.0 / 16.0,
+                );
+                diffuse_scalar_error(
+                    &mut errors,
+                    width,
+                    height,
+                    x as isize - 1,
+                    y as isize + 1,
+                    err / 16.0,
+                );
+            }
+        } else {
+            for x in 0..width {
+                let idx = y * width + x;
+                let adjusted = (data[idx] + errors[idx]).clamp(0.0, 1.0);
+                let quantized = quantize_unit_gray::<S>(adjusted, mode)?;
+                let err = adjusted - quantized;
+                data[idx] = quantized;
+                residual[idx] = err;
+
+                diffuse_scalar_error(
+                    &mut errors,
+                    width,
+                    height,
+                    x as isize + 1,
+                    y as isize,
+                    err * 7.0 / 16.0,
+                );
+                diffuse_scalar_error(
+                    &mut errors,
+                    width,
+                    height,
+                    x as isize - 1,
+                    y as isize + 1,
+                    err * 3.0 / 16.0,
+                );
+                diffuse_scalar_error(
+                    &mut errors,
+                    width,
+                    height,
+                    x as isize,
+                    y as isize + 1,
+                    err * 5.0 / 16.0,
+                );
+                diffuse_scalar_error(
+                    &mut errors,
+                    width,
+                    height,
+                    x as isize + 1,
+                    y as isize + 1,
+                    err / 16.0,
+                );
+            }
+        }
+    }
+
+    Ok(residual)
+}
+
+fn quantize_unit_gray<S: Sample>(value: f32, mode: QuantizeMode<'_, S>) -> Result<f32> {
+    let quantized = quantize_pixel::<S, crate::core::Gray>(&[S::from_unit_f32(value)], mode)?;
+    Ok(quantized[0].to_unit_f32())
+}
+
+fn diffuse_scalar_error(
+    errors: &mut [f32],
+    width: usize,
+    height: usize,
+    x: isize,
+    y: isize,
+    delta: f32,
+) {
+    if x < 0 || y < 0 {
+        return;
+    }
+
+    let x = x as usize;
+    let y = y as usize;
+    if x >= width || y >= height {
+        return;
+    }
+
+    errors[y * width + x] += delta;
+}
+
+fn write_multiscale_output<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    output: &[f32],
+) -> Result<()> {
+    let width = buffer.width;
+    let height = buffer.height;
+    let expected = checked_gray_len(width, height)?;
+    if output.len() != expected {
+        return Err(Error::InvalidArgument(
+            "multiscale output shape does not match image dimensions",
+        ));
+    }
+
+    for y in 0..height {
+        let row = buffer.try_row_mut(y)?;
+        for x in 0..width {
+            let src = output[y * width + x].clamp(0.0, 1.0);
+            let dst = row.get_mut(x).ok_or(BufferError::OutOfBounds)?;
+            *dst = S::from_unit_f32(src);
+        }
+    }
+
+    Ok(())
+}
+
+fn checked_gray_len(width: usize, height: usize) -> Result<usize> {
+    width
+        .checked_mul(height)
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))
 }
 
 fn diffuse_gradient_gray<S: Sample, L: PixelLayout>(

@@ -8,9 +8,9 @@ use dithr::core::PixelLayout;
 use dithr::diffusion::{
     atkinson_in_place, burkes_in_place, false_floyd_steinberg_in_place, fan_in_place,
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place,
-    jarvis_judice_ninke_in_place, ostromoukhov_in_place, shiau_fan_2_in_place, shiau_fan_in_place,
-    sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place,
-    two_row_sierra_in_place, zhou_fang_in_place,
+    jarvis_judice_ninke_in_place, multiscale_error_diffusion_in_place, ostromoukhov_in_place,
+    shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place, sierra_lite_in_place,
+    stevenson_arce_in_place, stucki_in_place, two_row_sierra_in_place, zhou_fang_in_place,
 };
 use dithr::{Error, GrayBuffer16, Palette, QuantizeMode, RgbBuffer32F};
 
@@ -284,6 +284,20 @@ fn gradient_based_error_diffusion_runs() {
 }
 
 #[test]
+fn multiscale_error_diffusion_runs() {
+    let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    multiscale_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("multiscale diffusion should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
 fn ostromoukhov_rejects_non_gray_formats() {
     let mut rgb = vec![128_u8; 4 * 4 * 3];
     let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
@@ -362,6 +376,36 @@ fn gradient_based_error_diffusion_rejects_non_gray_formats() {
     let mut rgba_buffer =
         dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
     let rgba_result = gradient_based_error_diffusion_in_place(
+        &mut rgba_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        rgba_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support grayscale formats only"
+        ))
+    ));
+}
+
+#[test]
+fn multiscale_error_diffusion_rejects_non_gray_formats() {
+    let mut rgb = vec![128_u8; 4 * 4 * 3];
+    let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
+    let rgb_result = multiscale_error_diffusion_in_place(
+        &mut rgb_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        rgb_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support grayscale formats only"
+        ))
+    ));
+
+    let mut rgba = vec![128_u8; 4 * 4 * 4];
+    let mut rgba_buffer =
+        dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
+    let rgba_result = multiscale_error_diffusion_in_place(
         &mut rgba_buffer,
         QuantizeMode::gray_bits(1).expect("valid bit depth"),
     );
@@ -518,7 +562,7 @@ fn fixture_builders_are_deterministic() {
 
 #[test]
 fn diffusion_u16_every_wrapper_smoke_gray() {
-    let wrappers: [DiffusionWrapperU16; 16] = [
+    let wrappers: [DiffusionWrapperU16; 17] = [
         floyd_steinberg_in_place,
         false_floyd_steinberg_in_place,
         jarvis_judice_ninke_in_place,
@@ -535,6 +579,7 @@ fn diffusion_u16_every_wrapper_smoke_gray() {
         ostromoukhov_in_place,
         zhou_fang_in_place,
         gradient_based_error_diffusion_in_place,
+        multiscale_error_diffusion_in_place,
     ];
 
     for wrapper in wrappers {
@@ -578,10 +623,11 @@ fn diffusion_f32_every_wrapper_smoke_gray() {
         assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
     }
 
-    let variable_wrappers: [DiffusionWrapperF32; 3] = [
+    let variable_wrappers: [DiffusionWrapperF32; 4] = [
         ostromoukhov_in_place,
         zhou_fang_in_place,
         gradient_based_error_diffusion_in_place,
+        multiscale_error_diffusion_in_place,
     ];
 
     for wrapper in variable_wrappers {
@@ -701,6 +747,52 @@ fn variable_diffusion_coeff_range_post_cleanup() {
     assert!(modulation[128] >= modulation[96]);
     assert!(modulation[128] >= modulation[160]);
     assert!(modulation.iter().all(|&entry| entry <= 199));
+}
+
+#[test]
+fn multiscale_error_diffusion_is_deterministic() {
+    let seed_data = gray_ramp_16x16();
+    let mut a = seed_data.clone();
+    let mut b = seed_data;
+
+    let mut buffer_a = dithr::gray_u8(&mut a, 16, 16, 16).expect("valid buffer should construct");
+    let mut buffer_b = dithr::gray_u8(&mut b, 16, 16, 16).expect("valid buffer should construct");
+
+    multiscale_error_diffusion_in_place(&mut buffer_a, QuantizeMode::GrayLevels(2))
+        .expect("multiscale diffusion should succeed");
+    multiscale_error_diffusion_in_place(&mut buffer_b, QuantizeMode::GrayLevels(2))
+        .expect("multiscale diffusion should succeed");
+
+    assert_eq!(a, b);
+}
+
+#[test]
+fn multiscale_error_diffusion_objective_invariants_gray() {
+    let mut data = gray_ramp_16x16();
+    let input_mean = data
+        .iter()
+        .map(|&value| f32::from(value) / 255.0)
+        .sum::<f32>()
+        / data.len() as f32;
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    multiscale_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("multiscale diffusion should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+    let white_count = data.iter().filter(|&&value| value == 255).count();
+    assert!(white_count > 0);
+    assert!(white_count < data.len());
+
+    let output_mean = data
+        .iter()
+        .map(|&value| f32::from(value) / 255.0)
+        .sum::<f32>()
+        / data.len() as f32;
+    assert!((output_mean - input_mean).abs() <= 0.1);
 }
 
 #[test]

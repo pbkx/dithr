@@ -230,6 +230,7 @@ Tone-dependent coefficient families.
 - `ostromoukhov_in_place`
 - `zhou_fang_in_place`
 - `gradient_based_error_diffusion_in_place`
+- `multiscale_error_diffusion_in_place`
 
 Scope note: variable diffusion methods are grayscale-only.
 
@@ -426,6 +427,8 @@ cargo test --doc --all-features
   <https://www.iro.umontreal.ca/~ostrom/publications/pdf/SIGGRAPH01_varcoeffED.pdf>
 - Zhou-Fang threshold modulation:
   <https://history.siggraph.org/learning/improving-mid-tone-quality-of-variable-coefficient-error-diffusion-using-threshold-modulation-by-zhou-and-fang/>
+- Multiscale error diffusion:
+  <https://doi.org/10.1109/83.557360>, <https://mcl.usc.edu/wp-content/uploads/2014/01/1997-03-A-multiscale-error-diffusion-technique-for-digital-Halftoning.pdf>
 - Riemersma dithering: <https://www.compuphase.com/riemer.htm>
 - Knuth dot diffusion: <https://dl.acm.org/doi/10.1145/35039.35040>
 - Optimized dot diffusion: <https://doi.org/10.1109/83.841944>

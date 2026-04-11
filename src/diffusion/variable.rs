@@ -9,6 +9,7 @@ use crate::{
 enum GrayOnlyVariableAlgorithm {
     Ostromoukhov,
     ZhouFang,
+    ToneDependent,
     HvsOptimized,
     GradientBased,
     Multiscale,
@@ -43,6 +44,13 @@ pub fn hvs_optimized_error_diffusion_in_place<S: Sample, L: PixelLayout>(
     mode: QuantizeMode<'_, S>,
 ) -> Result<()> {
     diffuse_gray_only_variable(buffer, mode, GrayOnlyVariableAlgorithm::HvsOptimized)
+}
+
+pub fn tone_dependent_error_diffusion_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    diffuse_gray_only_variable(buffer, mode, GrayOnlyVariableAlgorithm::ToneDependent)
 }
 
 pub fn gradient_based_error_diffusion_in_place<S: Sample, L: PixelLayout>(
@@ -612,6 +620,7 @@ fn diffuse_gray_only_variable<S: Sample, L: PixelLayout>(
         GrayOnlyVariableAlgorithm::ZhouFang => {
             diffuse_variable_gray(buffer, mode, Some(&ZHOU_FANG_MODULATION))
         }
+        GrayOnlyVariableAlgorithm::ToneDependent => diffuse_tone_dependent_gray(buffer, mode),
         GrayOnlyVariableAlgorithm::HvsOptimized => diffuse_hvs_optimized_gray(buffer, mode),
         GrayOnlyVariableAlgorithm::GradientBased => diffuse_gradient_gray(buffer, mode),
         GrayOnlyVariableAlgorithm::Multiscale => diffuse_multiscale_gray(buffer, mode),
@@ -668,6 +677,24 @@ const HIERARCHICAL_POSITION_GAIN: f32 = 0.08;
 const HIERARCHICAL_OVERLAP_PRIMARY: f32 = 0.34;
 const HIERARCHICAL_OVERLAP_SECONDARY: f32 = 0.16;
 const HIERARCHICAL_OVERLAP_TERTIARY: f32 = 0.24;
+const TONE_DEPENDENT_DIFFUSION_COEFFS: [[f32; 3]; 16] = [
+    [0.50, 0.26, 0.24],
+    [0.52, 0.24, 0.24],
+    [0.54, 0.23, 0.23],
+    [0.56, 0.22, 0.22],
+    [0.58, 0.21, 0.21],
+    [0.60, 0.20, 0.20],
+    [0.62, 0.19, 0.19],
+    [0.64, 0.18, 0.18],
+    [0.64, 0.18, 0.18],
+    [0.62, 0.19, 0.19],
+    [0.60, 0.20, 0.20],
+    [0.58, 0.21, 0.21],
+    [0.56, 0.22, 0.22],
+    [0.54, 0.23, 0.23],
+    [0.52, 0.24, 0.24],
+    [0.50, 0.26, 0.24],
+];
 const HVS_OPTIMIZED_FORWARD: f32 = 0.7770;
 const HVS_OPTIMIZED_DOWN_DIAGONAL: f32 = -0.0090;
 const HVS_OPTIMIZED_DOWN: f32 = 0.7861;
@@ -1667,6 +1694,128 @@ fn diffuse_variable_gray<S: Sample, L: PixelLayout>(
     Ok(())
 }
 
+fn diffuse_tone_dependent_gray<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    let width = buffer.width;
+    let height = buffer.height;
+    let mut errors = allocate_gray_error_buffer(width, height)?;
+
+    for y in 0..height {
+        let row = buffer.try_row_mut(y)?;
+        let reverse = (y & 1) == 1;
+
+        if reverse {
+            for x in (0..width).rev() {
+                let pixel = row.get_mut(x..=x).ok_or(BufferError::OutOfBounds)?;
+                let err_idx = (y * width + x) * 4;
+                let err = [
+                    errors[err_idx],
+                    errors[err_idx + 1],
+                    errors[err_idx + 2],
+                    errors[err_idx + 3],
+                ];
+                let adjusted = read_pixel_with_error::<S, L>(pixel, &err)?[0];
+                let quantized =
+                    quantize_pixel::<S, crate::core::Gray>(&[S::from_unit_f32(adjusted)], mode)?;
+                write_quantized_pixel::<S, L>(pixel, quantized);
+
+                let residual = adjusted - quantized[0].to_unit_f32();
+                let luma = luma_bucket_unit(adjusted);
+                let coeff = tone_dependent_coeff_for_luma(luma)?;
+                let tone = f32::from(luma) / 255.0;
+                let center_bias = 1.0 - (2.0 * tone - 1.0).abs();
+                let gain = 0.7 + 0.6 * center_bias;
+                let forward = residual * coeff[0] * gain;
+                let down_diag = residual * coeff[1] * gain;
+                let down = residual * coeff[2] * gain;
+                let xi = x as isize;
+                let yi = y as isize;
+
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi - 1,
+                    yi,
+                    [forward, 0.0, 0.0, 0.0],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi + 1,
+                    yi + 1,
+                    [down_diag, 0.0, 0.0, 0.0],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi,
+                    yi + 1,
+                    [down, 0.0, 0.0, 0.0],
+                );
+            }
+        } else {
+            for x in 0..width {
+                let pixel = row.get_mut(x..=x).ok_or(BufferError::OutOfBounds)?;
+                let err_idx = (y * width + x) * 4;
+                let err = [
+                    errors[err_idx],
+                    errors[err_idx + 1],
+                    errors[err_idx + 2],
+                    errors[err_idx + 3],
+                ];
+                let adjusted = read_pixel_with_error::<S, L>(pixel, &err)?[0];
+                let quantized =
+                    quantize_pixel::<S, crate::core::Gray>(&[S::from_unit_f32(adjusted)], mode)?;
+                write_quantized_pixel::<S, L>(pixel, quantized);
+
+                let residual = adjusted - quantized[0].to_unit_f32();
+                let luma = luma_bucket_unit(adjusted);
+                let coeff = tone_dependent_coeff_for_luma(luma)?;
+                let tone = f32::from(luma) / 255.0;
+                let center_bias = 1.0 - (2.0 * tone - 1.0).abs();
+                let gain = 0.7 + 0.6 * center_bias;
+                let forward = residual * coeff[0] * gain;
+                let down_diag = residual * coeff[1] * gain;
+                let down = residual * coeff[2] * gain;
+                let xi = x as isize;
+                let yi = y as isize;
+
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi + 1,
+                    yi,
+                    [forward, 0.0, 0.0, 0.0],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi - 1,
+                    yi + 1,
+                    [down_diag, 0.0, 0.0, 0.0],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi,
+                    yi + 1,
+                    [down, 0.0, 0.0, 0.0],
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn allocate_gray_error_buffer(width: usize, height: usize) -> Result<Vec<f32>> {
     let len = width
         .checked_mul(height)
@@ -1681,6 +1830,31 @@ fn coefficient_for_luma(luma: u8) -> (i16, i16, i16, i16) {
 
 fn modulation_for_luma(luma: u8, table: &[u8; 256]) -> u8 {
     table[usize::from(luma)]
+}
+
+fn tone_dependent_coeff_for_luma(luma: u8) -> Result<[f32; 3]> {
+    let table_len = TONE_DEPENDENT_DIFFUSION_COEFFS.len();
+    if table_len == 0 {
+        return Err(Error::InvalidArgument(
+            "tone-dependent diffusion coefficient table must be non-empty",
+        ));
+    }
+
+    let idx = (usize::from(luma) * table_len) / 256;
+    let coeff = TONE_DEPENDENT_DIFFUSION_COEFFS
+        .get(idx)
+        .ok_or(Error::InvalidArgument(
+            "tone-dependent diffusion coefficient lookup out of range",
+        ))?;
+
+    let sum = coeff[0] + coeff[1] + coeff[2];
+    if !sum.is_finite() || sum <= f32::EPSILON {
+        return Err(Error::InvalidArgument(
+            "tone-dependent diffusion coefficients must sum to a finite positive value",
+        ));
+    }
+
+    Ok([coeff[0] / sum, coeff[1] / sum, coeff[2] / sum])
 }
 
 fn zhou_fang_thresholded_unit(value_unit: f32, x: usize, y: usize, table: &[u8; 256]) -> f32 {

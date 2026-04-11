@@ -20,7 +20,8 @@ pub use variable::{
     gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
     hierarchical_error_diffusion_in_place, hvs_optimized_error_diffusion_in_place,
     linear_pixel_shuffling_in_place, multiscale_error_diffusion_in_place, ostromoukhov_in_place,
-    semivector_error_diffusion_in_place, vector_error_diffusion_in_place, zhou_fang_in_place,
+    semivector_error_diffusion_in_place, tone_dependent_error_diffusion_in_place,
+    vector_error_diffusion_in_place, zhou_fang_in_place,
 };
 
 #[doc(hidden)]

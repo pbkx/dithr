@@ -14,7 +14,8 @@ use dithr::diffusion::{
     jarvis_judice_ninke_in_place, linear_pixel_shuffling_in_place,
     multiscale_error_diffusion_in_place, ostromoukhov_in_place, shiau_fan_2_in_place,
     shiau_fan_in_place, sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place,
-    stucki_in_place, two_row_sierra_in_place, vector_error_diffusion_in_place, zhou_fang_in_place,
+    stucki_in_place, tone_dependent_error_diffusion_in_place, two_row_sierra_in_place,
+    vector_error_diffusion_in_place, zhou_fang_in_place,
 };
 use dithr::QuantizeMode;
 
@@ -214,6 +215,14 @@ fn bench_diffusion(c: &mut Criterion) {
         width,
         height,
         |buffer| linear_pixel_shuffling_in_place(buffer, mode_gray_1()),
+    );
+    bench_gray_case(
+        &mut group,
+        "tone_dependent_error_diffusion_gray1_512",
+        &fixture,
+        width,
+        height,
+        |buffer| tone_dependent_error_diffusion_in_place(buffer, mode_gray_1()),
     );
     group.finish();
 

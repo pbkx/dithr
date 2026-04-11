@@ -13,7 +13,8 @@ use dithr::diffusion::{
     jarvis_judice_ninke_in_place, linear_pixel_shuffling_in_place,
     multiscale_error_diffusion_in_place, ostromoukhov_in_place,
     semivector_error_diffusion_in_place, shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place,
-    sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place, two_row_sierra_in_place,
+    sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place,
+    tone_dependent_error_diffusion_in_place, two_row_sierra_in_place,
     vector_error_diffusion_in_place, zhou_fang_in_place,
 };
 use dithr::{Error, GrayBuffer16, Palette, QuantizeMode, RgbBuffer32F};
@@ -358,6 +359,20 @@ fn linear_pixel_shuffling_runs() {
 }
 
 #[test]
+fn tone_dependent_error_diffusion_runs() {
+    let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    tone_dependent_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("tone-dependent diffusion should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
 fn adaptive_vector_error_diffusion_runs_rgb() {
     let mut data = rgb_gradient_8x8();
     let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
@@ -646,6 +661,36 @@ fn linear_pixel_shuffling_rejects_non_gray_formats() {
 }
 
 #[test]
+fn tone_dependent_error_diffusion_rejects_non_gray_formats() {
+    let mut rgb = vec![128_u8; 4 * 4 * 3];
+    let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
+    let rgb_result = tone_dependent_error_diffusion_in_place(
+        &mut rgb_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        rgb_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support grayscale formats only"
+        ))
+    ));
+
+    let mut rgba = vec![128_u8; 4 * 4 * 4];
+    let mut rgba_buffer =
+        dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
+    let rgba_result = tone_dependent_error_diffusion_in_place(
+        &mut rgba_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        rgba_result,
+        Err(Error::UnsupportedFormat(
+            "variable diffusion algorithms support grayscale formats only"
+        ))
+    ));
+}
+
+#[test]
 fn adaptive_vector_error_diffusion_rejects_gray_formats() {
     let mut gray = vec![128_u8; 4 * 4];
     let mut gray_buffer =
@@ -858,7 +903,7 @@ fn fixture_builders_are_deterministic() {
 
 #[test]
 fn diffusion_u16_every_wrapper_smoke_gray() {
-    let wrappers: [DiffusionWrapperU16; 21] = [
+    let wrappers: [DiffusionWrapperU16; 22] = [
         floyd_steinberg_in_place,
         false_floyd_steinberg_in_place,
         jarvis_judice_ninke_in_place,
@@ -880,6 +925,7 @@ fn diffusion_u16_every_wrapper_smoke_gray() {
         feature_preserving_msed_in_place,
         green_noise_msed_in_place,
         linear_pixel_shuffling_in_place,
+        tone_dependent_error_diffusion_in_place,
     ];
 
     for wrapper in wrappers {
@@ -927,7 +973,7 @@ fn diffusion_f32_every_wrapper_smoke_gray() {
         assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
     }
 
-    let variable_wrappers: [DiffusionWrapperF32; 8] = [
+    let variable_wrappers: [DiffusionWrapperF32; 9] = [
         ostromoukhov_in_place,
         zhou_fang_in_place,
         hvs_optimized_error_diffusion_in_place,
@@ -936,6 +982,7 @@ fn diffusion_f32_every_wrapper_smoke_gray() {
         feature_preserving_msed_in_place,
         green_noise_msed_in_place,
         linear_pixel_shuffling_in_place,
+        tone_dependent_error_diffusion_in_place,
     ];
 
     for wrapper in variable_wrappers {
@@ -1266,6 +1313,56 @@ fn linear_pixel_shuffling_output_hash_stable() {
     .expect("linear pixel shuffling should succeed");
 
     assert_eq!(fnv1a64(&data), 1_103_120_312_080_356_549_u64);
+}
+
+#[test]
+fn tone_dependent_error_diffusion_is_deterministic() {
+    let seed_data = gray_ramp_16x16();
+    let mut a = seed_data.clone();
+    let mut b = seed_data;
+
+    let mut buffer_a = dithr::gray_u8(&mut a, 16, 16, 16).expect("valid buffer should construct");
+    let mut buffer_b = dithr::gray_u8(&mut b, 16, 16, 16).expect("valid buffer should construct");
+
+    tone_dependent_error_diffusion_in_place(&mut buffer_a, QuantizeMode::GrayLevels(2))
+        .expect("tone-dependent diffusion should succeed");
+    tone_dependent_error_diffusion_in_place(&mut buffer_b, QuantizeMode::GrayLevels(2))
+        .expect("tone-dependent diffusion should succeed");
+
+    assert_eq!(a, b);
+    assert_eq!(fnv1a64(&a), fnv1a64(&b));
+}
+
+#[test]
+fn tone_dependent_error_diffusion_output_hash_stable() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    tone_dependent_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("tone-dependent diffusion should succeed");
+
+    assert_eq!(fnv1a64(&data), 16_710_726_971_806_801_047_u64);
+}
+
+#[test]
+fn tone_dependent_error_diffusion_coeff_index_bounds_test() {
+    let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    tone_dependent_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("tone-dependent diffusion should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+    let black = data.iter().filter(|&&value| value == 0).count();
+    let white = data.iter().filter(|&&value| value == 255).count();
+    assert!(black > 0);
+    assert!(white > 0);
 }
 
 #[test]

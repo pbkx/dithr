@@ -236,9 +236,12 @@ Tone-dependent coefficient families.
 - `green_noise_msed_in_place`
 - `linear_pixel_shuffling_in_place`
 - `adaptive_vector_error_diffusion_in_place`
+- `vector_error_diffusion_in_place`
+- `semivector_error_diffusion_in_place`
 
 Scope note: variable diffusion methods are grayscale-only except
-`adaptive_vector_error_diffusion_in_place`, which supports Rgb/Rgba with alpha
+`adaptive_vector_error_diffusion_in_place`, `vector_error_diffusion_in_place`,
+and `semivector_error_diffusion_in_place`, which support Rgb/Rgba with alpha
 preservation on Rgba.
 
 #### Advanced halftoning
@@ -420,7 +423,9 @@ cargo test --doc --all-features
   image editing workflows.
 - Not every algorithm supports every format/layout/sample combination.
 - Variable diffusion methods are grayscale-only except
-  `adaptive_vector_error_diffusion_in_place` for Rgb/Rgba.
+  `adaptive_vector_error_diffusion_in_place`,
+  `vector_error_diffusion_in_place`, and
+  `semivector_error_diffusion_in_place` for Rgb/Rgba.
 - `direct_binary_search_in_place`, `lattice_boltzmann_in_place`, and
   `electrostatic_halftoning_in_place` are integer grayscale-only.
 - Parallel wrappers are currently provided for ordered, Yliluoma, and binary
@@ -448,6 +453,8 @@ cargo test --doc --all-features
   <https://pubmed.ncbi.nlm.nih.gov/18282985/>, <https://doi.org/10.1109/83.597270>
 - HVS-optimized error diffusion (Kolpatzik-Bouman):
   <https://engineering.purdue.edu/~bouman/publications/pdf/jei1scan.pdf>, <https://engineering.purdue.edu/~bouman/publications/pub_doc.html>
+- Vector and semivector color error diffusion:
+  <https://pubmed.ncbi.nlm.nih.gov/18255498/>, <https://doi.org/10.1109/83.951540>, <https://users.ece.utexas.edu/~bevans/papers/2003/colorDiffusion/index.html>
 - Linear pixel shuffling error diffusion:
   <https://repository.rit.edu/other/391/>, <https://www.imaging.org/common/uploaded%20files/pdfs/Papers/2000/PICS-0-81/1625.pdf>
 - Riemersma dithering: <https://www.compuphase.com/riemer.htm>

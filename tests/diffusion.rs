@@ -11,8 +11,9 @@ use dithr::diffusion::{
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
     hvs_optimized_error_diffusion_in_place, jarvis_judice_ninke_in_place,
     linear_pixel_shuffling_in_place, multiscale_error_diffusion_in_place, ostromoukhov_in_place,
-    shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place, sierra_lite_in_place,
-    stevenson_arce_in_place, stucki_in_place, two_row_sierra_in_place, zhou_fang_in_place,
+    semivector_error_diffusion_in_place, shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place,
+    sierra_lite_in_place, stevenson_arce_in_place, stucki_in_place, two_row_sierra_in_place,
+    vector_error_diffusion_in_place, zhou_fang_in_place,
 };
 use dithr::{Error, GrayBuffer16, Palette, QuantizeMode, RgbBuffer32F};
 
@@ -372,6 +373,38 @@ fn adaptive_vector_error_diffusion_runs_rgb() {
 }
 
 #[test]
+fn vector_error_diffusion_runs_rgb() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    vector_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("vector diffusion should succeed");
+
+    assert!(data
+        .iter()
+        .all(|&value| { matches!(value, 0 | 85 | 170 | 255) }));
+}
+
+#[test]
+fn semivector_error_diffusion_runs_rgb() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    semivector_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("semivector diffusion should succeed");
+
+    assert!(data
+        .iter()
+        .all(|&value| { matches!(value, 0 | 85 | 170 | 255) }));
+}
+
+#[test]
 fn ostromoukhov_rejects_non_gray_formats() {
     let mut rgb = vec![128_u8; 4 * 4 * 3];
     let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
@@ -629,6 +662,40 @@ fn adaptive_vector_error_diffusion_rejects_gray_formats() {
 }
 
 #[test]
+fn vector_diffusion_rejects_gray_formats() {
+    let mut gray = vec![128_u8; 4 * 4];
+    let mut gray_buffer =
+        dithr::gray_u8(&mut gray, 4, 4, 4).expect("valid buffer should construct");
+    let gray_result = vector_error_diffusion_in_place(
+        &mut gray_buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        gray_result,
+        Err(Error::UnsupportedFormat(
+            "vector diffusion algorithms support Rgb and Rgba formats only"
+        ))
+    ));
+}
+
+#[test]
+fn semivector_diffusion_rejects_gray_formats() {
+    let mut gray = vec![128_u8; 4 * 4];
+    let mut gray_buffer =
+        dithr::gray_u8(&mut gray, 4, 4, 4).expect("valid buffer should construct");
+    let gray_result = semivector_error_diffusion_in_place(
+        &mut gray_buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        gray_result,
+        Err(Error::UnsupportedFormat(
+            "vector diffusion algorithms support Rgb and Rgba formats only"
+        ))
+    ));
+}
+
+#[test]
 fn diffusion_rejects_malformed_layout_invariants() {
     #[derive(Clone, Copy)]
     struct InvalidAlphaLayout;
@@ -811,7 +878,7 @@ fn diffusion_u16_every_wrapper_smoke_gray() {
 
 #[test]
 fn diffusion_f32_every_wrapper_smoke_gray() {
-    let classic_extended_wrappers: [DiffusionWrapperF32; 14] = [
+    let classic_extended_wrappers: [DiffusionWrapperF32; 16] = [
         floyd_steinberg_in_place,
         false_floyd_steinberg_in_place,
         jarvis_judice_ninke_in_place,
@@ -825,6 +892,8 @@ fn diffusion_f32_every_wrapper_smoke_gray() {
         fan_in_place,
         shiau_fan_in_place,
         shiau_fan_2_in_place,
+        vector_error_diffusion_in_place,
+        semivector_error_diffusion_in_place,
         adaptive_vector_error_diffusion_in_place,
     ];
 
@@ -1289,6 +1358,82 @@ fn adaptive_vector_error_diffusion_is_deterministic() {
 }
 
 #[test]
+fn vector_error_diffusion_is_deterministic() {
+    let seed_data = rgb_gradient_8x8();
+    let mut a = seed_data.clone();
+    let mut b = seed_data;
+
+    let mut buffer_a = dithr::rgb_u8(&mut a, 8, 8, 24).expect("valid buffer should construct");
+    let mut buffer_b = dithr::rgb_u8(&mut b, 8, 8, 24).expect("valid buffer should construct");
+
+    vector_error_diffusion_in_place(
+        &mut buffer_a,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("vector diffusion should succeed");
+    vector_error_diffusion_in_place(
+        &mut buffer_b,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("vector diffusion should succeed");
+
+    assert_eq!(a, b);
+    assert_eq!(fnv1a64(&a), fnv1a64(&b));
+}
+
+#[test]
+fn semivector_error_diffusion_is_deterministic() {
+    let seed_data = rgb_gradient_8x8();
+    let mut a = seed_data.clone();
+    let mut b = seed_data;
+
+    let mut buffer_a = dithr::rgb_u8(&mut a, 8, 8, 24).expect("valid buffer should construct");
+    let mut buffer_b = dithr::rgb_u8(&mut b, 8, 8, 24).expect("valid buffer should construct");
+
+    semivector_error_diffusion_in_place(
+        &mut buffer_a,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("semivector diffusion should succeed");
+    semivector_error_diffusion_in_place(
+        &mut buffer_b,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("semivector diffusion should succeed");
+
+    assert_eq!(a, b);
+    assert_eq!(fnv1a64(&a), fnv1a64(&b));
+}
+
+#[test]
+fn vector_error_diffusion_output_hash_stable() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    vector_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("vector diffusion should succeed");
+
+    assert_eq!(fnv1a64(&data), 6_317_725_775_587_847_331_u64);
+}
+
+#[test]
+fn semivector_error_diffusion_output_hash_stable() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    semivector_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("semivector diffusion should succeed");
+
+    assert_eq!(fnv1a64(&data), 12_394_747_726_639_947_453_u64);
+}
+
+#[test]
 fn adaptive_vector_error_diffusion_coeff_bounds_invariant() {
     let mut data: Vec<f32> = (0..(32 * 32 * 3))
         .map(|idx| {
@@ -1319,6 +1464,42 @@ fn adaptive_vector_error_diffusion_preserves_rgba_alpha() {
         QuantizeMode::rgb_bits(2).expect("valid bit depth"),
     )
     .expect("adaptive vector diffusion should succeed");
+
+    let after_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_alpha, after_alpha);
+}
+
+#[test]
+fn vector_error_diffusion_preserves_rgba_alpha() {
+    let mut data: Vec<u8> = (0_u16..(16 * 16 * 4))
+        .map(|value| ((value * 29 + 41) % 256) as u8)
+        .collect();
+    let before_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
+    let mut buffer = dithr::rgba_u8(&mut data, 16, 16, 64).expect("valid buffer should construct");
+
+    vector_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("vector diffusion should succeed");
+
+    let after_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_alpha, after_alpha);
+}
+
+#[test]
+fn semivector_error_diffusion_preserves_rgba_alpha() {
+    let mut data: Vec<u8> = (0_u16..(16 * 16 * 4))
+        .map(|value| ((value * 31 + 23) % 256) as u8)
+        .collect();
+    let before_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
+    let mut buffer = dithr::rgba_u8(&mut data, 16, 16, 64).expect("valid buffer should construct");
+
+    semivector_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("semivector diffusion should succeed");
 
     let after_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
     assert_eq!(before_alpha, after_alpha);

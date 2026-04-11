@@ -17,6 +17,12 @@ enum GrayOnlyVariableAlgorithm {
     LinearPixelShuffling,
 }
 
+#[derive(Clone, Copy)]
+enum ColorVectorAlgorithm {
+    Vector,
+    SemiVector,
+}
+
 pub fn ostromoukhov_in_place<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     mode: QuantizeMode<'_, S>,
@@ -288,6 +294,250 @@ pub fn adaptive_vector_error_diffusion_in_place<S: Sample, L: PixelLayout>(
     Ok(())
 }
 
+pub fn vector_error_diffusion_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    diffuse_color_vector(buffer, mode, ColorVectorAlgorithm::Vector)
+}
+
+pub fn semivector_error_diffusion_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    diffuse_color_vector(buffer, mode, ColorVectorAlgorithm::SemiVector)
+}
+
+fn diffuse_color_vector<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+    algorithm: ColorVectorAlgorithm,
+) -> Result<()> {
+    buffer.validate()?;
+
+    if !(L::COLOR_CHANNELS == 3 && (L::CHANNELS == 3 || L::CHANNELS == 4)) {
+        return Err(Error::UnsupportedFormat(
+            "vector diffusion algorithms support Rgb and Rgba formats only",
+        ));
+    }
+
+    let width = buffer.width;
+    let height = buffer.height;
+    let channels = L::CHANNELS;
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
+    let error_len = pixel_count
+        .checked_mul(4)
+        .ok_or(Error::InvalidArgument("error buffer size overflow"))?;
+    let mut errors = vec![0.0_f32; error_len];
+
+    for y in 0..height {
+        let reverse = (y & 1) == 1;
+        let row = buffer.try_row_mut(y)?;
+
+        if reverse {
+            for x in (0..width).rev() {
+                let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
+                let end = offset
+                    .checked_add(channels)
+                    .ok_or(BufferError::OutOfBounds)?;
+                let pixel = row.get_mut(offset..end).ok_or(BufferError::OutOfBounds)?;
+                let err_idx = (y * width + x) * 4;
+                let err = [
+                    errors[err_idx],
+                    errors[err_idx + 1],
+                    errors[err_idx + 2],
+                    errors[err_idx + 3],
+                ];
+                let adjusted_unit = read_pixel_with_error::<S, L>(pixel, &err)?;
+                let adjusted = [
+                    S::from_unit_f32(adjusted_unit[0]),
+                    S::from_unit_f32(adjusted_unit[1]),
+                    S::from_unit_f32(adjusted_unit[2]),
+                    S::from_unit_f32(adjusted_unit[3]),
+                ];
+                let quantized = quantize_pixel::<S, L>(&adjusted[..channels], mode)?;
+                let quantized_unit = read_unit_pixel::<S, L>(&quantized[..channels])?;
+                write_quantized_pixel::<S, L>(pixel, quantized);
+
+                let residual = [
+                    adjusted_unit[0] - quantized_unit[0],
+                    adjusted_unit[1] - quantized_unit[1],
+                    adjusted_unit[2] - quantized_unit[2],
+                ];
+                let transformed = match algorithm {
+                    ColorVectorAlgorithm::Vector => {
+                        color_residual_matrix_apply(residual, VECTOR_DIFFUSION_MATRIX)
+                    }
+                    ColorVectorAlgorithm::SemiVector => {
+                        color_residual_matrix_apply(residual, SEMIVECTOR_DIFFUSION_MATRIX)
+                    }
+                };
+                let xi = x as isize;
+                let yi = y as isize;
+
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi - 1,
+                    yi,
+                    [
+                        transformed[0] * VECTOR_ED_WEIGHT_FORWARD,
+                        transformed[1] * VECTOR_ED_WEIGHT_FORWARD,
+                        transformed[2] * VECTOR_ED_WEIGHT_FORWARD,
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi + 1,
+                    yi + 1,
+                    [
+                        transformed[0] * VECTOR_ED_WEIGHT_DOWN_DIAGONAL,
+                        transformed[1] * VECTOR_ED_WEIGHT_DOWN_DIAGONAL,
+                        transformed[2] * VECTOR_ED_WEIGHT_DOWN_DIAGONAL,
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi,
+                    yi + 1,
+                    [
+                        transformed[0] * VECTOR_ED_WEIGHT_DOWN,
+                        transformed[1] * VECTOR_ED_WEIGHT_DOWN,
+                        transformed[2] * VECTOR_ED_WEIGHT_DOWN,
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi - 1,
+                    yi + 1,
+                    [
+                        transformed[0] * VECTOR_ED_WEIGHT_DOWN_FORWARD,
+                        transformed[1] * VECTOR_ED_WEIGHT_DOWN_FORWARD,
+                        transformed[2] * VECTOR_ED_WEIGHT_DOWN_FORWARD,
+                        0.0,
+                    ],
+                );
+            }
+        } else {
+            for x in 0..width {
+                let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
+                let end = offset
+                    .checked_add(channels)
+                    .ok_or(BufferError::OutOfBounds)?;
+                let pixel = row.get_mut(offset..end).ok_or(BufferError::OutOfBounds)?;
+                let err_idx = (y * width + x) * 4;
+                let err = [
+                    errors[err_idx],
+                    errors[err_idx + 1],
+                    errors[err_idx + 2],
+                    errors[err_idx + 3],
+                ];
+                let adjusted_unit = read_pixel_with_error::<S, L>(pixel, &err)?;
+                let adjusted = [
+                    S::from_unit_f32(adjusted_unit[0]),
+                    S::from_unit_f32(adjusted_unit[1]),
+                    S::from_unit_f32(adjusted_unit[2]),
+                    S::from_unit_f32(adjusted_unit[3]),
+                ];
+                let quantized = quantize_pixel::<S, L>(&adjusted[..channels], mode)?;
+                let quantized_unit = read_unit_pixel::<S, L>(&quantized[..channels])?;
+                write_quantized_pixel::<S, L>(pixel, quantized);
+
+                let residual = [
+                    adjusted_unit[0] - quantized_unit[0],
+                    adjusted_unit[1] - quantized_unit[1],
+                    adjusted_unit[2] - quantized_unit[2],
+                ];
+                let transformed = match algorithm {
+                    ColorVectorAlgorithm::Vector => {
+                        color_residual_matrix_apply(residual, VECTOR_DIFFUSION_MATRIX)
+                    }
+                    ColorVectorAlgorithm::SemiVector => {
+                        color_residual_matrix_apply(residual, SEMIVECTOR_DIFFUSION_MATRIX)
+                    }
+                };
+                let xi = x as isize;
+                let yi = y as isize;
+
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi + 1,
+                    yi,
+                    [
+                        transformed[0] * VECTOR_ED_WEIGHT_FORWARD,
+                        transformed[1] * VECTOR_ED_WEIGHT_FORWARD,
+                        transformed[2] * VECTOR_ED_WEIGHT_FORWARD,
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi - 1,
+                    yi + 1,
+                    [
+                        transformed[0] * VECTOR_ED_WEIGHT_DOWN_DIAGONAL,
+                        transformed[1] * VECTOR_ED_WEIGHT_DOWN_DIAGONAL,
+                        transformed[2] * VECTOR_ED_WEIGHT_DOWN_DIAGONAL,
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi,
+                    yi + 1,
+                    [
+                        transformed[0] * VECTOR_ED_WEIGHT_DOWN,
+                        transformed[1] * VECTOR_ED_WEIGHT_DOWN,
+                        transformed[2] * VECTOR_ED_WEIGHT_DOWN,
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi + 1,
+                    yi + 1,
+                    [
+                        transformed[0] * VECTOR_ED_WEIGHT_DOWN_FORWARD,
+                        transformed[1] * VECTOR_ED_WEIGHT_DOWN_FORWARD,
+                        transformed[2] * VECTOR_ED_WEIGHT_DOWN_FORWARD,
+                        0.0,
+                    ],
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn color_residual_matrix_apply(error: [f32; 3], matrix: [[f32; 3]; 3]) -> [f32; 3] {
+    [
+        matrix[0][0] * error[0] + matrix[0][1] * error[1] + matrix[0][2] * error[2],
+        matrix[1][0] * error[0] + matrix[1][1] * error[1] + matrix[1][2] * error[2],
+        matrix[2][0] * error[0] + matrix[2][1] * error[1] + matrix[2][2] * error[2],
+    ]
+}
+
 fn diffuse_gray_only_variable<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     mode: QuantizeMode<'_, S>,
@@ -343,6 +593,17 @@ const ADAPTIVE_VECTOR_MAX_WEIGHT: f32 = 0.75;
 const ADAPTIVE_VECTOR_LEARNING_RATE: f32 = 0.09;
 const ADAPTIVE_VECTOR_RELAX_RATE: f32 = 0.035;
 const ADAPTIVE_VECTOR_EPSILON: f32 = 1.0e-7;
+const VECTOR_ED_WEIGHT_FORWARD: f32 = 7.0 / 16.0;
+const VECTOR_ED_WEIGHT_DOWN_DIAGONAL: f32 = 3.0 / 16.0;
+const VECTOR_ED_WEIGHT_DOWN: f32 = 5.0 / 16.0;
+const VECTOR_ED_WEIGHT_DOWN_FORWARD: f32 = 1.0 / 16.0;
+const VECTOR_DIFFUSION_MATRIX: [[f32; 3]; 3] =
+    [[0.84, 0.10, 0.06], [0.10, 0.84, 0.06], [0.08, 0.08, 0.84]];
+const SEMIVECTOR_DIFFUSION_MATRIX: [[f32; 3]; 3] = [
+    [0.77568, 0.18784, 0.03648],
+    [0.09568, 0.86784, 0.03648],
+    [0.09568, 0.18784, 0.71648],
+];
 const HVS_OPTIMIZED_FORWARD: f32 = 0.7770;
 const HVS_OPTIMIZED_DOWN_DIAGONAL: f32 = -0.0090;
 const HVS_OPTIMIZED_DOWN: f32 = 0.7861;

@@ -10,9 +10,10 @@ use dithr::data::{
     generate_bayer_16x16, BAYER_2X2, BAYER_4X4, BAYER_8X8, CLUSTER_DOT_4X4, CLUSTER_DOT_8X8,
 };
 use dithr::ordered::{
-    bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
-    cluster_dot_4x4_in_place, cluster_dot_8x8_in_place, custom_ordered_in_place,
-    void_and_cluster_in_place, yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
+    adaptive_ordered_dither_in_place, bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place,
+    bayer_8x8_in_place, cluster_dot_4x4_in_place, cluster_dot_8x8_in_place,
+    custom_ordered_in_place, void_and_cluster_in_place, yliluoma_1_in_place, yliluoma_2_in_place,
+    yliluoma_3_in_place,
 };
 #[cfg(feature = "rayon")]
 use dithr::ordered::{yliluoma_1_in_place_par, yliluoma_2_in_place_par, yliluoma_3_in_place_par};
@@ -230,6 +231,62 @@ fn void_and_cluster_f32_binary_invariant() {
         .expect("void-and-cluster should succeed");
 
     assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
+}
+
+#[test]
+fn adaptive_ordered_runs_and_quantizes_u8() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    adaptive_ordered_dither_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("adaptive ordered dithering should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn adaptive_ordered_u16_binary_invariant() {
+    let mut data = gray_ramp_8x8_u16();
+    let mut buffer = dithr::gray_u16(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    adaptive_ordered_dither_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("adaptive ordered dithering should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+}
+
+#[test]
+fn adaptive_ordered_f32_binary_invariant() {
+    let mut data: Vec<f32> = (0..(8 * 8))
+        .map(|index| index as f32 / ((8 * 8 - 1) as f32))
+        .collect();
+    let mut buffer = dithr::gray_32f(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    adaptive_ordered_dither_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("adaptive ordered dithering should succeed");
+
+    assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
+}
+
+#[test]
+fn adaptive_ordered_rgba_alpha_preserved() {
+    let mut data: Vec<u8> = (0_u16..80)
+        .map(|value| ((value * 37 + 19) % 256) as u8)
+        .collect();
+    let before_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
+    let mut buffer = dithr::rgba_u8(&mut data, 4, 5, 16).expect("valid buffer should construct");
+
+    adaptive_ordered_dither_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("adaptive ordered dithering should succeed");
+
+    let after_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_alpha, after_alpha);
 }
 
 #[test]

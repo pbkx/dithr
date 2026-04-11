@@ -181,6 +181,7 @@ Cluster-dot:
 Custom map:
 
 - `custom_ordered_in_place`
+- `adaptive_ordered_dither_in_place`
 
 Parallel variants (`rayon` feature):
 
@@ -478,6 +479,7 @@ cargo test --doc --all-features
 - Electrostatic halftoning:
   <https://onlinelibrary.wiley.com/doi/10.1111/j.1467-8659.2010.01716.x>
 - Void-and-cluster dithering: <https://docslib.org/doc/9596963/the-void-and-cluster-method-for-dither-array-generation>, <https://cv.ulichney.com/papers/1994-filter-design.pdf>
+- Adaptive ordered dither: <https://doi.org/10.1006/gmip.1996.0414>, <https://www.sciencedirect.com/science/article/pii/S1077316996904141>
 
 ## License
 

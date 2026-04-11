@@ -1,3 +1,4 @@
+mod adaptive;
 mod bayer;
 mod cluster;
 pub(crate) mod core;
@@ -31,6 +32,7 @@ impl std::fmt::Display for OrderedError {
 
 impl std::error::Error for OrderedError {}
 
+pub use adaptive::adaptive_ordered_dither_in_place;
 pub use bayer::{bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place};
 #[cfg(feature = "rayon")]
 pub use bayer::{

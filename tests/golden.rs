@@ -11,9 +11,10 @@ use dithr::dbs::{
     least_squares_model_based_in_place, model_based_med_in_place,
 };
 use dithr::diffusion::{
-    adaptive_vector_error_diffusion_in_place, atkinson_in_place, burkes_in_place,
-    false_floyd_steinberg_in_place, fan_in_place, feature_preserving_msed_in_place,
-    floyd_steinberg_in_place, gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
+    adaptive_vector_error_diffusion_in_place, atkinson_in_place, block_error_diffusion_in_place,
+    burkes_in_place, false_floyd_steinberg_in_place, fan_in_place,
+    feature_preserving_msed_in_place, floyd_steinberg_in_place,
+    gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
     hierarchical_error_diffusion_in_place, hvs_optimized_error_diffusion_in_place,
     jarvis_judice_ninke_in_place, linear_pixel_shuffling_in_place,
     mbvq_color_error_diffusion_in_place, multiscale_error_diffusion_in_place,
@@ -490,6 +491,20 @@ fn golden_atkinson_gray_ramp_16x16() {
     .expect("atkinson should succeed");
 
     assert_eq!(fnv1a64(&data), 3_764_225_652_723_977_986_u64);
+}
+
+#[test]
+fn golden_block_error_diffusion_gray_ramp_16x16() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    block_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("block error diffusion should succeed");
+
+    assert_eq!(fnv1a64(&data), 9_888_425_698_637_677_718_u64);
 }
 
 #[test]

@@ -6,9 +6,10 @@ use common::{
 };
 use dithr::core::PixelLayout;
 use dithr::diffusion::{
-    adaptive_vector_error_diffusion_in_place, atkinson_in_place, burkes_in_place,
-    false_floyd_steinberg_in_place, fan_in_place, feature_preserving_msed_in_place,
-    floyd_steinberg_in_place, gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
+    adaptive_vector_error_diffusion_in_place, atkinson_in_place, block_error_diffusion_in_place,
+    burkes_in_place, false_floyd_steinberg_in_place, fan_in_place,
+    feature_preserving_msed_in_place, floyd_steinberg_in_place,
+    gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
     hierarchical_error_diffusion_in_place, hvs_optimized_error_diffusion_in_place,
     jarvis_judice_ninke_in_place, linear_pixel_shuffling_in_place,
     mbvq_color_error_diffusion_in_place, multiscale_error_diffusion_in_place,
@@ -175,6 +176,47 @@ fn atkinson_runs() {
     .expect("atkinson should succeed");
 
     assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn block_error_diffusion_runs_gray() {
+    let mut data: Vec<u8> = (0_u16..256).map(|value| value as u8).collect();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    block_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("block error diffusion should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn block_error_diffusion_block_size_invariants() {
+    let mut even = gray_ramp_16x16();
+    let mut even_buffer =
+        dithr::gray_u8(&mut even, 16, 16, 16).expect("valid buffer should construct");
+    block_error_diffusion_in_place(
+        &mut even_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("block error diffusion should succeed");
+    assert!(even.iter().all(|&value| value == 0 || value == 255));
+
+    let width = 17_usize;
+    let height = 15_usize;
+    let mut odd: Vec<u8> = (0..(width * height))
+        .map(|idx| ((idx * 23 + (idx / width) * 11) % 256) as u8)
+        .collect();
+    let mut odd_buffer =
+        dithr::gray_u8(&mut odd, width, height, width).expect("valid buffer should construct");
+    block_error_diffusion_in_place(
+        &mut odd_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("block error diffusion should succeed");
+    assert!(odd.iter().all(|&value| value == 0 || value == 255));
 }
 
 #[test]
@@ -893,6 +935,36 @@ fn neugebauer_color_error_diffusion_rejects_gray_formats() {
         gray_result,
         Err(Error::UnsupportedFormat(
             "vector diffusion algorithms support Rgb and Rgba formats only"
+        ))
+    ));
+}
+
+#[test]
+fn block_error_diffusion_rejects_non_gray_formats() {
+    let mut rgb = vec![128_u8; 4 * 4 * 3];
+    let mut rgb_buffer = dithr::rgb_u8(&mut rgb, 4, 4, 12).expect("valid buffer should construct");
+    let rgb_result = block_error_diffusion_in_place(
+        &mut rgb_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        rgb_result,
+        Err(Error::UnsupportedFormat(
+            "block error diffusion supports grayscale formats only"
+        ))
+    ));
+
+    let mut rgba = vec![128_u8; 4 * 4 * 4];
+    let mut rgba_buffer =
+        dithr::rgba_u8(&mut rgba, 4, 4, 16).expect("valid buffer should construct");
+    let rgba_result = block_error_diffusion_in_place(
+        &mut rgba_buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        rgba_result,
+        Err(Error::UnsupportedFormat(
+            "block error diffusion supports grayscale formats only"
         ))
     ));
 }
@@ -1809,6 +1881,30 @@ fn neugebauer_color_error_diffusion_is_deterministic() {
 }
 
 #[test]
+fn block_error_diffusion_is_deterministic() {
+    let seed_data = gray_ramp_16x16();
+    let mut a = seed_data.clone();
+    let mut b = seed_data;
+
+    let mut buffer_a = dithr::gray_u8(&mut a, 16, 16, 16).expect("valid buffer should construct");
+    let mut buffer_b = dithr::gray_u8(&mut b, 16, 16, 16).expect("valid buffer should construct");
+
+    block_error_diffusion_in_place(
+        &mut buffer_a,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("block error diffusion should succeed");
+    block_error_diffusion_in_place(
+        &mut buffer_b,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("block error diffusion should succeed");
+
+    assert_eq!(a, b);
+    assert_eq!(fnv1a64(&a), fnv1a64(&b));
+}
+
+#[test]
 fn vector_error_diffusion_output_hash_stable() {
     let mut data = rgb_gradient_8x8();
     let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
@@ -1862,6 +1958,20 @@ fn neugebauer_color_error_diffusion_output_hash_stable() {
     .expect("neugebauer color diffusion should succeed");
 
     assert_eq!(fnv1a64(&data), 15_655_645_645_567_106_596_u64);
+}
+
+#[test]
+fn block_error_diffusion_output_hash_stable() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    block_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("block error diffusion should succeed");
+
+    assert_eq!(fnv1a64(&data), 9_888_425_698_637_677_718_u64);
 }
 
 #[test]

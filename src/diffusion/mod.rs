@@ -1,3 +1,4 @@
+pub mod block;
 pub mod classic;
 pub(crate) mod core;
 pub mod extended;
@@ -9,6 +10,7 @@ use crate::{
     Buffer, QuantizeMode, Result,
 };
 
+pub use block::block_error_diffusion_in_place;
 pub use classic::{
     atkinson_in_place, burkes_in_place, false_floyd_steinberg_in_place, floyd_steinberg_in_place,
     jarvis_judice_ninke_in_place, sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place,

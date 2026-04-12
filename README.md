@@ -228,6 +228,9 @@ Additional diffusion kernels with different spread patterns.
 - `fan_in_place`
 - `shiau_fan_in_place`
 - `shiau_fan_2_in_place`
+- `block_error_diffusion_in_place`
+
+Scope note: `block_error_diffusion_in_place` is grayscale-only.
 
 #### Variable diffusion
 
@@ -450,6 +453,7 @@ cargo test --doc --all-features
   `semivector_error_diffusion_in_place`,
   `mbvq_color_error_diffusion_in_place`, and
   `neugebauer_color_error_diffusion_in_place` for Rgb/Rgba.
+- `block_error_diffusion_in_place` is grayscale-only.
 - `direct_binary_search_in_place`,
   `clustered_dot_direct_multibit_search_in_place`,
   `lattice_boltzmann_in_place`, and `electrostatic_halftoning_in_place` are
@@ -483,6 +487,8 @@ cargo test --doc --all-features
   <https://pubmed.ncbi.nlm.nih.gov/18255498/>, <https://doi.org/10.1109/83.951540>, <https://users.ece.utexas.edu/~bevans/papers/2003/colorDiffusion/index.html>
 - MBVQ/Neugebauer color error diffusion:
   <https://www.mdpi.com/2313-433X/6/4/23>, <https://doi.org/10.3390/jimaging6040023>, <https://patents.google.com/patent/US5991438A/en>, <https://patents.google.com/patent/EP0895408A2/en>
+- Block error diffusion:
+  <https://doi.org/10.1109/TIP.2005.859776>, <https://shiftleft.com/mirrors/www.hpl.hp.com/personal/Niranjan_Damera-Venkata/files/ibc.pdf>
 - Hierarchical error diffusion:
   <https://pubmed.ncbi.nlm.nih.gov/19473943/>, <https://doi.org/10.1109/TIP.2009.2019778>
 - Tone-dependent error diffusion:

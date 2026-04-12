@@ -171,6 +171,10 @@
 //! - [`shiau_fan_in_place`]
 //! - [`shiau_fan_2_in_place`]
 //!
+//! Diffusion (block):
+//!
+//! - `diffusion::block_error_diffusion_in_place`
+//!
 //! Variable diffusion:
 //!
 //! - [`ostromoukhov_in_place`]
@@ -225,6 +229,7 @@
 //! - `diffusion::mbvq_color_error_diffusion_in_place` and
 //!   `diffusion::neugebauer_color_error_diffusion_in_place` support `Rgb` and
 //!   `Rgba` layouts; alpha is preserved for `Rgba`.
+//! - `diffusion::block_error_diffusion_in_place` is grayscale-only.
 //! - [`direct_binary_search_in_place`], [`lattice_boltzmann_in_place`], and
 //!   [`electrostatic_halftoning_in_place`] are integer grayscale-only.
 //! - [`model_based_med_in_place`] and [`least_squares_model_based_in_place`]

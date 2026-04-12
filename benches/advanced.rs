@@ -7,7 +7,8 @@ use common::{
 use criterion::{criterion_group, criterion_main, Criterion};
 use dithr::dbs::{
     clustered_dot_direct_multibit_search_in_place, direct_binary_search_in_place,
-    direct_pattern_control_in_place, electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
+    direct_pattern_control_in_place, electrostatic_halftoning_in_place,
+    hierarchical_colorant_dbs_in_place, lattice_boltzmann_in_place,
     least_squares_model_based_in_place, model_based_med_in_place,
 };
 use dithr::dot_diffusion::{knuth_dot_diffusion_in_place, optimized_dot_diffusion_in_place};
@@ -87,6 +88,14 @@ fn bench_advanced(c: &mut Criterion) {
         width,
         height,
         |buffer| direct_pattern_control_in_place(buffer, 2),
+    );
+    bench_rgb_case(
+        &mut group,
+        "hierarchical_colorant_dbs_rgb_256_iters2",
+        &fixture,
+        width,
+        height,
+        |buffer| hierarchical_colorant_dbs_in_place(buffer, 2),
     );
     group.finish();
 

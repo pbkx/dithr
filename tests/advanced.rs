@@ -6,7 +6,8 @@ use common::{
 };
 use dithr::dbs::{
     clustered_dot_direct_multibit_search_in_place, direct_binary_search_in_place,
-    direct_pattern_control_in_place, electrostatic_halftoning_in_place, lattice_boltzmann_in_place,
+    direct_pattern_control_in_place, electrostatic_halftoning_in_place,
+    hierarchical_colorant_dbs_in_place, lattice_boltzmann_in_place,
     least_squares_model_based_in_place, model_based_med_in_place,
 };
 use dithr::dot_diffusion::{knuth_dot_diffusion_in_place, optimized_dot_diffusion_in_place};
@@ -211,6 +212,81 @@ fn direct_pattern_control_rgba_preserves_alpha() {
         assert!(px[1] == 0 || px[1] == 255);
         assert!(px[2] == 0 || px[2] == 255);
     }
+}
+
+#[test]
+fn hierarchical_colorant_dbs_hierarchy_order_is_deterministic() {
+    let mut data_a = rgb_gradient_8x8();
+    let mut data_b = rgb_gradient_8x8();
+
+    let mut buffer_a = dithr::rgb_u8(&mut data_a, 8, 8, 24).expect("valid buffer should construct");
+    let mut buffer_b = dithr::rgb_u8(&mut data_b, 8, 8, 24).expect("valid buffer should construct");
+
+    hierarchical_colorant_dbs_in_place(&mut buffer_a, 3)
+        .expect("hierarchical colorant dbs should succeed");
+    hierarchical_colorant_dbs_in_place(&mut buffer_b, 3)
+        .expect("hierarchical colorant dbs should succeed");
+
+    assert_eq!(fnv1a64(&data_a), fnv1a64(&data_b));
+    for px in data_a.chunks_exact(3) {
+        assert!(px[0] == 0 || px[0] == 255);
+        assert!(px[1] == 0 || px[1] == 255);
+        assert!(px[2] == 0 || px[2] == 255);
+    }
+}
+
+#[test]
+fn hierarchical_colorant_dbs_quality_regression_vs_baseline_colorant_fixture() {
+    let target = rgb_gradient_8x8();
+    let mut baseline = target.clone();
+    let mut optimized = target.clone();
+
+    let mut baseline_buffer =
+        dithr::rgb_u8(&mut baseline, 8, 8, 24).expect("valid buffer should construct");
+    let mut optimized_buffer =
+        dithr::rgb_u8(&mut optimized, 8, 8, 24).expect("valid buffer should construct");
+
+    hierarchical_colorant_dbs_in_place(&mut baseline_buffer, 0)
+        .expect("hierarchical colorant dbs should succeed");
+    hierarchical_colorant_dbs_in_place(&mut optimized_buffer, 3)
+        .expect("hierarchical colorant dbs should succeed");
+
+    let baseline_obj = rgb_hvs_objective_for_test(&target, &baseline, 8, 8);
+    let optimized_obj = rgb_hvs_objective_for_test(&target, &optimized, 8, 8);
+    assert!(optimized_obj <= baseline_obj);
+}
+
+#[test]
+fn hierarchical_colorant_dbs_rejects_rgba_or_float() {
+    let mut rgba = Vec::with_capacity(8 * 8 * 4);
+    for y in 0_u8..8 {
+        for x in 0_u8..8 {
+            rgba.push(x.saturating_mul(32));
+            rgba.push(y.saturating_mul(32));
+            rgba.push((x ^ y).saturating_mul(32));
+            rgba.push(255);
+        }
+    }
+    let mut rgba_buffer =
+        dithr::rgba_u8(&mut rgba, 8, 8, 32).expect("valid buffer should construct");
+    let rgba_result = hierarchical_colorant_dbs_in_place(&mut rgba_buffer, 2);
+    assert_eq!(
+        rgba_result,
+        Err(dithr::Error::UnsupportedFormat(
+            "research algorithms support Rgb8 and Rgb16 only"
+        ))
+    );
+
+    let mut rgb_f32 = rgb_gradient_8x8_f32();
+    let mut f32_buffer =
+        dithr::rgb_32f(&mut rgb_f32, 8, 8, 24).expect("valid buffer should construct");
+    let f32_result = hierarchical_colorant_dbs_in_place(&mut f32_buffer, 2);
+    assert_eq!(
+        f32_result,
+        Err(dithr::Error::UnsupportedFormat(
+            "research algorithms support Rgb8 and Rgb16 only"
+        ))
+    );
 }
 
 #[test]
@@ -557,6 +633,63 @@ fn multibit_objective_for_test(target: &[u8], output: &[u8], width: usize, heigh
                 }
             }
             energy += f64::from(filtered) * f64::from(filtered);
+        }
+    }
+
+    energy
+}
+
+fn rgb_hvs_objective_for_test(target: &[u8], output: &[u8], width: usize, height: usize) -> f64 {
+    const RADIUS: usize = 3;
+    const SIZE: usize = RADIUS * 2 + 1;
+    const SIGMA: f64 = 1.0;
+
+    let mut kernel = [0.0_f32; SIZE * SIZE];
+    let mut sum = 0.0_f64;
+    for ky in 0..SIZE {
+        for kx in 0..SIZE {
+            let dx = kx as isize - RADIUS as isize;
+            let dy = ky as isize - RADIUS as isize;
+            let dist2 = (dx * dx + dy * dy) as f64;
+            let value = (-dist2 / (2.0 * SIGMA * SIGMA)).exp();
+            kernel[ky * SIZE + kx] = value as f32;
+            sum += value;
+        }
+    }
+    for value in &mut kernel {
+        *value = (*value as f64 / sum) as f32;
+    }
+
+    let target_unit = target
+        .iter()
+        .copied()
+        .map(|value| f32::from(value) / 255.0)
+        .collect::<Vec<f32>>();
+    let output_unit = output
+        .iter()
+        .copied()
+        .map(|value| f32::from(value) / 255.0)
+        .collect::<Vec<f32>>();
+
+    let mut energy = 0.0_f64;
+    for y in 0..height {
+        for x in 0..width {
+            for c in 0..3 {
+                let mut filtered = 0.0_f32;
+                for ky in 0..SIZE {
+                    for kx in 0..SIZE {
+                        let sx = x as isize + kx as isize - RADIUS as isize;
+                        let sy = y as isize + ky as isize - RADIUS as isize;
+                        if sx < 0 || sy < 0 || sx as usize >= width || sy as usize >= height {
+                            continue;
+                        }
+                        let sidx = (sy as usize * width + sx as usize) * 3 + c;
+                        filtered +=
+                            kernel[ky * SIZE + kx] * (output_unit[sidx] - target_unit[sidx]);
+                    }
+                }
+                energy += f64::from(filtered) * f64::from(filtered);
+            }
         }
     }
 

@@ -56,6 +56,8 @@ const MODEL_EYE_RADIUS: usize = 3;
 const MODEL_EYE_SIZE: usize = MODEL_EYE_RADIUS * 2 + 1;
 const MODEL_EYE_SIGMA: f64 = 1.2;
 const MODEL_MED_ERROR_LIMIT: f32 = 1.0;
+const HIERARCHICAL_COLORANT_GROUP_MASKS: [usize; 7] =
+    [0b111, 0b011, 0b101, 0b110, 0b001, 0b010, 0b100];
 
 pub fn direct_binary_search_in_place<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
@@ -416,6 +418,162 @@ pub fn direct_pattern_control_in_place<S: Sample, L: PixelLayout>(
                         &[(x, y, db)],
                     );
                     improved = true;
+                }
+            }
+        }
+
+        if !improved {
+            break;
+        }
+    }
+
+    for y in 0..height {
+        let row = buffer.try_row_mut(y)?;
+        for x in 0..width {
+            let idx = y * width + x;
+            let state = states[idx];
+            let rgb = primary_domain(state, max_value);
+            let base = x * L::CHANNELS;
+            row[base] = domain_to_sample(rgb[0], max_value);
+            row[base + 1] = domain_to_sample(rgb[1], max_value);
+            row[base + 2] = domain_to_sample(rgb[2], max_value);
+        }
+    }
+
+    Ok(())
+}
+
+pub fn hierarchical_colorant_dbs_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    max_iters: usize,
+) -> Result<()> {
+    buffer.validate()?;
+    ensure_rgb_integer_opaque_format::<S, L>()?;
+
+    let width = buffer.width;
+    let height = buffer.height;
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
+    let max_value = integer_sample_max::<S>()?;
+
+    let target = rgb_target_unit(buffer, width, height, pixel_count)?;
+    let regions = target
+        .iter()
+        .copied()
+        .map(mbvq_region_for_rgb)
+        .collect::<Vec<MbvqRegion>>();
+    let mut states = target
+        .iter()
+        .zip(regions.iter().copied())
+        .map(|(&rgb, region)| nearest_region_state(rgb, region))
+        .collect::<Vec<usize>>();
+    let mut output = states_to_primary_unit(&states);
+    let target_r = target.iter().map(|rgb| rgb[0]).collect::<Vec<f32>>();
+    let target_g = target.iter().map(|rgb| rgb[1]).collect::<Vec<f32>>();
+    let target_b = target.iter().map(|rgb| rgb[2]).collect::<Vec<f32>>();
+
+    let hvs = dbs_hvs_filter();
+    let mut filtered_error_r =
+        dbs_filtered_error_map_levels(&target_r, &output.0, width, height, &hvs, DBS_HVS_RADIUS);
+    let mut filtered_error_g =
+        dbs_filtered_error_map_levels(&target_g, &output.1, width, height, &hvs, DBS_HVS_RADIUS);
+    let mut filtered_error_b =
+        dbs_filtered_error_map_levels(&target_b, &output.2, width, height, &hvs, DBS_HVS_RADIUS);
+
+    for _ in 0..max_iters {
+        let mut improved = false;
+
+        for group_mask in HIERARCHICAL_COLORANT_GROUP_MASKS {
+            for y in 0..height {
+                for x in 0..width {
+                    let idx = y * width + x;
+                    let current = states[idx];
+                    let current_rgb = primary_unit(current);
+                    let mut best_state = current;
+                    let mut best_delta = 0.0_f64;
+                    let region = regions[idx];
+
+                    for candidate in mbvq_region_states(region) {
+                        if candidate == current
+                            || ((current ^ candidate) & (!group_mask & 0b111)) != 0
+                        {
+                            continue;
+                        }
+
+                        let next_rgb = primary_unit(candidate);
+                        let dr = next_rgb[0] - current_rgb[0];
+                        let dg = next_rgb[1] - current_rgb[1];
+                        let db = next_rgb[2] - current_rgb[2];
+
+                        let delta_r = dbs_candidate_delta_energy(
+                            width,
+                            height,
+                            &hvs,
+                            DBS_HVS_RADIUS,
+                            &filtered_error_r,
+                            &[(x, y, dr)],
+                        );
+                        let delta_g = dbs_candidate_delta_energy(
+                            width,
+                            height,
+                            &hvs,
+                            DBS_HVS_RADIUS,
+                            &filtered_error_g,
+                            &[(x, y, dg)],
+                        );
+                        let delta_b = dbs_candidate_delta_energy(
+                            width,
+                            height,
+                            &hvs,
+                            DBS_HVS_RADIUS,
+                            &filtered_error_b,
+                            &[(x, y, db)],
+                        );
+                        let delta = delta_r + delta_g + delta_b;
+                        if delta < best_delta {
+                            best_delta = delta;
+                            best_state = candidate;
+                        }
+                    }
+
+                    if best_state != current {
+                        let next_rgb = primary_unit(best_state);
+                        let dr = next_rgb[0] - current_rgb[0];
+                        let dg = next_rgb[1] - current_rgb[1];
+                        let db = next_rgb[2] - current_rgb[2];
+
+                        states[idx] = best_state;
+                        output.0[idx] = next_rgb[0];
+                        output.1[idx] = next_rgb[1];
+                        output.2[idx] = next_rgb[2];
+
+                        dbs_apply_delta_filtered_error(
+                            width,
+                            height,
+                            &hvs,
+                            DBS_HVS_RADIUS,
+                            &mut filtered_error_r,
+                            &[(x, y, dr)],
+                        );
+                        dbs_apply_delta_filtered_error(
+                            width,
+                            height,
+                            &hvs,
+                            DBS_HVS_RADIUS,
+                            &mut filtered_error_g,
+                            &[(x, y, dg)],
+                        );
+                        dbs_apply_delta_filtered_error(
+                            width,
+                            height,
+                            &hvs,
+                            DBS_HVS_RADIUS,
+                            &mut filtered_error_b,
+                            &[(x, y, db)],
+                        );
+                        improved = true;
+                    }
                 }
             }
         }
@@ -955,6 +1113,62 @@ fn primary_candidates(current: usize) -> [usize; 8] {
         current ^ 0b110,
         current ^ 0b111,
     ]
+}
+
+fn mbvq_region_for_rgb(rgb: [f32; 3]) -> MbvqRegion {
+    let r = rgb[0];
+    let g = rgb[1];
+    let b = rgb[2];
+
+    if r + g > 1.0 {
+        if g + b > 1.0 {
+            if r + g + b > 2.0 {
+                MbvqRegion::Cmyw
+            } else {
+                MbvqRegion::Mygc
+            }
+        } else {
+            MbvqRegion::Rgmy
+        }
+    } else if g + b <= 1.0 {
+        if r + g + b <= 1.0 {
+            MbvqRegion::Krgb
+        } else {
+            MbvqRegion::Rgbm
+        }
+    } else {
+        MbvqRegion::Cmgb
+    }
+}
+
+fn mbvq_region_states(region: MbvqRegion) -> [usize; 4] {
+    match region {
+        MbvqRegion::Cmyw => [0b110, 0b101, 0b011, 0b111],
+        MbvqRegion::Mygc => [0b101, 0b011, 0b010, 0b110],
+        MbvqRegion::Rgmy => [0b001, 0b010, 0b101, 0b011],
+        MbvqRegion::Krgb => [0b000, 0b001, 0b010, 0b100],
+        MbvqRegion::Rgbm => [0b001, 0b010, 0b100, 0b101],
+        MbvqRegion::Cmgb => [0b110, 0b101, 0b010, 0b100],
+    }
+}
+
+fn nearest_region_state(rgb: [f32; 3], region: MbvqRegion) -> usize {
+    let mut best_state = mbvq_region_states(region)[0];
+    let mut best_dist = f32::INFINITY;
+
+    for state in mbvq_region_states(region) {
+        let candidate = primary_unit(state);
+        let dr = rgb[0] - candidate[0];
+        let dg = rgb[1] - candidate[1];
+        let db = rgb[2] - candidate[2];
+        let dist = dr * dr + dg * dg + db * db;
+        if dist < best_dist {
+            best_dist = dist;
+            best_state = state;
+        }
+    }
+
+    best_state
 }
 
 fn write_binary_output<S: Sample, L: PixelLayout>(
@@ -1847,6 +2061,16 @@ enum CandidateMove {
     Swap(usize, usize),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MbvqRegion {
+    Cmyw,
+    Mygc,
+    Rgmy,
+    Krgb,
+    Rgbm,
+    Cmgb,
+}
+
 fn ensure_grayscale_integer_format<S: Sample, L: PixelLayout>() -> Result<()> {
     if L::CHANNELS == 1 && !L::HAS_ALPHA && !S::IS_FLOAT {
         Ok(())
@@ -1863,6 +2087,16 @@ fn ensure_rgb_integer_format<S: Sample, L: PixelLayout>() -> Result<()> {
     } else {
         Err(Error::UnsupportedFormat(
             "research algorithms support Rgb8/Rgba8 and Rgb16/Rgba16 only",
+        ))
+    }
+}
+
+fn ensure_rgb_integer_opaque_format<S: Sample, L: PixelLayout>() -> Result<()> {
+    if L::CHANNELS == 3 && L::COLOR_CHANNELS == 3 && !L::HAS_ALPHA && !S::IS_FLOAT {
+        Ok(())
+    } else {
+        Err(Error::UnsupportedFormat(
+            "research algorithms support Rgb8 and Rgb16 only",
         ))
     }
 }

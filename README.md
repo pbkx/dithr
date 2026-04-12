@@ -264,6 +264,7 @@ Specialized methods with narrower scope than the ordered/diffusion baseline.
 - `direct_binary_search_in_place`
 - `clustered_dot_direct_multibit_search_in_place`
 - `direct_pattern_control_in_place`
+- `hierarchical_colorant_dbs_in_place`
 - `lattice_boltzmann_in_place`
 - `electrostatic_halftoning_in_place`
 - `model_based_med_in_place`
@@ -278,6 +279,7 @@ Scope notes:
   integer grayscale buffers.
 - `direct_pattern_control_in_place` supports integer `Rgb`/`Rgba` buffers;
   alpha is preserved for `Rgba`.
+- `hierarchical_colorant_dbs_in_place` supports integer `Rgb` buffers.
 - `riemersma_in_place`, `knuth_dot_diffusion_in_place`, and
   `optimized_dot_diffusion_in_place` support Gray/Rgb/Rgba layouts, with alpha
   preserved for Rgba paths.
@@ -500,6 +502,7 @@ cargo test --doc --all-features
 - Stochastic clustered-dot dithering: <https://perso.liris.cnrs.fr/victor.ostromoukhov/publications/pdf/SPIE99_StochasticClust.pdf>, <https://pubmed.ncbi.nlm.nih.gov/18255440/>
 - Clustered-dot direct multibit search: <https://pubmed.ncbi.nlm.nih.gov/28113172/>, <https://doi.org/10.1109/TIP.2016.2552723>, <https://research.ibm.com/publications/hybrid-halftoning-using-direct-multi-bit-search-dms-screen-algorithm>
 - Direct pattern control halftoning: <https://pubmed.ncbi.nlm.nih.gov/28613170/>, <https://doi.org/10.1109/TIP.2017.2713939>, <https://cv.ulichney.com/papers/2017-PARAWACS-IEEE.pdf>
+- Hierarchical colorant DBS (MBVQ-guided): <https://pubmed.ncbi.nlm.nih.gov/20236895/>, <https://doi.org/10.1109/TIP.2010.2045690>, <https://pubmed.ncbi.nlm.nih.gov/28613170/>
 
 ## License
 

@@ -19,9 +19,11 @@ pub use variable::{
     adaptive_vector_error_diffusion_in_place, feature_preserving_msed_in_place,
     gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
     hierarchical_error_diffusion_in_place, hvs_optimized_error_diffusion_in_place,
-    linear_pixel_shuffling_in_place, multiscale_error_diffusion_in_place, ostromoukhov_in_place,
-    semivector_error_diffusion_in_place, structure_aware_error_diffusion_in_place,
-    tone_dependent_error_diffusion_in_place, vector_error_diffusion_in_place, zhou_fang_in_place,
+    linear_pixel_shuffling_in_place, mbvq_color_error_diffusion_in_place,
+    multiscale_error_diffusion_in_place, neugebauer_color_error_diffusion_in_place,
+    ostromoukhov_in_place, semivector_error_diffusion_in_place,
+    structure_aware_error_diffusion_in_place, tone_dependent_error_diffusion_in_place,
+    vector_error_diffusion_in_place, zhou_fang_in_place,
 };
 
 #[doc(hidden)]

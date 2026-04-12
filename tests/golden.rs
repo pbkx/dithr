@@ -16,7 +16,8 @@ use dithr::diffusion::{
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
     hierarchical_error_diffusion_in_place, hvs_optimized_error_diffusion_in_place,
     jarvis_judice_ninke_in_place, linear_pixel_shuffling_in_place,
-    multiscale_error_diffusion_in_place, ostromoukhov_in_place,
+    mbvq_color_error_diffusion_in_place, multiscale_error_diffusion_in_place,
+    neugebauer_color_error_diffusion_in_place, ostromoukhov_in_place,
     semivector_error_diffusion_in_place, shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place,
     sierra_lite_in_place, stevenson_arce_in_place, structure_aware_error_diffusion_in_place,
     stucki_in_place, tone_dependent_error_diffusion_in_place, two_row_sierra_in_place,
@@ -751,6 +752,34 @@ fn golden_hierarchical_error_diffusion_rgb_gradient_8x8() {
     .expect("hierarchical diffusion should succeed");
 
     assert_eq!(fnv1a64(&data), 11_794_439_059_347_037_317_u64);
+}
+
+#[test]
+fn golden_mbvq_color_error_diffusion_rgb_gradient_8x8() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    mbvq_color_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("mbvq color diffusion should succeed");
+
+    assert_eq!(fnv1a64(&data), 10_608_991_526_256_162_203_u64);
+}
+
+#[test]
+fn golden_neugebauer_color_error_diffusion_rgb_gradient_8x8() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    neugebauer_color_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("neugebauer color diffusion should succeed");
+
+    assert_eq!(fnv1a64(&data), 15_655_645_645_567_106_596_u64);
 }
 
 #[test]

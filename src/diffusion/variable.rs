@@ -24,6 +24,8 @@ enum ColorVectorAlgorithm {
     Vector,
     SemiVector,
     Hierarchical,
+    Mbvq,
+    Neugebauer,
 }
 
 pub fn ostromoukhov_in_place<S: Sample, L: PixelLayout>(
@@ -332,6 +334,20 @@ pub fn hierarchical_error_diffusion_in_place<S: Sample, L: PixelLayout>(
     diffuse_color_vector(buffer, mode, ColorVectorAlgorithm::Hierarchical)
 }
 
+pub fn mbvq_color_error_diffusion_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    diffuse_color_vector(buffer, mode, ColorVectorAlgorithm::Mbvq)
+}
+
+pub fn neugebauer_color_error_diffusion_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    diffuse_color_vector(buffer, mode, ColorVectorAlgorithm::Neugebauer)
+}
+
 fn diffuse_color_vector<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     mode: QuantizeMode<'_, S>,
@@ -381,7 +397,13 @@ fn diffuse_color_vector<S: Sample, L: PixelLayout>(
                     S::from_unit_f32(adjusted_unit[2]),
                     S::from_unit_f32(adjusted_unit[3]),
                 ];
-                let quantized = quantize_pixel::<S, L>(&adjusted[..channels], mode)?;
+                let quantized = quantize_color_vector_pixel::<S, L>(
+                    pixel,
+                    adjusted_unit,
+                    adjusted,
+                    mode,
+                    algorithm,
+                )?;
                 let quantized_unit = read_unit_pixel::<S, L>(&quantized[..channels])?;
                 write_quantized_pixel::<S, L>(pixel, quantized);
 
@@ -390,17 +412,7 @@ fn diffuse_color_vector<S: Sample, L: PixelLayout>(
                     adjusted_unit[1] - quantized_unit[1],
                     adjusted_unit[2] - quantized_unit[2],
                 ];
-                let transformed = match algorithm {
-                    ColorVectorAlgorithm::Vector => {
-                        color_residual_matrix_apply(residual, VECTOR_DIFFUSION_MATRIX)
-                    }
-                    ColorVectorAlgorithm::SemiVector => {
-                        color_residual_matrix_apply(residual, SEMIVECTOR_DIFFUSION_MATRIX)
-                    }
-                    ColorVectorAlgorithm::Hierarchical => {
-                        hierarchical_color_residual_transform(residual, x, y)
-                    }
-                };
+                let transformed = color_residual_transform(residual, x, y, algorithm);
                 let xi = x as isize;
                 let yi = y as isize;
 
@@ -478,7 +490,13 @@ fn diffuse_color_vector<S: Sample, L: PixelLayout>(
                     S::from_unit_f32(adjusted_unit[2]),
                     S::from_unit_f32(adjusted_unit[3]),
                 ];
-                let quantized = quantize_pixel::<S, L>(&adjusted[..channels], mode)?;
+                let quantized = quantize_color_vector_pixel::<S, L>(
+                    pixel,
+                    adjusted_unit,
+                    adjusted,
+                    mode,
+                    algorithm,
+                )?;
                 let quantized_unit = read_unit_pixel::<S, L>(&quantized[..channels])?;
                 write_quantized_pixel::<S, L>(pixel, quantized);
 
@@ -487,17 +505,7 @@ fn diffuse_color_vector<S: Sample, L: PixelLayout>(
                     adjusted_unit[1] - quantized_unit[1],
                     adjusted_unit[2] - quantized_unit[2],
                 ];
-                let transformed = match algorithm {
-                    ColorVectorAlgorithm::Vector => {
-                        color_residual_matrix_apply(residual, VECTOR_DIFFUSION_MATRIX)
-                    }
-                    ColorVectorAlgorithm::SemiVector => {
-                        color_residual_matrix_apply(residual, SEMIVECTOR_DIFFUSION_MATRIX)
-                    }
-                    ColorVectorAlgorithm::Hierarchical => {
-                        hierarchical_color_residual_transform(residual, x, y)
-                    }
-                };
+                let transformed = color_residual_transform(residual, x, y, algorithm);
                 let xi = x as isize;
                 let yi = y as isize;
 
@@ -610,6 +618,171 @@ fn hierarchical_color_residual_transform(residual: [f32; 3], x: usize, y: usize)
     ]
 }
 
+fn color_residual_transform(
+    residual: [f32; 3],
+    x: usize,
+    y: usize,
+    algorithm: ColorVectorAlgorithm,
+) -> [f32; 3] {
+    match algorithm {
+        ColorVectorAlgorithm::Vector => {
+            color_residual_matrix_apply(residual, VECTOR_DIFFUSION_MATRIX)
+        }
+        ColorVectorAlgorithm::SemiVector => {
+            color_residual_matrix_apply(residual, SEMIVECTOR_DIFFUSION_MATRIX)
+        }
+        ColorVectorAlgorithm::Hierarchical => hierarchical_color_residual_transform(residual, x, y),
+        ColorVectorAlgorithm::Mbvq => {
+            color_residual_matrix_apply(residual, MBVQ_COLOR_DIFFUSION_MATRIX)
+        }
+        ColorVectorAlgorithm::Neugebauer => {
+            color_residual_matrix_apply(residual, NEUGEBAUER_COLOR_DIFFUSION_MATRIX)
+        }
+    }
+}
+
+fn quantize_color_vector_pixel<S: Sample, L: PixelLayout>(
+    pixel: &[S],
+    adjusted_unit: [f32; 4],
+    adjusted: [S; 4],
+    mode: QuantizeMode<'_, S>,
+    algorithm: ColorVectorAlgorithm,
+) -> Result<[S; 4]> {
+    match algorithm {
+        ColorVectorAlgorithm::Vector
+        | ColorVectorAlgorithm::SemiVector
+        | ColorVectorAlgorithm::Hierarchical => {
+            quantize_pixel::<S, L>(&adjusted[..L::CHANNELS], mode)
+        }
+        ColorVectorAlgorithm::Mbvq | ColorVectorAlgorithm::Neugebauer => {
+            let quantized_hint = quantize_pixel::<S, L>(&adjusted[..L::CHANNELS], mode)?;
+            let hint_unit = read_unit_pixel::<S, L>(&quantized_hint[..L::CHANNELS])?;
+            let source_unit = read_unit_pixel::<S, L>(pixel)?;
+            let state = select_neugebauer_primary(
+                [source_unit[0], source_unit[1], source_unit[2]],
+                [hint_unit[0], hint_unit[1], hint_unit[2]],
+                algorithm,
+            );
+            let primary = neugebauer_primary_unit(state);
+            Ok([
+                S::from_unit_f32(primary[0]),
+                S::from_unit_f32(primary[1]),
+                S::from_unit_f32(primary[2]),
+                S::from_unit_f32(adjusted_unit[3]),
+            ])
+        }
+    }
+}
+
+fn select_neugebauer_primary(
+    source_rgb: [f32; 3],
+    target_rgb: [f32; 3],
+    algorithm: ColorVectorAlgorithm,
+) -> usize {
+    let candidates = match algorithm {
+        ColorVectorAlgorithm::Mbvq => CandidateStates::Mbvq(mbvq_states_for_rgb(source_rgb)),
+        ColorVectorAlgorithm::Neugebauer => CandidateStates::All,
+        _ => CandidateStates::All,
+    };
+
+    let mut best_state = 0_usize;
+    let mut best_distance = f32::INFINITY;
+    match candidates {
+        CandidateStates::Mbvq(states) => {
+            for &state in &states {
+                let candidate = neugebauer_primary_unit(state);
+                let distance = neugebauer_color_distance(candidate, target_rgb);
+                if distance < best_distance || (distance == best_distance && state < best_state) {
+                    best_distance = distance;
+                    best_state = state;
+                }
+            }
+        }
+        CandidateStates::All => {
+            for state in 0..8_usize {
+                let candidate = neugebauer_primary_unit(state);
+                let distance = neugebauer_color_distance(candidate, target_rgb);
+                if distance < best_distance || (distance == best_distance && state < best_state) {
+                    best_distance = distance;
+                    best_state = state;
+                }
+            }
+        }
+    }
+
+    best_state
+}
+
+fn neugebauer_color_distance(a: [f32; 3], b: [f32; 3]) -> f32 {
+    let dr = a[0] - b[0];
+    let dg = a[1] - b[1];
+    let db = a[2] - b[2];
+    NEUGEBAUER_DISTANCE_WEIGHTS[0] * dr * dr
+        + NEUGEBAUER_DISTANCE_WEIGHTS[1] * dg * dg
+        + NEUGEBAUER_DISTANCE_WEIGHTS[2] * db * db
+}
+
+fn neugebauer_primary_unit(state: usize) -> [f32; 3] {
+    [
+        if state & 0b001 != 0 { 1.0 } else { 0.0 },
+        if state & 0b010 != 0 { 1.0 } else { 0.0 },
+        if state & 0b100 != 0 { 1.0 } else { 0.0 },
+    ]
+}
+
+fn mbvq_states_for_rgb(rgb: [f32; 3]) -> [usize; 4] {
+    match mbvq_region_for_rgb(rgb) {
+        MbvqRegion::Cmyw => [0b110, 0b101, 0b011, 0b111],
+        MbvqRegion::Mygc => [0b101, 0b011, 0b010, 0b110],
+        MbvqRegion::Rgmy => [0b001, 0b010, 0b101, 0b011],
+        MbvqRegion::Krgb => [0b000, 0b001, 0b010, 0b100],
+        MbvqRegion::Rgbm => [0b001, 0b010, 0b100, 0b101],
+        MbvqRegion::Cmgb => [0b110, 0b101, 0b010, 0b100],
+    }
+}
+
+fn mbvq_region_for_rgb(rgb: [f32; 3]) -> MbvqRegion {
+    let r = rgb[0];
+    let g = rgb[1];
+    let b = rgb[2];
+
+    if r + g > 1.0 {
+        if g + b > 1.0 {
+            if r + g + b > 2.0 {
+                MbvqRegion::Cmyw
+            } else {
+                MbvqRegion::Mygc
+            }
+        } else {
+            MbvqRegion::Rgmy
+        }
+    } else if g + b <= 1.0 {
+        if r + g + b <= 1.0 {
+            MbvqRegion::Krgb
+        } else {
+            MbvqRegion::Rgbm
+        }
+    } else {
+        MbvqRegion::Cmgb
+    }
+}
+
+#[derive(Clone, Copy)]
+enum CandidateStates {
+    Mbvq([usize; 4]),
+    All,
+}
+
+#[derive(Clone, Copy)]
+enum MbvqRegion {
+    Cmyw,
+    Mygc,
+    Rgmy,
+    Krgb,
+    Rgbm,
+    Cmgb,
+}
+
 fn diffuse_gray_only_variable<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     mode: QuantizeMode<'_, S>,
@@ -678,6 +851,11 @@ const SEMIVECTOR_DIFFUSION_MATRIX: [[f32; 3]; 3] = [
     [0.09568, 0.86784, 0.03648],
     [0.09568, 0.18784, 0.71648],
 ];
+const MBVQ_COLOR_DIFFUSION_MATRIX: [[f32; 3]; 3] =
+    [[0.86, 0.09, 0.05], [0.09, 0.86, 0.05], [0.07, 0.07, 0.86]];
+const NEUGEBAUER_COLOR_DIFFUSION_MATRIX: [[f32; 3]; 3] =
+    [[0.82, 0.12, 0.06], [0.12, 0.82, 0.06], [0.10, 0.10, 0.82]];
+const NEUGEBAUER_DISTANCE_WEIGHTS: [f32; 3] = [0.299, 0.587, 0.114];
 const HIERARCHICAL_COLOR_SEQUENCE: [[usize; 3]; 4] = [[0, 1, 2], [1, 2, 0], [2, 0, 1], [0, 2, 1]];
 const HIERARCHICAL_BASE_WEIGHT: f32 = 0.56;
 const HIERARCHICAL_MEDIUM_WEIGHT: f32 = 0.30;

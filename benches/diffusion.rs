@@ -12,7 +12,8 @@ use dithr::diffusion::{
     floyd_steinberg_in_place, gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
     hierarchical_error_diffusion_in_place, hvs_optimized_error_diffusion_in_place,
     jarvis_judice_ninke_in_place, linear_pixel_shuffling_in_place,
-    multiscale_error_diffusion_in_place, ostromoukhov_in_place, shiau_fan_2_in_place,
+    mbvq_color_error_diffusion_in_place, multiscale_error_diffusion_in_place,
+    neugebauer_color_error_diffusion_in_place, ostromoukhov_in_place, shiau_fan_2_in_place,
     shiau_fan_in_place, sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place,
     structure_aware_error_diffusion_in_place, stucki_in_place,
     tone_dependent_error_diffusion_in_place, two_row_sierra_in_place,
@@ -306,6 +307,22 @@ fn bench_diffusion(c: &mut Criterion) {
         width,
         height,
         |buffer| hierarchical_error_diffusion_in_place(buffer, mode_palette_cga()),
+    );
+    bench_rgb_case(
+        &mut group,
+        "mbvq_color_error_diffusion_rgb_palette_cga_256",
+        &fixture,
+        width,
+        height,
+        |buffer| mbvq_color_error_diffusion_in_place(buffer, mode_palette_cga()),
+    );
+    bench_rgb_case(
+        &mut group,
+        "neugebauer_color_error_diffusion_rgb_palette_cga_256",
+        &fixture,
+        width,
+        height,
+        |buffer| neugebauer_color_error_diffusion_in_place(buffer, mode_palette_cga()),
     );
     group.finish();
 

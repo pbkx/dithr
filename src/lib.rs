@@ -147,6 +147,7 @@
 //! - Stochastic clustered-dot: `ordered::stochastic_clustered_dot_in_place`
 //! - AM/FM hybrid halftoning: `ordered::am_fm_hybrid_halftoning_in_place`
 //! - Clustered AM/FM halftoning: `ordered::clustered_am_fm_halftoning_in_place`
+//! - Blue-noise multitone dithering: `ordered::blue_noise_multitone_dither_in_place`
 //!
 //! Palette-oriented ordered (Yliluoma):
 //!
@@ -237,6 +238,7 @@
 //! - `diffusion::block_error_diffusion_in_place` is grayscale-only.
 //! - `ordered::am_fm_hybrid_halftoning_in_place` and
 //!   `ordered::clustered_am_fm_halftoning_in_place` are grayscale-only.
+//! - `ordered::blue_noise_multitone_dither_in_place` is grayscale-only.
 //! - [`direct_binary_search_in_place`], [`lattice_boltzmann_in_place`], and
 //!   [`electrostatic_halftoning_in_place`] are integer grayscale-only.
 //! - [`model_based_med_in_place`] and [`least_squares_model_based_in_place`]

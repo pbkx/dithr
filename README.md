@@ -189,6 +189,7 @@ Custom map:
 - `stochastic_clustered_dot_in_place`
 - `am_fm_hybrid_halftoning_in_place`
 - `clustered_am_fm_halftoning_in_place`
+- `blue_noise_multitone_dither_in_place`
 
 Parallel variants (`rayon` feature):
 
@@ -453,6 +454,7 @@ cargo test --doc --all-features
 - Not every algorithm supports every format/layout/sample combination.
 - `am_fm_hybrid_halftoning_in_place` and
   `clustered_am_fm_halftoning_in_place` are grayscale-only.
+- `blue_noise_multitone_dither_in_place` is grayscale-only.
 - Variable diffusion methods are grayscale-only except
   `adaptive_vector_error_diffusion_in_place`,
   `vector_error_diffusion_in_place`,
@@ -525,6 +527,7 @@ cargo test --doc --all-features
 - Stochastic clustered-dot dithering: <https://perso.liris.cnrs.fr/victor.ostromoukhov/publications/pdf/SPIE99_StochasticClust.pdf>, <https://pubmed.ncbi.nlm.nih.gov/18255440/>
 - AM/FM hybrid halftoning: <https://engineering.purdue.edu/~bouman/publications/orig-pdf/jei8.pdf>, <https://doi.org/10.1117/12.643690>
 - Clustered AM/FM halftoning: <https://doi.org/10.2352/ISSN.2169-4451.2004.20.1.art00025_2>, <https://dblp.org/db/conf/clrimg/clrimg2006.html>
+- Blue-noise multitone dithering: <https://doi.org/10.1109/TIP.2008.926145>, <https://www.eecis.udel.edu/~arce/files/Publications/5-Multitone.pdf>
 - Clustered-dot direct multibit search: <https://pubmed.ncbi.nlm.nih.gov/28113172/>, <https://doi.org/10.1109/TIP.2016.2552723>, <https://research.ibm.com/publications/hybrid-halftoning-using-direct-multi-bit-search-dms-screen-algorithm>
 - Direct pattern control halftoning: <https://pubmed.ncbi.nlm.nih.gov/28613170/>, <https://doi.org/10.1109/TIP.2017.2713939>, <https://cv.ulichney.com/papers/2017-PARAWACS-IEEE.pdf>
 - Hierarchical colorant DBS (MBVQ-guided): <https://pubmed.ncbi.nlm.nih.gov/20236895/>, <https://doi.org/10.1109/TIP.2010.2045690>, <https://pubmed.ncbi.nlm.nih.gov/28613170/>

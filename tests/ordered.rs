@@ -11,8 +11,9 @@ use dithr::data::{
 };
 use dithr::ordered::{
     adaptive_ordered_dither_in_place, am_fm_hybrid_halftoning_in_place, bayer_16x16_in_place,
-    bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place, cluster_dot_4x4_in_place,
-    cluster_dot_8x8_in_place, clustered_am_fm_halftoning_in_place, custom_ordered_in_place,
+    bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place,
+    blue_noise_multitone_dither_in_place, cluster_dot_4x4_in_place, cluster_dot_8x8_in_place,
+    clustered_am_fm_halftoning_in_place, custom_ordered_in_place,
     image_based_dither_screen_in_place, polyomino_ordered_dither_in_place, ranked_dither_in_place,
     space_filling_curve_ordered_dither_in_place, stochastic_clustered_dot_in_place,
     void_and_cluster_in_place, yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
@@ -760,6 +761,73 @@ fn clustered_am_fm_halftoning_is_deterministic() {
 
     assert_eq!(data_a, data_b);
     assert_eq!(fnv1a64(&data_a), 423_163_558_945_169_899_u64);
+}
+
+#[test]
+fn blue_noise_multitone_dither_runs_and_quantizes_u8() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    blue_noise_multitone_dither_in_place(&mut buffer, QuantizeMode::GrayLevels(4))
+        .expect("blue-noise multitone dithering should succeed");
+
+    assert!(data
+        .iter()
+        .all(|&value| matches!(value, 0 | 85 | 170 | 255)));
+}
+
+#[test]
+fn blue_noise_multitone_dither_multilevel_occupancy_invariant() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    blue_noise_multitone_dither_in_place(&mut buffer, QuantizeMode::GrayLevels(8))
+        .expect("blue-noise multitone dithering should succeed");
+
+    let mut seen = [false; 8];
+    for &value in &data {
+        let idx = usize::from(value) * 7 / 255;
+        seen[idx] = true;
+    }
+
+    let used = seen.into_iter().filter(|&entry| entry).count();
+    assert!(used >= 4);
+}
+
+#[test]
+fn blue_noise_multitone_dither_rejects_non_gray_layout() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    let result = blue_noise_multitone_dither_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    );
+
+    assert_eq!(
+        result,
+        Err(Error::UnsupportedFormat(
+            "blue-noise multitone dithering supports Gray layouts only"
+        ))
+    );
+}
+
+#[test]
+fn blue_noise_multitone_dither_is_deterministic() {
+    let mut data_a = vec![127_u8; 16 * 16];
+    let mut data_b = vec![127_u8; 16 * 16];
+    let mut buffer_a =
+        dithr::gray_u8(&mut data_a, 16, 16, 16).expect("valid buffer should construct");
+    let mut buffer_b =
+        dithr::gray_u8(&mut data_b, 16, 16, 16).expect("valid buffer should construct");
+
+    blue_noise_multitone_dither_in_place(&mut buffer_a, QuantizeMode::GrayLevels(8))
+        .expect("blue-noise multitone dithering should succeed");
+    blue_noise_multitone_dither_in_place(&mut buffer_b, QuantizeMode::GrayLevels(8))
+        .expect("blue-noise multitone dithering should succeed");
+
+    assert_eq!(data_a, data_b);
+    assert_eq!(fnv1a64(&data_a), 4_651_372_225_787_809_868_u64);
 }
 
 #[test]

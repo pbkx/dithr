@@ -17,11 +17,12 @@ use dithr::diffusion::{
     gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
     hierarchical_error_diffusion_in_place, hvs_optimized_error_diffusion_in_place,
     jarvis_judice_ninke_in_place, linear_pixel_shuffling_in_place,
-    mbvq_color_error_diffusion_in_place, multiscale_error_diffusion_in_place,
-    neugebauer_color_error_diffusion_in_place, ostromoukhov_in_place,
-    semivector_error_diffusion_in_place, shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place,
-    sierra_lite_in_place, stevenson_arce_in_place, structure_aware_error_diffusion_in_place,
-    stucki_in_place, tone_dependent_error_diffusion_in_place, two_row_sierra_in_place,
+    mbvq_color_error_diffusion_in_place, multichannel_green_noise_error_diffusion_in_place,
+    multiscale_error_diffusion_in_place, neugebauer_color_error_diffusion_in_place,
+    ostromoukhov_in_place, semivector_error_diffusion_in_place, shiau_fan_2_in_place,
+    shiau_fan_in_place, sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place,
+    structure_aware_error_diffusion_in_place, stucki_in_place,
+    tone_dependent_error_diffusion_in_place, two_row_sierra_in_place,
     vector_error_diffusion_in_place, zhou_fang_in_place,
 };
 use dithr::dot_diffusion::{knuth_dot_diffusion_in_place, optimized_dot_diffusion_in_place};
@@ -795,6 +796,20 @@ fn golden_neugebauer_color_error_diffusion_rgb_gradient_8x8() {
     .expect("neugebauer color diffusion should succeed");
 
     assert_eq!(fnv1a64(&data), 15_655_645_645_567_106_596_u64);
+}
+
+#[test]
+fn golden_multichannel_green_noise_error_diffusion_rgb_gradient_8x8() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    multichannel_green_noise_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("multichannel green-noise diffusion should succeed");
+
+    assert_eq!(fnv1a64(&data), 8_387_199_595_912_073_184_u64);
 }
 
 #[test]

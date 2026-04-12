@@ -252,14 +252,16 @@ Tone-dependent coefficient families.
 - `hierarchical_error_diffusion_in_place`
 - `mbvq_color_error_diffusion_in_place`
 - `neugebauer_color_error_diffusion_in_place`
+- `multichannel_green_noise_error_diffusion_in_place`
 
 Scope note: variable diffusion methods are grayscale-only except
 `adaptive_vector_error_diffusion_in_place`, `vector_error_diffusion_in_place`,
 `semivector_error_diffusion_in_place`, and
 `hierarchical_error_diffusion_in_place`,
 `mbvq_color_error_diffusion_in_place`, and
-`neugebauer_color_error_diffusion_in_place`, which support Rgb/Rgba with alpha
-preservation on Rgba.
+`neugebauer_color_error_diffusion_in_place`, and
+`multichannel_green_noise_error_diffusion_in_place`, which support Rgb/Rgba
+with alpha preservation on Rgba.
 
 #### Advanced halftoning
 
@@ -452,7 +454,8 @@ cargo test --doc --all-features
   `vector_error_diffusion_in_place`,
   `semivector_error_diffusion_in_place`,
   `mbvq_color_error_diffusion_in_place`, and
-  `neugebauer_color_error_diffusion_in_place` for Rgb/Rgba.
+  `neugebauer_color_error_diffusion_in_place`, and
+  `multichannel_green_noise_error_diffusion_in_place` for Rgb/Rgba.
 - `block_error_diffusion_in_place` is grayscale-only.
 - `direct_binary_search_in_place`,
   `clustered_dot_direct_multibit_search_in_place`,
@@ -479,6 +482,8 @@ cargo test --doc --all-features
   <https://ira.lib.polyu.edu.hk/bitstream/10397/1524/1/J-JEI-Feature-preserving%20multiscale%20error%20diffusion_04.pdf>, <https://doi.org/10.1117/1.1758728>
 - Green-noise multiscale error diffusion:
   <https://pubmed.ncbi.nlm.nih.gov/20215075/>, <https://www.eie.polyu.edu.hk/~enyhchan/J-TIP-Green_noise_digital_halftoning_with_MED.pdf>
+- Multichannel green-noise error diffusion:
+  <https://doi.org/10.1109/83.841537>, <https://doi.org/10.1364/JOSAA.16.001575>
 - Adaptive vector error diffusion:
   <https://pubmed.ncbi.nlm.nih.gov/18282985/>, <https://doi.org/10.1109/83.597270>
 - HVS-optimized error diffusion (Kolpatzik-Bouman):

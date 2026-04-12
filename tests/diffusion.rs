@@ -12,11 +12,12 @@ use dithr::diffusion::{
     gradient_based_error_diffusion_in_place, green_noise_msed_in_place,
     hierarchical_error_diffusion_in_place, hvs_optimized_error_diffusion_in_place,
     jarvis_judice_ninke_in_place, linear_pixel_shuffling_in_place,
-    mbvq_color_error_diffusion_in_place, multiscale_error_diffusion_in_place,
-    neugebauer_color_error_diffusion_in_place, ostromoukhov_in_place,
-    semivector_error_diffusion_in_place, shiau_fan_2_in_place, shiau_fan_in_place, sierra_in_place,
-    sierra_lite_in_place, stevenson_arce_in_place, structure_aware_error_diffusion_in_place,
-    stucki_in_place, tone_dependent_error_diffusion_in_place, two_row_sierra_in_place,
+    mbvq_color_error_diffusion_in_place, multichannel_green_noise_error_diffusion_in_place,
+    multiscale_error_diffusion_in_place, neugebauer_color_error_diffusion_in_place,
+    ostromoukhov_in_place, semivector_error_diffusion_in_place, shiau_fan_2_in_place,
+    shiau_fan_in_place, sierra_in_place, sierra_lite_in_place, stevenson_arce_in_place,
+    structure_aware_error_diffusion_in_place, stucki_in_place,
+    tone_dependent_error_diffusion_in_place, two_row_sierra_in_place,
     vector_error_diffusion_in_place, zhou_fang_in_place,
 };
 use dithr::{Error, GrayBuffer16, Palette, QuantizeMode, RgbBuffer32F};
@@ -514,6 +515,46 @@ fn neugebauer_color_error_diffusion_runs_rgb() {
 }
 
 #[test]
+fn multichannel_green_noise_error_diffusion_runs_rgb() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    multichannel_green_noise_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("multichannel green-noise diffusion should succeed");
+
+    assert!(data
+        .iter()
+        .all(|&value| { matches!(value, 0 | 85 | 170 | 255) }));
+}
+
+#[test]
+fn multichannel_green_noise_error_diffusion_color_channel_invariants() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    multichannel_green_noise_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("multichannel green-noise diffusion should succeed");
+
+    let mut channel_nonzero = [false; 3];
+    let mut channel_not_full = [false; 3];
+    for px in data.chunks_exact(3) {
+        for channel in 0..3 {
+            channel_nonzero[channel] |= px[channel] > 0;
+            channel_not_full[channel] |= px[channel] < 255;
+            assert!(matches!(px[channel], 0 | 85 | 170 | 255));
+        }
+    }
+    assert!(channel_nonzero.iter().all(|&flag| flag));
+    assert!(channel_not_full.iter().all(|&flag| flag));
+}
+
+#[test]
 fn mbvq_color_error_diffusion_membership_invariant() {
     let source = rgb_gradient_8x8();
     let mut data = source.clone();
@@ -935,6 +976,23 @@ fn neugebauer_color_error_diffusion_rejects_gray_formats() {
         gray_result,
         Err(Error::UnsupportedFormat(
             "vector diffusion algorithms support Rgb and Rgba formats only"
+        ))
+    ));
+}
+
+#[test]
+fn multichannel_green_noise_error_diffusion_rejects_gray_formats() {
+    let mut gray = vec![128_u8; 4 * 4];
+    let mut gray_buffer =
+        dithr::gray_u8(&mut gray, 4, 4, 4).expect("valid buffer should construct");
+    let gray_result = multichannel_green_noise_error_diffusion_in_place(
+        &mut gray_buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    );
+    assert!(matches!(
+        gray_result,
+        Err(Error::UnsupportedFormat(
+            "multichannel green-noise error diffusion supports Rgb and Rgba formats only"
         ))
     ));
 }
@@ -1881,6 +1939,30 @@ fn neugebauer_color_error_diffusion_is_deterministic() {
 }
 
 #[test]
+fn multichannel_green_noise_error_diffusion_is_deterministic() {
+    let seed_data = rgb_gradient_8x8();
+    let mut a = seed_data.clone();
+    let mut b = seed_data;
+
+    let mut buffer_a = dithr::rgb_u8(&mut a, 8, 8, 24).expect("valid buffer should construct");
+    let mut buffer_b = dithr::rgb_u8(&mut b, 8, 8, 24).expect("valid buffer should construct");
+
+    multichannel_green_noise_error_diffusion_in_place(
+        &mut buffer_a,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("multichannel green-noise diffusion should succeed");
+    multichannel_green_noise_error_diffusion_in_place(
+        &mut buffer_b,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("multichannel green-noise diffusion should succeed");
+
+    assert_eq!(a, b);
+    assert_eq!(fnv1a64(&a), fnv1a64(&b));
+}
+
+#[test]
 fn block_error_diffusion_is_deterministic() {
     let seed_data = gray_ramp_16x16();
     let mut a = seed_data.clone();
@@ -1958,6 +2040,20 @@ fn neugebauer_color_error_diffusion_output_hash_stable() {
     .expect("neugebauer color diffusion should succeed");
 
     assert_eq!(fnv1a64(&data), 15_655_645_645_567_106_596_u64);
+}
+
+#[test]
+fn multichannel_green_noise_error_diffusion_output_hash_stable() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    multichannel_green_noise_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("multichannel green-noise diffusion should succeed");
+
+    assert_eq!(fnv1a64(&data), 8_387_199_595_912_073_184_u64);
 }
 
 #[test]
@@ -2182,6 +2278,24 @@ fn neugebauer_color_error_diffusion_preserves_rgba_alpha() {
         QuantizeMode::rgb_bits(2).expect("valid bit depth"),
     )
     .expect("neugebauer color diffusion should succeed");
+
+    let after_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
+    assert_eq!(before_alpha, after_alpha);
+}
+
+#[test]
+fn multichannel_green_noise_error_diffusion_preserves_rgba_alpha() {
+    let mut data: Vec<u8> = (0_u16..(16 * 16 * 4))
+        .map(|value| ((value * 61 + 17) % 256) as u8)
+        .collect();
+    let before_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
+    let mut buffer = dithr::rgba_u8(&mut data, 16, 16, 64).expect("valid buffer should construct");
+
+    multichannel_green_noise_error_diffusion_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    )
+    .expect("multichannel green-noise diffusion should succeed");
 
     let after_alpha: Vec<u8> = data.iter().skip(3).step_by(4).copied().collect();
     assert_eq!(before_alpha, after_alpha);

@@ -193,6 +193,7 @@
 //! - [`hierarchical_error_diffusion_in_place`]
 //! - `diffusion::mbvq_color_error_diffusion_in_place`
 //! - `diffusion::neugebauer_color_error_diffusion_in_place`
+//! - `diffusion::multichannel_green_noise_error_diffusion_in_place`
 //!
 //! Advanced halftoning:
 //!
@@ -229,6 +230,8 @@
 //! - `diffusion::mbvq_color_error_diffusion_in_place` and
 //!   `diffusion::neugebauer_color_error_diffusion_in_place` support `Rgb` and
 //!   `Rgba` layouts; alpha is preserved for `Rgba`.
+//! - `diffusion::multichannel_green_noise_error_diffusion_in_place` supports
+//!   `Rgb` and `Rgba` layouts; alpha is preserved for `Rgba`.
 //! - `diffusion::block_error_diffusion_in_place` is grayscale-only.
 //! - [`direct_binary_search_in_place`], [`lattice_boltzmann_in_place`], and
 //!   [`electrostatic_halftoning_in_place`] are integer grayscale-only.

@@ -348,6 +348,266 @@ pub fn neugebauer_color_error_diffusion_in_place<S: Sample, L: PixelLayout>(
     diffuse_color_vector(buffer, mode, ColorVectorAlgorithm::Neugebauer)
 }
 
+pub fn multichannel_green_noise_error_diffusion_in_place<S: Sample, L: PixelLayout>(
+    buffer: &mut Buffer<'_, S, L>,
+    mode: QuantizeMode<'_, S>,
+) -> Result<()> {
+    buffer.validate()?;
+
+    if !(L::COLOR_CHANNELS == 3 && (L::CHANNELS == 3 || L::CHANNELS == 4)) {
+        return Err(Error::UnsupportedFormat(
+            "multichannel green-noise error diffusion supports Rgb and Rgba formats only",
+        ));
+    }
+
+    let width = buffer.width;
+    let height = buffer.height;
+    let channels = L::CHANNELS;
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(Error::InvalidArgument("image dimensions overflow"))?;
+    let error_len = pixel_count
+        .checked_mul(4)
+        .ok_or(Error::InvalidArgument("error buffer size overflow"))?;
+    let mut errors = vec![0.0_f32; error_len];
+    let green_noise_maps = [
+        build_green_noise_map(width, height, GREEN_NOISE_COLOR_SEED_R)?,
+        build_green_noise_map(width, height, GREEN_NOISE_COLOR_SEED_G)?,
+        build_green_noise_map(width, height, GREEN_NOISE_COLOR_SEED_B)?,
+    ];
+
+    for y in 0..height {
+        let reverse = (y & 1) == 1;
+        let row = buffer.try_row_mut(y)?;
+
+        if reverse {
+            for x in (0..width).rev() {
+                let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
+                let end = offset
+                    .checked_add(channels)
+                    .ok_or(BufferError::OutOfBounds)?;
+                let pixel = row.get_mut(offset..end).ok_or(BufferError::OutOfBounds)?;
+                let err_idx = (y * width + x) * 4;
+                let err = [
+                    errors[err_idx],
+                    errors[err_idx + 1],
+                    errors[err_idx + 2],
+                    errors[err_idx + 3],
+                ];
+                let adjusted_unit = read_pixel_with_error::<S, L>(pixel, &err)?;
+                let idx = y * width + x;
+                let modulation = [
+                    green_noise_maps[0][idx],
+                    green_noise_maps[1][idx],
+                    green_noise_maps[2][idx],
+                ];
+                let thresholded_unit = [
+                    (adjusted_unit[0] + modulation[0] * GREEN_NOISE_THRESHOLD_AMPLITUDE)
+                        .clamp(0.0, 1.0),
+                    (adjusted_unit[1] + modulation[1] * GREEN_NOISE_THRESHOLD_AMPLITUDE)
+                        .clamp(0.0, 1.0),
+                    (adjusted_unit[2] + modulation[2] * GREEN_NOISE_THRESHOLD_AMPLITUDE)
+                        .clamp(0.0, 1.0),
+                    adjusted_unit[3],
+                ];
+                let thresholded = [
+                    S::from_unit_f32(thresholded_unit[0]),
+                    S::from_unit_f32(thresholded_unit[1]),
+                    S::from_unit_f32(thresholded_unit[2]),
+                    S::from_unit_f32(thresholded_unit[3]),
+                ];
+                let quantized = quantize_pixel::<S, L>(&thresholded[..channels], mode)?;
+                let quantized_unit = read_unit_pixel::<S, L>(&quantized[..channels])?;
+                write_quantized_pixel::<S, L>(pixel, quantized);
+
+                let residual = [
+                    adjusted_unit[0] - quantized_unit[0],
+                    adjusted_unit[1] - quantized_unit[1],
+                    adjusted_unit[2] - quantized_unit[2],
+                ];
+                let transformed =
+                    color_residual_matrix_apply(residual, MULTICHANNEL_GREEN_NOISE_MATRIX);
+                let scaled = [
+                    transformed[0]
+                        * (1.0 + modulation[0] * GREEN_NOISE_DIFFUSION_AMPLITUDE).clamp(0.8, 1.2),
+                    transformed[1]
+                        * (1.0 + modulation[1] * GREEN_NOISE_DIFFUSION_AMPLITUDE).clamp(0.8, 1.2),
+                    transformed[2]
+                        * (1.0 + modulation[2] * GREEN_NOISE_DIFFUSION_AMPLITUDE).clamp(0.8, 1.2),
+                ];
+                let xi = x as isize;
+                let yi = y as isize;
+
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi - 1,
+                    yi,
+                    [
+                        scaled[0] * VECTOR_ED_WEIGHT_FORWARD,
+                        scaled[1] * VECTOR_ED_WEIGHT_FORWARD,
+                        scaled[2] * VECTOR_ED_WEIGHT_FORWARD,
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi + 1,
+                    yi + 1,
+                    [
+                        scaled[0] * VECTOR_ED_WEIGHT_DOWN_DIAGONAL,
+                        scaled[1] * VECTOR_ED_WEIGHT_DOWN_DIAGONAL,
+                        scaled[2] * VECTOR_ED_WEIGHT_DOWN_DIAGONAL,
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi,
+                    yi + 1,
+                    [
+                        scaled[0] * VECTOR_ED_WEIGHT_DOWN,
+                        scaled[1] * VECTOR_ED_WEIGHT_DOWN,
+                        scaled[2] * VECTOR_ED_WEIGHT_DOWN,
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi - 1,
+                    yi + 1,
+                    [
+                        scaled[0] * VECTOR_ED_WEIGHT_DOWN_FORWARD,
+                        scaled[1] * VECTOR_ED_WEIGHT_DOWN_FORWARD,
+                        scaled[2] * VECTOR_ED_WEIGHT_DOWN_FORWARD,
+                        0.0,
+                    ],
+                );
+            }
+        } else {
+            for x in 0..width {
+                let offset = x.checked_mul(channels).ok_or(BufferError::OutOfBounds)?;
+                let end = offset
+                    .checked_add(channels)
+                    .ok_or(BufferError::OutOfBounds)?;
+                let pixel = row.get_mut(offset..end).ok_or(BufferError::OutOfBounds)?;
+                let err_idx = (y * width + x) * 4;
+                let err = [
+                    errors[err_idx],
+                    errors[err_idx + 1],
+                    errors[err_idx + 2],
+                    errors[err_idx + 3],
+                ];
+                let adjusted_unit = read_pixel_with_error::<S, L>(pixel, &err)?;
+                let idx = y * width + x;
+                let modulation = [
+                    green_noise_maps[0][idx],
+                    green_noise_maps[1][idx],
+                    green_noise_maps[2][idx],
+                ];
+                let thresholded_unit = [
+                    (adjusted_unit[0] + modulation[0] * GREEN_NOISE_THRESHOLD_AMPLITUDE)
+                        .clamp(0.0, 1.0),
+                    (adjusted_unit[1] + modulation[1] * GREEN_NOISE_THRESHOLD_AMPLITUDE)
+                        .clamp(0.0, 1.0),
+                    (adjusted_unit[2] + modulation[2] * GREEN_NOISE_THRESHOLD_AMPLITUDE)
+                        .clamp(0.0, 1.0),
+                    adjusted_unit[3],
+                ];
+                let thresholded = [
+                    S::from_unit_f32(thresholded_unit[0]),
+                    S::from_unit_f32(thresholded_unit[1]),
+                    S::from_unit_f32(thresholded_unit[2]),
+                    S::from_unit_f32(thresholded_unit[3]),
+                ];
+                let quantized = quantize_pixel::<S, L>(&thresholded[..channels], mode)?;
+                let quantized_unit = read_unit_pixel::<S, L>(&quantized[..channels])?;
+                write_quantized_pixel::<S, L>(pixel, quantized);
+
+                let residual = [
+                    adjusted_unit[0] - quantized_unit[0],
+                    adjusted_unit[1] - quantized_unit[1],
+                    adjusted_unit[2] - quantized_unit[2],
+                ];
+                let transformed =
+                    color_residual_matrix_apply(residual, MULTICHANNEL_GREEN_NOISE_MATRIX);
+                let scaled = [
+                    transformed[0]
+                        * (1.0 + modulation[0] * GREEN_NOISE_DIFFUSION_AMPLITUDE).clamp(0.8, 1.2),
+                    transformed[1]
+                        * (1.0 + modulation[1] * GREEN_NOISE_DIFFUSION_AMPLITUDE).clamp(0.8, 1.2),
+                    transformed[2]
+                        * (1.0 + modulation[2] * GREEN_NOISE_DIFFUSION_AMPLITUDE).clamp(0.8, 1.2),
+                ];
+                let xi = x as isize;
+                let yi = y as isize;
+
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi + 1,
+                    yi,
+                    [
+                        scaled[0] * VECTOR_ED_WEIGHT_FORWARD,
+                        scaled[1] * VECTOR_ED_WEIGHT_FORWARD,
+                        scaled[2] * VECTOR_ED_WEIGHT_FORWARD,
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi - 1,
+                    yi + 1,
+                    [
+                        scaled[0] * VECTOR_ED_WEIGHT_DOWN_DIAGONAL,
+                        scaled[1] * VECTOR_ED_WEIGHT_DOWN_DIAGONAL,
+                        scaled[2] * VECTOR_ED_WEIGHT_DOWN_DIAGONAL,
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi,
+                    yi + 1,
+                    [
+                        scaled[0] * VECTOR_ED_WEIGHT_DOWN,
+                        scaled[1] * VECTOR_ED_WEIGHT_DOWN,
+                        scaled[2] * VECTOR_ED_WEIGHT_DOWN,
+                        0.0,
+                    ],
+                );
+                diffuse_error_forward::<L>(
+                    &mut errors,
+                    width,
+                    height,
+                    xi + 1,
+                    yi + 1,
+                    [
+                        scaled[0] * VECTOR_ED_WEIGHT_DOWN_FORWARD,
+                        scaled[1] * VECTOR_ED_WEIGHT_DOWN_FORWARD,
+                        scaled[2] * VECTOR_ED_WEIGHT_DOWN_FORWARD,
+                        0.0,
+                    ],
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn diffuse_color_vector<S: Sample, L: PixelLayout>(
     buffer: &mut Buffer<'_, S, L>,
     mode: QuantizeMode<'_, S>,
@@ -830,6 +1090,9 @@ struct MultiscaleLevel {
 }
 
 const GREEN_NOISE_BASE_SEED: u64 = 0xD1B5_4A32_7C6E_9F01;
+const GREEN_NOISE_COLOR_SEED_R: u64 = GREEN_NOISE_BASE_SEED ^ 0x54A3_0F15_9C71_2D83;
+const GREEN_NOISE_COLOR_SEED_G: u64 = GREEN_NOISE_BASE_SEED ^ 0xA8D6_1E2A_38E2_5B06;
+const GREEN_NOISE_COLOR_SEED_B: u64 = GREEN_NOISE_BASE_SEED ^ 0xFC89_2D3F_D553_8889;
 const GREEN_NOISE_SMALL_RADIUS: usize = 1;
 const GREEN_NOISE_LARGE_RADIUS: usize = 3;
 const GREEN_NOISE_THRESHOLD_AMPLITUDE: f32 = 0.0625;
@@ -856,6 +1119,8 @@ const MBVQ_COLOR_DIFFUSION_MATRIX: [[f32; 3]; 3] =
 const NEUGEBAUER_COLOR_DIFFUSION_MATRIX: [[f32; 3]; 3] =
     [[0.82, 0.12, 0.06], [0.12, 0.82, 0.06], [0.10, 0.10, 0.82]];
 const NEUGEBAUER_DISTANCE_WEIGHTS: [f32; 3] = [0.299, 0.587, 0.114];
+const MULTICHANNEL_GREEN_NOISE_MATRIX: [[f32; 3]; 3] =
+    [[0.84, 0.08, 0.08], [0.08, 0.84, 0.08], [0.08, 0.08, 0.84]];
 const HIERARCHICAL_COLOR_SEQUENCE: [[usize; 3]; 4] = [[0, 1, 2], [1, 2, 0], [2, 0, 1], [0, 2, 1]];
 const HIERARCHICAL_BASE_WEIGHT: f32 = 0.56;
 const HIERARCHICAL_MEDIUM_WEIGHT: f32 = 0.30;

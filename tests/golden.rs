@@ -27,12 +27,12 @@ use dithr::diffusion::{
 };
 use dithr::dot_diffusion::{knuth_dot_diffusion_in_place, optimized_dot_diffusion_in_place};
 use dithr::ordered::{
-    adaptive_ordered_dither_in_place, bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place,
-    bayer_8x8_in_place, cluster_dot_4x4_in_place, cluster_dot_8x8_in_place,
-    custom_ordered_in_place, image_based_dither_screen_in_place, polyomino_ordered_dither_in_place,
-    ranked_dither_in_place, space_filling_curve_ordered_dither_in_place,
-    stochastic_clustered_dot_in_place, void_and_cluster_in_place, yliluoma_1_in_place,
-    yliluoma_2_in_place, yliluoma_3_in_place,
+    adaptive_ordered_dither_in_place, am_fm_hybrid_halftoning_in_place, bayer_16x16_in_place,
+    bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place, cluster_dot_4x4_in_place,
+    cluster_dot_8x8_in_place, clustered_am_fm_halftoning_in_place, custom_ordered_in_place,
+    image_based_dither_screen_in_place, polyomino_ordered_dither_in_place, ranked_dither_in_place,
+    space_filling_curve_ordered_dither_in_place, stochastic_clustered_dot_in_place,
+    void_and_cluster_in_place, yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
 };
 use dithr::riemersma::riemersma_in_place;
 use dithr::stochastic::{random_binary_in_place, threshold_binary_in_place};
@@ -270,6 +270,34 @@ fn golden_stochastic_clustered_dot_gray_ramp_16x16() {
     .expect("stochastic clustered-dot should succeed");
 
     assert_eq!(fnv1a64(&data), 1_940_931_942_480_500_182_u64);
+}
+
+#[test]
+fn golden_am_fm_hybrid_halftoning_gray_ramp_16x16() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    am_fm_hybrid_halftoning_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("am/fm hybrid halftoning should succeed");
+
+    assert_eq!(fnv1a64(&data), 6_423_847_279_977_571_159_u64);
+}
+
+#[test]
+fn golden_clustered_am_fm_halftoning_gray_ramp_16x16() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    clustered_am_fm_halftoning_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("clustered am/fm halftoning should succeed");
+
+    assert_eq!(fnv1a64(&data), 11_742_863_478_066_401_925_u64);
 }
 
 #[test]

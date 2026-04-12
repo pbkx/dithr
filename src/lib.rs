@@ -145,6 +145,8 @@
 //! - Image-based dither screens: `ordered::image_based_dither_screen_in_place`
 //! - Polyomino ordered: `ordered::polyomino_ordered_dither_in_place`
 //! - Stochastic clustered-dot: `ordered::stochastic_clustered_dot_in_place`
+//! - AM/FM hybrid halftoning: `ordered::am_fm_hybrid_halftoning_in_place`
+//! - Clustered AM/FM halftoning: `ordered::clustered_am_fm_halftoning_in_place`
 //!
 //! Palette-oriented ordered (Yliluoma):
 //!
@@ -233,6 +235,8 @@
 //! - `diffusion::multichannel_green_noise_error_diffusion_in_place` supports
 //!   `Rgb` and `Rgba` layouts; alpha is preserved for `Rgba`.
 //! - `diffusion::block_error_diffusion_in_place` is grayscale-only.
+//! - `ordered::am_fm_hybrid_halftoning_in_place` and
+//!   `ordered::clustered_am_fm_halftoning_in_place` are grayscale-only.
 //! - [`direct_binary_search_in_place`], [`lattice_boltzmann_in_place`], and
 //!   [`electrostatic_halftoning_in_place`] are integer grayscale-only.
 //! - [`model_based_med_in_place`] and [`least_squares_model_based_in_place`]

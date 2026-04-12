@@ -10,12 +10,12 @@ use dithr::data::{
     generate_bayer_16x16, BAYER_2X2, BAYER_4X4, BAYER_8X8, CLUSTER_DOT_4X4, CLUSTER_DOT_8X8,
 };
 use dithr::ordered::{
-    adaptive_ordered_dither_in_place, bayer_16x16_in_place, bayer_2x2_in_place, bayer_4x4_in_place,
-    bayer_8x8_in_place, cluster_dot_4x4_in_place, cluster_dot_8x8_in_place,
-    custom_ordered_in_place, image_based_dither_screen_in_place, polyomino_ordered_dither_in_place,
-    ranked_dither_in_place, space_filling_curve_ordered_dither_in_place,
-    stochastic_clustered_dot_in_place, void_and_cluster_in_place, yliluoma_1_in_place,
-    yliluoma_2_in_place, yliluoma_3_in_place,
+    adaptive_ordered_dither_in_place, am_fm_hybrid_halftoning_in_place, bayer_16x16_in_place,
+    bayer_2x2_in_place, bayer_4x4_in_place, bayer_8x8_in_place, cluster_dot_4x4_in_place,
+    cluster_dot_8x8_in_place, clustered_am_fm_halftoning_in_place, custom_ordered_in_place,
+    image_based_dither_screen_in_place, polyomino_ordered_dither_in_place, ranked_dither_in_place,
+    space_filling_curve_ordered_dither_in_place, stochastic_clustered_dot_in_place,
+    void_and_cluster_in_place, yliluoma_1_in_place, yliluoma_2_in_place, yliluoma_3_in_place,
 };
 #[cfg(feature = "rayon")]
 use dithr::ordered::{yliluoma_1_in_place_par, yliluoma_2_in_place_par, yliluoma_3_in_place_par};
@@ -598,6 +598,168 @@ fn stochastic_clustered_dot_generated_screen_is_deterministic() {
 
     assert_eq!(data_a, data_b);
     assert_eq!(fnv1a64(&data_a), 15_527_226_259_204_765_055_u64);
+}
+
+#[test]
+fn am_fm_hybrid_halftoning_runs_and_quantizes_u8() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    am_fm_hybrid_halftoning_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("am/fm hybrid halftoning should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn am_fm_hybrid_halftoning_u16_binary_invariant() {
+    let mut data = gray_ramp_8x8_u16();
+    let mut buffer = dithr::gray_u16(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    am_fm_hybrid_halftoning_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("am/fm hybrid halftoning should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+}
+
+#[test]
+fn am_fm_hybrid_halftoning_f32_binary_invariant() {
+    let mut data: Vec<f32> = (0..(8 * 8))
+        .map(|index| index as f32 / ((8 * 8 - 1) as f32))
+        .collect();
+    let mut buffer = dithr::gray_32f(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    am_fm_hybrid_halftoning_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("am/fm hybrid halftoning should succeed");
+
+    assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
+}
+
+#[test]
+fn am_fm_hybrid_halftoning_rejects_non_gray_layout() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    let result = am_fm_hybrid_halftoning_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    );
+
+    assert_eq!(
+        result,
+        Err(Error::UnsupportedFormat(
+            "AM/FM hybrid halftoning supports Gray layouts only"
+        ))
+    );
+}
+
+#[test]
+fn am_fm_hybrid_halftoning_is_deterministic() {
+    let mut data_a = vec![127_u8; 16 * 16];
+    let mut data_b = vec![127_u8; 16 * 16];
+
+    let mut buffer_a =
+        dithr::gray_u8(&mut data_a, 16, 16, 16).expect("valid buffer should construct");
+    let mut buffer_b =
+        dithr::gray_u8(&mut data_b, 16, 16, 16).expect("valid buffer should construct");
+
+    am_fm_hybrid_halftoning_in_place(
+        &mut buffer_a,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("am/fm hybrid halftoning should succeed");
+    am_fm_hybrid_halftoning_in_place(
+        &mut buffer_b,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("am/fm hybrid halftoning should succeed");
+
+    assert_eq!(data_a, data_b);
+    assert_eq!(fnv1a64(&data_a), 15_927_645_420_284_732_981_u64);
+}
+
+#[test]
+fn clustered_am_fm_halftoning_runs_and_quantizes_u8() {
+    let mut data = gray_ramp_16x16();
+    let mut buffer = dithr::gray_u8(&mut data, 16, 16, 16).expect("valid buffer should construct");
+
+    clustered_am_fm_halftoning_in_place(
+        &mut buffer,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("clustered am/fm halftoning should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 255));
+}
+
+#[test]
+fn clustered_am_fm_halftoning_u16_binary_invariant() {
+    let mut data = gray_ramp_8x8_u16();
+    let mut buffer = dithr::gray_u16(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    clustered_am_fm_halftoning_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("clustered am/fm halftoning should succeed");
+
+    assert!(data.iter().all(|&value| value == 0 || value == 65_535));
+}
+
+#[test]
+fn clustered_am_fm_halftoning_f32_binary_invariant() {
+    let mut data: Vec<f32> = (0..(8 * 8))
+        .map(|index| index as f32 / ((8 * 8 - 1) as f32))
+        .collect();
+    let mut buffer = dithr::gray_32f(&mut data, 8, 8, 8).expect("valid buffer should construct");
+
+    clustered_am_fm_halftoning_in_place(&mut buffer, QuantizeMode::GrayLevels(2))
+        .expect("clustered am/fm halftoning should succeed");
+
+    assert!(data.iter().all(|&value| value == 0.0 || value == 1.0));
+}
+
+#[test]
+fn clustered_am_fm_halftoning_rejects_non_gray_layout() {
+    let mut data = rgb_gradient_8x8();
+    let mut buffer = dithr::rgb_u8(&mut data, 8, 8, 24).expect("valid buffer should construct");
+
+    let result = clustered_am_fm_halftoning_in_place(
+        &mut buffer,
+        QuantizeMode::rgb_bits(2).expect("valid bit depth"),
+    );
+
+    assert_eq!(
+        result,
+        Err(Error::UnsupportedFormat(
+            "clustered AM/FM halftoning supports Gray layouts only"
+        ))
+    );
+}
+
+#[test]
+fn clustered_am_fm_halftoning_is_deterministic() {
+    let mut data_a = vec![127_u8; 16 * 16];
+    let mut data_b = vec![127_u8; 16 * 16];
+
+    let mut buffer_a =
+        dithr::gray_u8(&mut data_a, 16, 16, 16).expect("valid buffer should construct");
+    let mut buffer_b =
+        dithr::gray_u8(&mut data_b, 16, 16, 16).expect("valid buffer should construct");
+
+    clustered_am_fm_halftoning_in_place(
+        &mut buffer_a,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("clustered am/fm halftoning should succeed");
+    clustered_am_fm_halftoning_in_place(
+        &mut buffer_b,
+        QuantizeMode::gray_bits(1).expect("valid bit depth"),
+    )
+    .expect("clustered am/fm halftoning should succeed");
+
+    assert_eq!(data_a, data_b);
+    assert_eq!(fnv1a64(&data_a), 423_163_558_945_169_899_u64);
 }
 
 #[test]

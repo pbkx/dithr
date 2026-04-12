@@ -187,6 +187,8 @@ Custom map:
 - `image_based_dither_screen_in_place`
 - `polyomino_ordered_dither_in_place`
 - `stochastic_clustered_dot_in_place`
+- `am_fm_hybrid_halftoning_in_place`
+- `clustered_am_fm_halftoning_in_place`
 
 Parallel variants (`rayon` feature):
 
@@ -449,6 +451,8 @@ cargo test --doc --all-features
 - Core processing is in-memory and buffer-first; it does not provide general
   image editing workflows.
 - Not every algorithm supports every format/layout/sample combination.
+- `am_fm_hybrid_halftoning_in_place` and
+  `clustered_am_fm_halftoning_in_place` are grayscale-only.
 - Variable diffusion methods are grayscale-only except
   `adaptive_vector_error_diffusion_in_place`,
   `vector_error_diffusion_in_place`,
@@ -519,6 +523,8 @@ cargo test --doc --all-features
 - Image-based dither screens: <https://graphicsinterface.org/wp-content/uploads/gi1999-22.pdf>, <https://doi.org/10.20380/GI1999.22>
 - Polyomino-based digital halftoning: <https://arxiv.org/abs/0812.1647>, <https://doi.org/10.48550/arXiv.0812.1647>
 - Stochastic clustered-dot dithering: <https://perso.liris.cnrs.fr/victor.ostromoukhov/publications/pdf/SPIE99_StochasticClust.pdf>, <https://pubmed.ncbi.nlm.nih.gov/18255440/>
+- AM/FM hybrid halftoning: <https://engineering.purdue.edu/~bouman/publications/orig-pdf/jei8.pdf>, <https://doi.org/10.1117/12.643690>
+- Clustered AM/FM halftoning: <https://doi.org/10.2352/ISSN.2169-4451.2004.20.1.art00025_2>, <https://dblp.org/db/conf/clrimg/clrimg2006.html>
 - Clustered-dot direct multibit search: <https://pubmed.ncbi.nlm.nih.gov/28113172/>, <https://doi.org/10.1109/TIP.2016.2552723>, <https://research.ibm.com/publications/hybrid-halftoning-using-direct-multi-bit-search-dms-screen-algorithm>
 - Direct pattern control halftoning: <https://pubmed.ncbi.nlm.nih.gov/28613170/>, <https://doi.org/10.1109/TIP.2017.2713939>, <https://cv.ulichney.com/papers/2017-PARAWACS-IEEE.pdf>
 - Hierarchical colorant DBS (MBVQ-guided): <https://pubmed.ncbi.nlm.nih.gov/20236895/>, <https://doi.org/10.1109/TIP.2010.2045690>, <https://pubmed.ncbi.nlm.nih.gov/28613170/>
